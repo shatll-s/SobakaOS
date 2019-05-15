@@ -7,13 +7,13 @@ At first I must say - it is very simple OS, there aren`t so many features like i
 Initial setup is simple - register on (https://sobaka.group), download the image, unpack, write it on ssd (I like Etcher), write in the settings file rig number and password, optional wifi ssid/password. After that, stick the SSD into the rig and everything should start.
 Further management is made through the site.
 
-###Some technical info:
+#### Some technical info:
 - system Ubuntu 18.04
 - kernel 4.17
 - NVIDIA driver 415.27
 - AMD driver 18.50
 
-###Supported miners:
+#### Supported miners:
 - Claymore
 - Phoenix Miner
 - EWBF
@@ -36,7 +36,7 @@ Further management is made through the site.
 - Team Red Miner AMD
 - CryptoDredge NVIDIA
 
-###Telegram notifications
+#### Telegram notifications
 
 
 There are notifications in Telegram, you should send the command /start 12345678 to the bot (change 12345678 to your code, visible on the user settings page or the farm settings page).
