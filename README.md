@@ -46,3 +46,4 @@ The system is absolutely free. There are no hidden miners on the cpu, etc. Try &
 
 [image]:(https://sobaka.group/downloads/other/screenshot_3.png)
 [image2]: https://sobaka.group/downloads/other/screenshot_4.png
+![Image alt](https://github.com/{username}/{repository}/raw/{branch}/service/dog.jpg)
