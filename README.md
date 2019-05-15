@@ -44,5 +44,5 @@ Rigs can be organized in a farm with collective access or simply delimit on some
 
 The system is absolutely free. There are no hidden miners on the cpu, etc. Try & check.
 
-[image]: (https://sobaka.group/downloads/other/screenshot_3.png)
+![image]: (https://sobaka.group/downloads/other/screenshot_3.png)
 [image2]: https://sobaka.group/downloads/other/screenshot_4.png
