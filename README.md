@@ -45,4 +45,4 @@ Rigs can be organized in a farm with collective access or simply delimit on some
 The system is absolutely free. There are no hidden miners on the cpu, etc. Try & check.
 
 ![Screenshot: Monitoring](https://github.com/shatll-s/SobakaOS/raw/master/share/screenshot_3.png)
-![Screenshot: Rig](https://github.com/shatll-s/SobakaOS/raw/master/share/screenshot_3.png)
+![Screenshot: Rig](https://github.com/shatll-s/SobakaOS/raw/master/share/screenshot_4.png)
