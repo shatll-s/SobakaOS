@@ -4,7 +4,7 @@ Hello everyone!
 **SobakaOS** is GPU mining platform.
 At first I must say - it is very simple OS, there aren`t so many features like in cool systems like smos, hive, etc. Maybe something is not working properly because I tested it only on my and friendly rigs (mostly 470/480/570/580, 1060/1070/1080/1080ti, no VEGA or RTX).
 
-Initial setup is simple - register on (https://sobaka.group), download the image, unpack, write it on ssd (I like Etcher), write in the settings file rig number and password, optional wifi ssid/password. After that, stick the SSD into the rig and everything should start.
+Initial setup is simple - register on https://sobaka.group, download the image, unpack, write it on ssd (I like Etcher), write in the settings file rig number and password, optional wifi ssid/password. After that, stick the SSD into the rig and everything should start.
 Further management is made through the site.
 
 #### Some technical info
