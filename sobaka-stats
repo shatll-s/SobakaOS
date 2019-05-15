@@ -236,6 +236,10 @@ case $1 in
 	;;
 	nanominer)
 		#miner_ver=`echo $stats_template | jq -r '.[0]'` #no miner version in API
+		[[ $miner1 == "nanominer" ]] && batch='/tmp/batch1' || batch='/tmp/batch2'
+		manifest=`cat $batch`
+		[[ `echo $manifest | jq ".fork"` != null ]]	&& miner_ver=`echo $manifest | jq -r ".fork"`
+
 		local stats_template=$(curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET '127.0.0.1:9090/stats')
 		miner_online_raw=`echo $stats_template | jq -r '.WorkTime'`
 		if (($miner_online_raw)); then
