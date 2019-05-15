@@ -1,0 +1,109 @@
+#!/bin/bash
+[ -t 1 ] && . colors
+
+function nvidia_stop () {
+	try_count=3
+	[[ ! -z $1 ]] && try_count=$1
+	echo -e "${CYAN}> Stoping services${WHITE}"
+	#echo 1 > /tmp/nvidia_stop
+
+	for (( i=0; i < $try_count; i++ ))
+	do
+		wd stop > /dev/null 2>&1
+		systemctl stop sobaka 
+		systemctl stop sobakax #> /dev/null 2>&1
+		killall -9 xinit > /dev/null 2>&1
+		rmmod -f nvidia_uvm > /dev/null 2>&1
+		rmmod -f nvidia_drm > /dev/null 2>&1
+		rmmod -f nvidia_modeset > /dev/null 2>&1
+		rmmod -f nvidia > /dev/null 2>&1
+		sleep 1
+		count_nvidia=`lsmod | grep -c nvidia`
+		if [[ $count_nvidia -eq 0 ]]; then
+			echo -e "${GREEN}> Unload modules successfull${WHITE}"
+			return 0
+		fi
+	done
+	echo -e "${RED}> Unload modules failed${WHITE}"
+	return 1
+}
+
+function nvidia_start () {
+	#rm /tmp/nvidia_stop > /dev/null 2>&1
+	echo -e "${CYAN}> Turning all services on${WHITE}"
+	systemctl start sobakax #> /dev/null 2>&1
+	sleep 10
+	systemctl start sobaka
+	systemctl start sobaka-wd
+}
+
+function nvidia_install () {
+	url=$1
+
+	if [[ -z $url ]]; then
+		echo -e "${CYAN}> Getting the latest version${WHITE}"
+		versions_url="https://sobaka.group/downloads/drivers/driver_versions.txt"
+		versions=`curl -sLk $versions_url`
+		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && return 1
+		eval "$versions"
+		echo -e "The latest stable Nvidia driver version: ${GREEN}${LATEST_NVIDIA}${WHITE}"
+		url="https://sobaka.group/downloads/drivers/${LATEST_NVIDIA}"
+	fi
+
+	cd "/sobaka/downloads"
+	driver_name=`basename $url`
+
+	if [[ -e ./$driver_name ]]; then
+		echo -e "${CYAN}> Driver $driver_name is already downloaded${WHITE}"
+	else
+		echo -e "${CYAN}> Downloading $url${WHITE}"
+		wget -c $url -O "/sobaka/downloads/$driver_name" #`[ -t 0 ] && echo '--no-verbose'`
+		[[ $? -ne 0 ]] && echo -e "${RED}Error downloading driver${WHITE}" && exit 1
+	fi
+
+
+	#driver_name="/sobaka/downloads/NVIDIA-Linux-x86_64-418.56.run"
+	#chmod 700 "$driver_name"
+	echo -e "${CYAN}> Installing${WHITE}"
+	apt update
+	apt-get install -y dkms
+	sh "$driver_name" --accept-license --no-questions --ui=none --install-libglvnd --dkms 
+	exitcode=$?
+
+	if [[ $exitcode -eq 0 ]]; then
+			echo -e ""
+			echo -e "${CYAN}> Updating nvidia-settings${WHITE}"
+			apt update
+			nvidia_settings_version=`dpkg -s nvidia-settings 2>&1 | grep '^Version: ' | sed 's/Version: //'`
+			if [[ -z "$nvidia_settings_version" ]]; then
+				echo -e "nvidia-setting is not installed, installing"
+				apt-get install --reinstall -y nvidia-settings
+			else
+				echo -e "nvidia-setting is installed, upgrading"
+				apt-get install --only-upgrade --reinstall -y nvidia-settings
+			fi
+	else
+		echo -e "${RED}Error installing driver${WHITE}" && exit 1
+	fi
+}
+
+case $1 in
+	nvidia)
+		nvidia_stop
+		nvidia_install $2
+		nvidia_start
+		echo -e "${GREEN}Installation complete, reboot please${WHITE}"
+	;;
+	nvidia_stop)
+		nvidia_stop
+	;;
+	amd)
+		echo "Coming in new updates..."
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname nvidia|nvidia_stop|amd${WHITE}"
+		echo "e.g. driver-update nvidia (update to latest version)"
+		echo "e.g. driver-update nvidia http://ru.download.nvidia.com/XFree86/Linux-x86_64/418.56/NVIDIA-Linux-x86_64-418.56.run"
+	;;
+esac

@@ -1,0 +1,60 @@
+#!/bin/bash
+#variables
+[ -t 1 ] && . colors #source colors only if running in terminal
+VERSION_FILE='/sobaka/cfg/miner_versions.json'
+RIG_CFG="/sobaka/cfg/rig.cfg"
+
+[[ ! -f $VERSION_FILE ]] && echo "{}" > $VERSION_FILE
+miner_ver=`cat $VERSION_FILE`
+[[ -z $miner_ver ]] && miner_ver="{}"
+#echo $miner_ver | jq '.'
+
+bname=`basename $0`
+if [[ ! $1 || ! $2 ]]; then
+	echo -en "No miner or miner version is set\nUsage: ${CYAN}$bname miner version${WHITE}"
+	echo ", e.g. getminer gminer 1.36"
+	exit 1
+fi
+
+miner=$1
+ver=$2
+
+function getminer () {
+
+	[[ ! -f $RIG_CFG ]] && echo -e "${RED}There is no $RIG_CFG. Exiting...${WHITE}" && exit 1
+	. $RIG_CFG
+	[[ -z $HOST ]] && echo -e "${RED}Host is not set in $RIG_CFG. Exiting...${WHITE}" && exit 1
+	file="$miner@$ver.tar.gz"	
+	link=`echo $HOST | sed "s/message\.php/downloads\/miners\/$file/"`
+	cd /tmp
+	wget -q $link -O $file
+	if [[ $? -ne 0 ]]; then
+		echo -e "${RED}No file ${GREEN}$link${RED} on server. Exiting...${WHITE}"
+		msg "Miner download" warning "$(date --rfc-3339=seconds)\nError occured while downloading <b>$miner $ver</b>.<br>No file on server."
+		exit 1
+	else
+		echo -e "${GREEN}$miner $ver downloaded${WHITE}"
+	fi
+	folder="/sobaka/miners/$miner/$ver/"
+	[[ ! -d $folder ]] && echo -e "No folder ${GREEN}$folder${WHITE}, creating..." && mkdir -p $folder
+	tar -xf $file -C $folder
+	if [[ $? -ne 0 ]]; then
+		echo -e "${RED}Problem while extracting ${GREEN}$file${RED}. Exiting...${WHITE}"
+		msg "Miner download" warning "$(date --rfc-3339=seconds)\nError occured while trying to install <b>$miner $ver</b>.<br>Something wrong with install packet."
+		exit 1
+	fi
+	
+	[[ `echo $miner_ver | jq -r ".\"$miner\""` == null ]] && miner_ver=`jq ". + { \"$miner\": {} }" <<< "$miner_ver"`
+	miner_ver=`jq ".\"$miner\" += {\"$ver\" : \"\"}" <<< "$miner_ver"`
+	echo -e $miner_ver | jq '.' > $VERSION_FILE
+	echo "Miner added to $VERSION_FILE"
+	msg "Miner download" success "$(date --rfc-3339=seconds)\nNew miner <b>$miner $ver</b> successfully downloaded and installed in system."
+}
+
+if [[ ! -z $miner_ver && `echo $miner_ver | jq -r ".\"$miner\".\"$ver\""` != null ]]; then
+	echo -e "Miner ${GREEN}$miner $ver${WHITE} is already in system"
+	[[ $3 == "-f" ]] && echo "But you want to re-install it" && getminer
+else
+	echo -e "There is no ${GREEN}$miner $ver${WHITE} in system"
+	getminer
+fi

@@ -1,0 +1,47 @@
+#!/bin/bash
+[ -t 1 ] && . colors #source colors only if running in terminal
+
+n=$(gpu-detect AMD)
+if [ $n == 0 ]; then
+	echo "There are no AMD GPU detected, exiting"
+	exit
+fi
+echo -e "$n "$LIGHTRED"AMD"$WHITE" GPU detected "$(date --rfc-3339=seconds)"\n"
+core_addr=(`ls -d /sys/class/drm/card?/device/hwmon/hwmon? | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+
+for  ((i=0; i < $n; i++)); do
+	card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9]*\)\/device/\1/')
+	fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+    temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
+    temp[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is something like 65000
+    fan_raw[$i]=`cat "${fan_addr[$i]}/pwm1"`
+	let fan[$i]=${fan_raw[$i]}*100/255
+	#First line: PCI bus, address, temp, fan
+	echo -e $CYAN"GPU $LIGHTCYAN$i$WHITE$CYAN `cat "${core_addr[$i]}/uevent" | grep "PCI_SLOT_NAME" | sed 's/PCI_SLOT_NAME=//'`," \
+	"${core_addr[$i]}," \
+	$CYAN"Temp$LIGHTCYAN ${temp[$i]}$WHITE$CYAN, Fan$LIGHTCYAN ${fan[$i]}"$WHITE
+
+	#Second line: Core state, mem state
+	echo -e $CYAN"Core state "$LIGHTCYAN`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed 's/*//'` \
+	$WHITE$CYAN"("`cat "${core_addr[$i]}/power_dpm_force_performance_level"`"), " \
+	$CYAN"Mem state "$LIGHTCYAN`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed 's/*//'`"\n"$WHITE
+	
+	#Core clocks (cut, change place, etc)
+	echo -e $CYAN"State\tCore\tVoltage\t\tVolt.state"$WHITE \
+	$(wolfamdctrl -i $card --show-core | grep "DPM" -A3) \
+	| sed -e 's/VDDC\: /V/g; s/ (voltage table entry /\t\tV/g' \
+	| sed -e 's/) VDDC offset: [-0-9]* Core clock: / /g' \
+	| sed -e 's/DPM state /P/g; s/\: /\t/g' \
+	| sed 's/\(P[0-9]*\t\)\(V[0-9]*\t\tV[0-9]*\) \([0-9]*\)/\n\1\3 \t\2/g; s/ P/P/g'
+
+	#Mem clocks
+	echo -e $CYAN"Memory clocks:$WHITE"$(wolfamdctrl -i $card --show-mem | grep "Memory clock" | sed 's/Memory clock\:/\\t/g' )
+	$LINE
+done
+
+
+
+
+
+
+

@@ -1,0 +1,244 @@
+#!/bin/bash
+API_TIMEOUT=10
+RIG_CFG="/sobaka/cfg/rig.cfg"
+NVIDIASMI_FILE=/tmp/nvidiasmi #need to get some info from nvidia-smi
+AMDMEMINFO_FILE=/tmp/amdmeminfo
+[ -t 1 ] && . colors
+
+. $RIG_CFG
+export DISPLAY=":0"
+
+###########################################################################################
+#get first stats from system and miner, send to host, receive answer with comands 		  #
+###########################################################################################
+function firststats {
+
+core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
+for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
+	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
+done
+
+IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
+unset IFS
+
+for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
+	for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
+		[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
+	done
+done
+
+for (( i=0; i < ${#core_addr[@]}; i++ )); do
+	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
+		[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
+		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
+		local gpu_info[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5; print ","; print $4 }')
+		gpu_info[$i]=$(echo ${gpu_info[$i]} | sed 's/ ,/,/')
+		gpu_brand[$i]="A"
+	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
+	[[ ! -f $NVIDIASMI_FILE ]] &&
+		nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader > $NVIDIASMI_FILE
+		local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
+		local gpu_name[$i]=`awk -F ', ' '{print $2}' <<< $nvidiainfo`
+		local gpu_info[$i]=`awk -F ', ' '{print $6$7$8 }' <<< $nvidiainfo`
+		gpu_info[$i]="Power Limit (min/default/max): "$(echo ${gpu_info[$i]} | sed -e 's/\.00//g; s/ W/\//g; s/\/$/ W/')
+		local gpu_brand[$i]="N"
+	else #GPU is INTEL
+		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
+		local gpu_brand[$i]="I"
+	fi
+	#echo "Name: "${gpu_name[$i]}", Bus "${gpu_busid_sys[$i]} #no need
+done
+
+##################################################################
+#making json array of GPU names
+local rig_gpu_name_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local rig_gpu_name_json=$(jq -n --arg data "$rig_gpu_name_json" \
+        	--arg key "$i" \
+        	--arg value "${gpu_name[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+#making json array of GPU info
+local rig_gpu_info_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local rig_gpu_info_json=$(jq -n --arg data "$rig_gpu_info_json" \
+      	--arg key "$i" \
+    	--arg value "${gpu_info[$i]}" \
+	'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+#making json array of SYSTEM BUS ID
+local gpu_busid_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local gpu_busid_json=$(jq -n --arg data "$gpu_busid_json" \
+        	--arg key "$i" \
+        	--arg value "${gpu_busid_sys[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+#making json array of GPU brand
+local gpu_brand_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local gpu_brand_json=$(jq -n --arg data "$gpu_brand_json" \
+        	--arg key "$i" \
+        	--arg value "${gpu_brand[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+
+##################################################################
+# get system info
+##################################################################
+cpu_json=$(
+	jq -n \
+	--arg version "`dmidecode | grep "Processor Information" -A60 | grep "Version" | sed -e 's/Version\: //; s/\t//'`" \
+	--arg core "`dmidecode | grep "Processor Information" -A60 | grep  "Core Count" | sed -e 's/Core Count\: //; s/\t//'`" \
+	--arg cur_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Current Speed" | sed -e 's/Current Speed\: //; s/\t//'`" \
+	--arg max_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Max Speed" | sed -e 's/Max Speed\: //; s/\t//'`" \
+	'{
+		$version,
+		$core,
+		$cur_speed,
+		$max_speed
+	}'
+)
+
+mb_json=$(
+	jq -n \
+	--arg product_name "`dmidecode | grep "Base Board Information" -A5 | grep  "Product Name" | sed -e 's/Product Name\: //; s/\t//'`" \
+	--arg manufacturer "`dmidecode | grep "Base Board Information" -A5 | grep  "Manufacturer" | sed -e 's/Manufacturer\: //; s/\t//'`" \
+	--arg sn "`dmidecode | grep "Base Board Information" -A5 | grep  "Serial Number" | sed -e 's/Serial Number\: //; s/\t//'`" \
+	'{
+		$product_name,
+		$manufacturer,
+		$sn
+	}'
+)
+
+#ip=(`ifconfig | grep "inet addr" | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
+ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
+ip_json='{}'
+for ((i=0; i < ${#ip[@]}; i++)); do
+	ip_json=$(jq -n --arg data "$ip_json" \
+		--arg key "$i" \
+		--arg value "${ip[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+
+driver_amd=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
+driver_nvidia=$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
+
+sysinfo=$(
+	jq -n \
+	--arg system "`lsb_release -d --short` `uname -m`" \
+	--arg osver "$OS" \
+	--arg kernel "`uname -r`" \
+	--arg driver_amd "$driver_amd" \
+	--arg driver_nvidia "$driver_nvidia" \
+	--arg ram "`free -m | grep Mem | awk '{print $2}'`" \
+	--arg hdd_model "`hdparm -I /dev/sda | grep "Model Number" | sed 's/.*Model Number:\s*//' | sed 's/\"/\\\\\"/'`" \
+	--arg hdd_total "`df -H | grep "/$" | awk '{print $2}'`" \
+	--arg hdd_free "`df -H | grep "/$" | awk '{print $4}'`" \
+	--argjson cpu "$cpu_json" \
+	--argjson mb "$mb_json" \
+	'{	
+		$system,
+		$osver,
+		$kernel,
+		$driver_amd,
+		$driver_nvidia,
+		$cpu,
+		$mb,
+		$ram,
+		$hdd_model,
+		$hdd_total,
+		$hdd_free
+	}'
+)
+
+local request=$(
+	jq -n \
+	--arg password "$PASSWD" \
+	--arg refresh "$(date +%s)" \
+	--arg online $(date --date "`uptime -s`" +%s) \
+	--argjson ip "$ip_json" \
+	--argjson gpu_busid "$gpu_busid_json" \
+	--argjson gpu_name "$rig_gpu_name_json" \
+	--argjson gpu_info "$rig_gpu_info_json" \
+	--argjson gpu_brand "$gpu_brand_json" \
+	--argjson sysinfo "$sysinfo" \
+	'{	
+		"method": "hello",
+		"jsonrpc": "2.0",
+		"stats": {
+			$password,
+			$refresh,
+			$online,
+			$ip,
+			$gpu_busid,
+			$gpu_name,
+			$gpu_info,
+			$gpu_brand,
+			$sysinfo
+		}
+	}'
+)
+#echo $request | jq '.' 
+
+try=0
+
+while [[ $try -lt 3 ]]; do
+	response=$(echo $request | curl -s --data @- \
+		--connect-timeout 7 --max-time 15 \
+		"${HOST}?id=${RIG_ID}&method=hello2" -H "Content-Type: application/json; charset=utf-8\r\n")
+	#echo $response
+	if [[ $? -eq 0 ]]; then
+		#echo $response | jq '.'
+		answer=$(echo $response | jq -r '.hello_answer')
+		#answer=$(echo $response) #just for debug
+		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
+			echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
+		
+		#echo $response | jq
+		
+		if [[ $answer == "Data received" ]]; then
+			#name
+			name=$(echo $response | jq ".name" -r)
+			if [[ ! -z $name && $name != 'null' ]]; then
+				sobaka-work change_name "$name" --hello
+			fi
+
+			#nvidia
+			command_argument=$(echo $response | jq ".nvidia" --raw-output)
+			sobaka-work change_nvidia_oc "$command_argument" --hello
+
+			#amd
+			command_argument=$(echo $response | jq ".amd" --raw-output)
+			sobaka-work change_amd_oc "$command_argument" --hello
+
+			#manifests
+			command_argument=$(echo $response | jq ".batch1" --raw-output)
+			sobaka-work batch1 "$command_argument" --hello
+			command_argument=$(echo $response | jq ".batch2" --raw-output)
+			sobaka-work batch2 "$command_argument" --hello
+
+			[ -t 1 ] && echo -e "${GREEN}>Initial settings (batches, NVIDIA & AMD OC) received and applied${WHITE}" ||
+				echo $(date --rfc-3339=seconds)" Initial settings (batches, NVIDIA & AMD OC) received and applied"
+
+			exit 0
+		fi
+	else
+	[ -t 1 ] && echo -e "${RED}>IError while sending first stats${WHITE}" ||
+		echo $(date --rfc-3339=seconds)" Error while sending first stats"
+	fi
+	sleep 5
+	. $RIG_CFG
+	((try++))
+	
+done
+
+}
+
+echo -e "${GREEN}>Trying to say \"hello\" to server ${WHITE}"
+firststats

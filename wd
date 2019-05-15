@@ -1,0 +1,166 @@
+#!/bin/bash
+[ -t 1 ] && . colors
+. /etc/environment
+export PATH
+export CUDA_DEVICE_ORDER
+RIG_CFG="/sobaka/cfg/rig.cfg"
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+#LOG="/sobaka/log/sobaka-wd.log"
+#exec &>>$LOG
+
+
+SLEEP=5 #seconds to sleep over iteration
+MAX_REFRESH=20 #if hr update was earlier, do not use it
+#OK_MESSAGE_REDUCE=1
+OK_MESSAGE_REDUCE=$(( 1 * 60 / $SLEEP )) #e.g. only every 12th message will be displayed to reduce log
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+LOGO=${BROWN}$LOGO${WHITE}
+
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z $MINER_PID ]] && kill $MINER_PID
+}
+
+function loop() {
+
+	local miner=$2
+	local minhash=$3
+	#get variable value from memory
+	if [[ $1 -eq 1 ]]; then
+		lastgood=$lastgood_1
+		ok_count=$ok_count_1
+		#miner_restart_count=$miner_restart_count_1
+	else
+		lastgood=$lastgood_2
+		ok_count=$ok_count_2
+		#miner_restart_count=$miner_restart_count_2
+	fi
+	#got it
+
+	if [[ -z $lastgood ]]; then
+		lastgood=`date +%s`
+		echo -e "Let the countdown for ${CYAN}$miner${WHITE} begin"
+	fi
+	[[ -z $ok_count ]]&& ok_count=0
+
+	[[ -f /tmp/hr.$miner ]] && local stat=`stat -c %Y /tmp/hr.$miner` || local stat=0
+	local now=`date +%s`
+	local refresh=$(($now - $stat))
+	[[ -e /tmp/hr.$miner && $refresh -le $MAX_REFRESH ]] && hr=`cat /tmp/hr.$miner`
+	[[ -z $hr ]] && hr=0
+	local hashok=`echo $hr $minhash | awk '{ print ($1 >= $2) ? 1 : 0 }'` 
+	if [[ $hashok == 1 ]]; then #if current hash > min 
+		[[ -e /tmp/hr.$miner && $refresh -le $MAX_REFRESH ]] &&
+			lastgood=`stat -c %Y /tmp/hr.$miner` #||
+		miner_restart_count=0
+		#reduce messages
+		[[ $ok_count == 0 ]] &&
+			echo -e "${GREEN}OK${WHITE}\t${CYAN}$miner${WHITE} $hr kHs >= $minhash kHs"
+		miner_restart_count=0
+		((ok_count++))
+		[[ $ok_count -ge $OK_MESSAGE_REDUCE ]] && ok_count=0
+	else
+		local elapsed=$(($now - $lastgood))
+		echo -e "${RED}WARNING${NOCOLOR}\t${CYAN}$miner${WHITE} $hr kHs <  $minhash kHs for $elapsed seconds"
+		if [[ ! -z $WD_REBOOT ]]; then
+			local reboot_timeout=`echo $WD_REBOOT 60 | awk '{print $1 * $2}'`
+			if [[ $elapsed -ge $reboot_timeout ]]; then
+				msg "Watchdog: $miner low hashrate ($hr kH/s), rebooting" danger "$(date --rfc-3339=seconds) reboot"
+				echo -e "${RED}Rebooting after $WD_REBOOT minutes${NOCOLOR}"
+				nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
+			fi
+		fi
+		if [[ ! -z $WD_RESTART ]]; then
+			local miner_restart_timeout=`echo $WD_RESTART 60 | awk '{print $1 * $2}'`
+			if [[ $miner_restart_count == 0 && $elapsed -ge $miner_restart_timeout ]]; then
+				msg "Watchdog: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) restart"
+				echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $WD_RESTART minutes${WHITE}"
+				miner_restart_count=1
+				screen_kill $miner
+			fi
+		fi
+		ok_count=0
+	fi
+	#save local variables to memory
+	if [[ $1 -eq 1 ]]; then
+		lastgood_1=$lastgood
+		ok_count_1=$ok_count
+		#miner_restart_count_1=$miner_restart_count
+
+	else
+		lastgood_2=$lastgood
+		ok_count_2=$ok_count
+		#miner_restart_count_2=$miner_restart_count
+	fi
+}
+
+function start {
+	ok_count=0
+	echo -e "$LOGO"
+	while true; do
+		if [[ ! -f $RIG_CFG || ! -f $BATCH_CFG ]]; then
+			echo -e "${RED}No config file $RIG_CFG or $BATCH_CFG${WHITE}" 
+		else
+			. $RIG_CFG
+			. $BATCH_CFG
+		fi
+		
+		if [[ -z $WD_ENABLED || $WD_ENABLED != 1 ]]; then
+			echo -e "${YELLOW}Watchdog not enabled${WHITE}"
+			unset lastgood_1 lastgood_2 ok_count_1 ok_count_2
+			sleep $SLEEP
+			continue
+		fi
+
+		if [[ ! -z $miner1 ]]; then
+			minhash=`echo $WD_HR | jq -r ".${miner1}"`
+			if [[ ! -z $minhash && $minhash != "null" ]]; then
+				loop 1 $miner1 $minhash
+			fi
+		fi
+
+		if [[ ! -z $miner2 ]]; then
+			minhash2=`echo $WD_HR | jq -r ".${miner2}"`
+			if [[ ! -z $minhash2 && $minhash2 != "null" ]]; then
+				loop 2 $miner2 $minhash2
+			fi
+		fi
+		sleep $SLEEP
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d wd
+		screen -r wd
+	;;
+	start)
+		start
+	;;
+	stop)
+		screen_kill wd
+		echo "Watchdog stopped"
+	;;
+	restart)
+		screen_kill wd
+		screen -dmS wd bash -c "/sobaka/wd start"
+		echo "Watchdog restarted"
+	;;
+	screen)
+		screen_kill wd
+		screen -dmS wd bash -c "/sobaka/wd start"
+		#while true; do
+		#	sleep 30
+		#done
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart${WHITE}"
+	;;
+esac

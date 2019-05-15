@@ -1,0 +1,13 @@
+[Unit]
+Description=Sobaka Console on TTY1
+
+[Service]
+Type=simple
+ExecStart=/sobaka/sobaka-console
+
+StandardOutput=tty
+StandardInput=tty
+TTYPath=/dev/tty1
+
+[Install]
+WantedBy=multi-user.target

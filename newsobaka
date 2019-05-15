@@ -1,0 +1,51 @@
+#!/bin/bash
+RIG_CFG="/sobaka/cfg/rig.cfg"
+FLASH_CFG="/sobaka-flash/rig.cfg"
+TMP_FILE="/tmp/conv.cfg"
+. colors
+
+if [[ ! -z $RIG_CFG ]]; then #what is it???
+	mkdir -p /sobaka/cfg
+	#echo "RIG_ID=\nPASSWD=" > $RIG_CFG
+fi
+
+if [[ ! -f $RIG_CFG && -f $FLASH_CFG ]]; then
+	dos2unix -n $FLASH_CFG $TMP_FILE
+	. $TMP_FILE
+	if [[ -z ${RIG_ID} || -z ${PASSWD} || -z ${HOST} ]]; then
+		:
+	else
+		echo "There is no config file on rig, but I found something on flash..."
+		echo -e "RIG_ID: ${CYAN}${RIG_ID}${WHITE}"
+		echo -e "RIG_PASSWORD: ${CYAN}${PASSWD}${WHITE}"
+		echo -e "HOST: ${CYAN}${HOST}${WHITE}"
+		echo "Use this data? (y/n)"
+		read answer
+		[[ $answer == "y" ]]&& rig_id=${RIG_ID} && rig_password=${PASSWD} && rig_host=}${HOST} && OS="0.0" && flashdata=1 && echo "Ok!"
+	fi
+fi
+
+if [[ $flashdata != 1 ]]; then
+	[[ -f $RIG_CFG ]] && . $RIG_CFG
+	echo -e "This is simple registration form.\nEnter your ${CYAN}RIG_ID${WHITE}:"
+	read rig_id
+	echo -e "Enter ${CYAN}RIG_PASSWORD${WHITE}:"
+	read rig_password
+	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}"https://sobaka.group/message.php${WHITE}"\nType another host or hit Enter to use default:"
+	read rig_host
+	[[ -z $rig_host ]]&& rig_host="https://sobaka.group/message.php"
+	echo -e "Thank you, trying to apply changes.\nIf something goes wrong, you can change rig ID & password manually, just type \"nano /sobaka/cfg/rig.cfg\""
+fi
+
+cfg="#This is rig configuration file\n"
+cfg+="OS=\"$OS\"\n"
+cfg+="HOST=\"$rig_host\"\n"
+cfg+="RIG_ID=\"$rig_id\"\n"
+cfg+="PASSWD=\"$rig_password\"\n"
+echo -e $cfg > $RIG_CFG
+echo "user:$PASSWD" | chpasswd #Change password
+$LINE
+#hello
+systemctl restart sobaka
+systemctl restart sobaka-agent
+hello

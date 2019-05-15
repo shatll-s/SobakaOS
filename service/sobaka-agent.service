@@ -1,0 +1,12 @@
+[Unit]
+Description=Sobaka agent (send stats, receive commands)
+After=network-online.target
+After=sobaka-boot.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/nice -n -20 /sobaka/sobaka-agent run
+WorkingDirectory=/sobaka
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,380 @@
+#!/bin/bash
+
+RIG_CFG="/sobaka/cfg/rig.cfg"
+VARIABLES_CFG="/sobaka/service/variables"
+[[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/sobaka/cfg/batch.cfg"
+. $VARIABLES_CFG
+
+##################################################################################################################
+#Just command help
+if [[ ! -z $1 ]]; then
+	if [[ -f $1 ]]; then # "First operand is link to json file..."
+		manifest=`cat $1`
+		if [[ -z $(jq -e . >/dev/null 2>&1 <<< "$manifest") && $? != 0 ]]; then
+			basename=`basename $0`
+			echo "$basename: first operand is link to invalid json file. Exiting"
+			exit 1
+		fi
+	else
+		basename=`basename $0`
+		echo "$basename: first operand is not a link to valid json. Exiting"
+		exit 1
+	fi
+else
+	basename=`basename $0`
+	echo "$basename: missing operand"
+	echo -e "You need to put link to json file as first operand"
+	exit 1
+fi
+
+miner_i=$(echo $1 | sed 's/\/tmp\/batch//')
+if [[ ! -z $manifest ]]; then
+	##################################################################################################################
+	#WD section
+
+	if [[ $(echo $manifest | jq '.wd.wd_hr') != '""' && $(echo $manifest | jq '.wd.wd_hr') != 'null' ]]; then
+		if (cat $RIG_CFG | grep -qc "WD_HR="); then 
+			sed -i "/.*WD_HR=.*/d" $RIG_CFG
+		fi
+		echo "WD_HR='"$(echo $manifest | jq '.wd.wd_hr')"'" >> $RIG_CFG
+	fi
+
+	if [[ $(echo $manifest | jq '.wd.wd_enabled') != '""' && $(echo $manifest | jq '.wd.wd_enabled') != 'null' ]]; then
+		if (cat $RIG_CFG | grep -qc "WD_ENABLED="); then 
+			sed -i "/.*WD_ENABLED=.*/d" $RIG_CFG
+		fi
+		echo "WD_ENABLED="$(echo $manifest | jq -r '.wd.wd_enabled') >> $RIG_CFG
+
+		#WD_MINER restart time
+		if [[ $(echo $manifest | jq '.wd.wd_restart') != '""' && $(echo $manifest | jq '.wd.wd_restart') != 'null' ]]; then
+			wd_restart=$(echo $manifest | jq -r '.wd.wd_restart')
+		else
+			wd_restart=3
+		fi
+		[[ $(cat $RIG_CFG | grep -c "WD_RESTART=") -gt 0 ]] && sed -i "/.*WD_RESTART=.*/d" $RIG_CFG
+		echo "WD_RESTART="$wd_restart >> $RIG_CFG
+		#WD_REBOOT restart time
+		if [[ $(echo $manifest | jq '.wd.wd_reboot') != '""' && $(echo $manifest | jq '.wd.wd_reboot') != 'null' ]]; then
+			wd_reboot=$(echo $manifest | jq -r '.wd.wd_reboot')
+		else
+			wd_reboot=5
+		fi
+		[[ $(cat $RIG_CFG | grep -c "WD_REBOOT=") -gt 0 ]] && sed -i "/.*WD_REBOOT=.*/d" $RIG_CFG
+		echo "WD_REBOOT="$wd_reboot >> $RIG_CFG
+	fi
+
+	##################################################################################################################
+	#variables
+
+	name=$(cat /etc/hostname)
+#	[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
+#	[[ `echo $manifest | jq ".coin"` != null ]]	&& coin=`echo $manifest | jq -r ".coin"`
+#	[[ `echo $manifest | jq ".wallet"` != null ]]	&& wallet=`echo $manifest | jq -r ".wallet"`
+#	[[ `echo $manifest | jq ".pass"` != null ]]	&& pass=`echo $manifest | jq -r ".pass"`
+#	[[ `echo $manifest | jq ".pool"` != null ]]	&& pool=`echo $manifest | jq -r ".pool"`
+#	pool_without_port=`echo $pool | sed 's/\:[0-9][0-9]*$//'`
+#	port=`echo $pool | sed 's/.*://'`
+#	[[ `echo $manifest | jq ".template"` != null ]]	&&
+#		template=`echo $manifest | jq -r ".template" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`
+#	[[ `echo $manifest | jq ".addition"` != null ]]	&& addition=`echo $manifest | jq -r ".addition"`
+#	[[ `echo $manifest | jq ".algo"` != null ]]	&& algo=`echo $manifest | jq -r ".algo"`
+#	[[ `echo $manifest | jq ".fork"` != null ]]	&& fork=`echo $manifest | jq -r ".fork"`
+#	[[ `echo $manifest | jq ".brand"` != null ]]	&& brand=`echo $manifest | jq -r ".brand"`
+	#config is json
+
+	for option in miner coin wallet pass pool addition algo fork brand; do
+		if [[ `echo $manifest | jq ".$option"` != null ]]; then
+			option_value="`echo $manifest | jq -r \".$option\"`" #double slash, because eval open it
+			eval "$option=\"$option_value\""
+		fi
+	done
+	
+	if [[ ! -z $pool ]]; then
+		pool_without_port=`echo $pool | sed 's/\:[0-9][0-9]*$//'`
+		port=`echo $pool | sed 's/.*://'`
+	fi
+
+	[[ `echo $manifest | jq ".template"` != null ]]	&&
+		template=`echo $manifest | jq -r ".template" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`
+
+	for option in config config_pools config_nvidia config_amd config_cpu; do
+		if [[ `echo $manifest | jq ".$option"` != null ]]; then
+			option_value="`echo $manifest | jq -r \".$option\" | sed 's/&#34;/\\\\"/g; s/&#39;/\\\\"/g; s/,\s*$//'`"
+			#double slash, because eval open it. Also delete comma in the end
+			[[ $option_value != {* && $option_value != *} ]] && option_value="{$option_value}"
+			eval "$option=\"$option_value\""
+		fi
+	done
+	
+	[[ ! -z $fork ]] && miner_dir="/sobaka/miners/$miner/$fork/" || miner_dir="/sobaka/miners/$miner/"
+	#[[ $miner == "xmr_stak" ]] && minerexec="cd $miner_dir; " || minerexec=""
+	minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
+	if [[ $miner == "ccminer" && $fork == "tpruvot-2.3.1" ]]; then
+		:
+	else
+		minerexec+="${PREFIX[$miner]}" #prefix=EXPORT MEMORY_ALLOCATION......
+	fi
+	#minerexec+="/sobaka/miners/$miner/"
+	#[[ ! -z $fork ]]	&& minerexec+="$fork/"
+
+	minerexec+="${miner_dir}miner" #now all miners need to have name "miner"
+	/sobaka/getminer $miner $fork	##################################################################################################################
+	#configuring minerexec
+
+	case $miner in
+		claymore)
+			minerexec+=" -epool $pool"
+			[[ ! -z $template ]]&& minerexec+=" -ewal $template"
+			[[ ! -z $pass ]]	&& minerexec+=" -epsw $pass"
+			[[ ! -z $dcri ]]	&& minerexec+=" -dcri $dcri"
+			#dual is dead
+				#[[ `echo $manifest | jq ".dual_template"` != null ]]&&
+				#		dual_template=`echo $manifest | jq ".dual_template" | sed 's/\"//g'`
+				#	[[ `echo $manifest | jq ".dualcoin"` != null ]]&& dualcoin=`echo $manifest | jq ".dualcoin"`
+				#	[[ `echo $manifest | jq ".dcri"` != null ]]&& dcri=`echo $manifest | jq ".dcri"`
+
+				#[[ ! -z $dual_template `echo $manifest | jq ".dual_template"` != null ]]&& minerexec+=" -dwal \$"${MINER}"_DUAL_TEMPLATE"
+				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dcoin \$"${MINER}"_DUALCOIN"
+				#[[ ! -z $pass `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" -dpsw \$APASS"
+				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+		;;
+		ewbf)
+			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
+			port=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/.*://')
+			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
+			minerexec+=" --server $raw_pool --port $port"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
+			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /sobaka/log/"$miner".log"
+		;;
+		bminer)
+			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
+			minerexec+=" -uri "
+			[[ -z $algo || $algo == "equihash" ]]&& minerexec+="stratum" || minerexec+=$algo
+			minerexec+="://"
+			[[ ! -z $template ]]&& minerexec+=$template
+			[[ ! -z $pass ]]	&& minerexec+=":"$pass
+			minerexec+="@$pool"
+			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/sobaka/log/"$miner".log -watchdog=false"
+		;;
+		ccminer)
+			#minerexec+="$fork -o $pool"
+			minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]}"
+		;;
+		sgminer)
+			#minerexec+="$fork -o $pool"
+			minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $algo ]]&& minerexec+=" -k $algo"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-listen --api-port ${APIPORT[$miner]}"
+		;;
+		ethminer)
+			minerexec+=" -P"
+			[[ $template != *://* ]]&& minerexec+=" stratum://"		
+			minerexec+="$template:$pass@$pool" #USERNAME.WORKERNAME:WORKERPWD
+			echo $brand	
+			minerexec+=" --farm-recheck 500 --report-hashrate --api-port ${APIPORT[$miner]} --HWMON 1 $brand"
+		;;
+		claymore_c)
+			minerexec+=" -xpool $pool -xwal $template"
+			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+		;;
+		claymore_z)
+			minerexec+=" -zpool $pool -zwal $template"
+			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+		;;
+		cpuminer)
+			minerexec+=" -o "
+			[[ $template != *://* ]]&& minerexec+="stratum+tcp://"
+			minerexec+="$pool -u $template"
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]}"
+		;;
+		t_rex)
+			minerexec+=" -c config"
+			#make config file
+			#[[ ! -z $fork ]] && miner_dir="/sobaka/miners/t_rex/$fork" || miner_dir="/sobaka/miners/t_rex"
+			#if fork is not set, may be there are some global configs?
+			
+			sobaka_json=`cat "$miner_dir/config_global.json"` #it will be json based on global, but with user changes
+
+			[[ ! -z $template ]]&& sobaka_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $sobaka_json`
+			[[ ! -z $pool ]]&& sobaka_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $sobaka_json`
+			[[ ! -z $pass ]]&& sobaka_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $sobaka_json`
+			[[ ! -z $algo ]]&& sobaka_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $sobaka_json`
+
+			#looking for keys in json
+			if [[ $config != "{null}" ]]; then
+				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+				for ((y=0; y < ${#keys[@]}; y++)); do
+					#echo "Check ${keys[$y]}"
+					[[ `echo $sobaka_json | jq ".\"${keys[$y]}\""` != null ]] &&
+						sobaka_json=`jq "del(.\"${keys[$y]}\")" <<< "$sobaka_json"` #if key exist, delete it
+
+					value=`echo $config | jq ".\"${keys[$y]}\""`
+					sobaka_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$sobaka_json"`
+				done
+			fi	
+				echo -e "$sobaka_json" | jq '.' > "$miner_dir/config"
+		;;
+		nanominer)
+			minerexec+=" /sobaka/miners/nanominer/config.ini "
+			config="logPath=/sobaka/log/nanominer.txt\n"
+			config+="port=9090\n"
+			config+="mport=0\n"
+			config+="rigName = $name\n"
+			[[ ! -z $algo ]]&& config+="[$algo]\n"
+			[[ ! -z $coin ]]&& config+="coin=$coin\n"
+			config+="wallet = $wallet\n"
+			config+="pool1 = $pool\n"
+			[[ ! -z $pass ]]&& config+="rigPassword = $pass\n"
+			[[ ! -z $addition ]]&& config+="$addition"
+			
+			echo -e "$config" > /sobaka/miners/nanominer/config.ini
+		;;
+		lolminer)
+			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
+			[[ ! -z $algo ]]&& minerexec+=" --coin $algo"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" --pool $pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" --port $port"
+			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+			minerexec+=" --apiport ${APIPORT[$miner]}"
+		;;
+		gminer)
+			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
+			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" --server $pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" --port $port"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
+			minerexec+=" --api ${APIPORT[$miner]}"
+		;;
+		xmrig*)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-port ${APIPORT[$miner]}"
+		;;
+		z_enemy)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind=${APIPORT[$miner]} --log=/sobaka/log/z_enemy.txt"
+		;;
+		xmr_stak)
+			minerexec+=" -c ${miner_dir}config.txt -C ${miner_dir}pools.txt"
+			for config_name in config.txt pools.txt nvidia.txt amd.txt cpu.txt; do
+				[[ -f "${miner_dir}${config_name}" ]] && rm "${miner_dir}${config_name}"
+			done
+			#pools.txt section
+				pool_json=$(
+					jq -n \
+					--arg pool_address "$pool" \
+					--arg wallet_address "$wallet" \
+					--arg rig_id "$name" \
+					--arg pool_password "$pass" \
+					--arg tls_fingerprint "" \
+					'{
+						$pool_address, $wallet_address,	$rig_id, $pool_password, $tls_fingerprint
+					}'
+				)
+				[[ $pool == *nicehash* ]] && use_nicehash=true || use_nicehash=false
+				pool_json=`jq ". + { \"use_nicehash\": $use_nicehash }" <<< "$pool_json"`
+				pool_json=`jq ". + { \"use_tls\": false }" <<< "$pool_json"`
+				pool_json=`jq ". + { \"pool_weight\": 1 }" <<< "$pool_json"`
+
+				#looking for keys in json
+				if [[ $config_pools != "{null}" ]]; then
+					keys=(`echo $config_pools | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+					for ((y=0; y < ${#keys[@]}; y++)); do
+						[[ `echo $pool_json | jq ".\"${keys[$y]}\""` != null ]] &&
+							pool_json=`jq "del(.\"${keys[$y]}\")" <<< "$pool_json"` #if key exist, delete it
+
+						value=`echo $config_pools | jq ".\"${keys[$y]}\""`
+						pool_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$pool_json"`
+					done
+				fi	
+				
+				pools_txt="\"pool_list\" :\n["`echo -e "$pool_json" | jq '.'`"],\n\"currency\" : \"$algo\""
+				echo -e "$pools_txt" > $miner_dir/pools.txt
+			#end of pool.txt section
+
+			#config.txt section
+				config_txt="{"`cat "$miner_dir/global_config.cfg"`"}" #it will be based on global, but with user changes
+
+				#looking for keys in json
+				if [[ $config != "{null}" ]]; then
+					keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+					for ((y=0; y < ${#keys[@]}; y++)); do
+						[[ `echo $config_txt | jq ".\"${keys[$y]}\""` != null ]] &&
+							config_txt=`jq "del(.\"${keys[$y]}\")" <<< "$config_txt"` #if key exist, delete it
+
+						value=`echo $config | jq ".\"${keys[$y]}\""`
+						config_txt=`jq ". + { \"${keys[$y]}\": $value }" <<< "$config_txt"`
+					done
+				fi	
+				echo -e "$config_txt" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/config.txt"
+			#end of config.txt section
+
+			#nvidia.txt, amd.txt, cpu.txt section
+				[[ ! -z $config_nvidia ]] && echo -e "$config_nvidia" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/nvidia.txt"
+				[[ ! -z $config_amd ]] && echo -e "$config_amd" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/amd.txt"
+				[[ ! -z $config_cpu ]] && echo -e "$config_cpu" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/cpu.txt"
+			#end of nvidia.txt, amd.txt, cpu.txt section
+		;;
+		wildrig_multi)
+			#./wildrig-multi --algo algo --opencl-threads auto --opencl-launch auto --url pool:port --user wallet --pass password
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/sobaka/log/wildrig.txt"
+		;;
+		phoenix)
+			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
+			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
+			[[ ! -z $template ]]&& minerexec+=" -wal $template"
+			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
+			minerexec+=" -cdmport ${APIPORT[$miner]} -log 1 -logfile /sobaka/log/phoenix.txt"
+		;;
+		teamredminer)
+			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/sobaka/log/teamredminer.txt"
+		;;
+		cryptodredge)
+			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind ${APIPORT[$miner]} --log /sobaka/log/cryptodredge.txt"
+		;;
+		*)
+			: #do nothing
+		;;
+	esac
+	[[ ! -z $addition && $miner != "nanominer" ]] && minerexec+=" $addition"	
+fi		
+[[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
+[[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
+echo -e "batch$miner_i=\"$minerexec\"" >> $BATCH_CFG
+echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
+
+echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"
+#[ -t 1 ] && echo -e "You can check it, but don\`t change manually.\nAll your changes will be terminated on next boot or wallet change."

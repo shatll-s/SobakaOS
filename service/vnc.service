@@ -1,0 +1,12 @@
+[Unit]
+Description=Start x11vnc at display :0
+After=network.target sobaka-boot.service sobakax.service
+Requires=sobakax.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 15
+ExecStart=/sobaka/vnc
+
+[Install]
+WantedBy=multi-user.target

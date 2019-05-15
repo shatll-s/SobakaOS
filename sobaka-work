@@ -1,0 +1,343 @@
+#!/bin/bash
+[ -t 1 ] && . colors #source colors only if running in terminal
+AMD_CFG="/sobaka/cfg/amd.cfg"
+NVIDIA_CFG="/sobaka/cfg/nvidia.cfg"
+RIG_CFG="/sobaka/cfg/rig.cfg"
+WALLET_CFG="/sobaka/cfg/wallet.cfg"
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+LOCK_DIR="/tmp/sobaka-work"
+
+#######################################################
+#kill screens								  		  #
+#######################################################
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z $MINER_PID ]]&& kill $MINER_PID
+}
+
+########################################################
+#exec comand and return								   #
+########################################################
+
+if (( $# < 1 )); then
+	echo "Usage: $0 \"command\" [\"argument\"]"
+	exit 1
+fi
+
+[[ ! -d $LOCK_DIR ]] && mkdir -p $LOCK_DIR
+PID=$$
+PID_file="$LOCK_DIR/$PID"
+touch $PID_file
+
+echo $(date --rfc-3339=seconds)" Start doing \"$1\""
+
+case $1 in
+	exec)
+		return=$(timeout 300 bash -c "$2" 0> /dev/null)
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			msg "$1 : $2" success "$return"
+		else
+			msg "$1 : $2" warning $return
+		fi
+	;;
+	get_bios)
+		#[[ $2 < 10 ]] && bus="0"$2
+		#bus=`echo $2 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` #now it`s mistake
+		bus=$2
+		adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
+		#echo -e "argument=$2\nbus=$bus\nadapter=$adapter"
+		return=$(sudo atiflash -s $adapter "/tmp/amd${adapter}.rom")
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			. $RIG_CFG
+			chown user:user "/tmp/amd$adapter.rom"
+			#gzip -9 -c "/tmp/amd$adapter.rom" 
+			#base64 -w 0 "/tmp/amd${adapter}.rom" | gzip -9 -c | msg "Bios-rig"${RIG_ID}"-GPU${adapter}.rom" file payload #it works
+			gzip -9 -c "/tmp/amd${adapter}.rom" | base64 -w 0 | msg "Bios-rig"${RIG_ID}"-GPU"${adapter}".rom" file payload
+		else
+			msg "BIOS save error" warning "Error occured while saving bios for adapter ${adapter} (bus id $2)\n$return"
+		fi
+	;;
+	flash_bios)
+		. $RIG_CFG		
+		cd /tmp
+		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$2 #https://sobaka.group/files/1/upload/0000001_bios_amd_bus02.rom.gz
+		wget -q $link 
+		exitcode=$?
+		if [[ ! $exitcode -eq 0 ]]; then
+			msg "Flash BIOS" error "Error occured during download BIOS ($exitcode)\n$return"
+			rm $PID_file
+			exit 1
+		fi
+		file_gz=$(echo $2 | sed 's/.*\/\([_.a-z0-9]*\)$/\1/') #0000003_bios_amd_bus02.rom.gz
+		#echo "Filename: "$file
+		gzip -df $file_gz 
+		exitcode=$?
+		if [[ ! $exitcode -eq 0 ]]; then
+			msg "Flash BIOS" error "Error occured during unzipping BIOS ($exitcode)\n$return"
+			rm $PID_file
+			exit 1
+		fi
+		file=$(echo $file_gz | sed 's/.gz//') #0000004_bios_amd_bus02.rom
+		bus=$(echo $file | sed 's/.*bus\([0-9]*\).rom/\1/') #02
+		#bus=`echo $shortbus 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` 
+		adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//') && echo $adapter
+		return=$(atiflash -p $adapter -f "/tmp/$file")
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			msg "Flash BIOS" success "$return"
+		else
+			msg "Flash BIOS" error "Something goes wrong ($exitcode)\n$return"
+		fi
+	;;
+	change_host)
+		#sed -i "s/.*MINER=.*/MINER=$2/g" $RIG_CFG
+		if [[ $2 ]]; then
+			[[ ! -z $(grep "HOST=" $RIG_CFG) ]]&& sed -i "s/.*HOST=.*/HOST=$2/g" $RIG_CFG || echo "HOST=$2" >> $RIG_CFG
+			msg "Host change" ok \
+			"$(date --rfc-3339=seconds)\nHost succesfully changed to <b>$2</b>."
+		else
+			msg "Host change" warning \
+			"$(date --rfc-3339=seconds)\nHost is not changed (connection will be lose if you will set empty host)."
+		fi
+	;;
+	change_miner*)
+		i=$(echo $1 | sed 's/change_miner//')
+		sed -i "/.*miner$i=.*/d" $BATCH_CFG
+		echo -e "miner$i=$2" >> $BATCH_CFG
+		if [[ $2 ]]; then
+			msg "Miner $i change" ok \
+			"$(date --rfc-3339=seconds)\nMiner succesfully changed to <b>$2</b>.\nIf you selected the same miner, no action will be done."
+		else
+			msg "Miner $i stop" ok \
+			"$(date --rfc-3339=seconds)\nMiner succesfully disabled."
+		fi
+	;;
+	miner_log)
+		screen -S $2 -X hardcopy /tmp/hardcopy
+		if [[ $? -eq 0 ]]; then
+			return=$(cat /tmp/hardcopy | sed 's/"//g')
+			msg "Log: $2" success "$return"
+		else
+			return="$(screen -ls)"
+			msg "Log: $2" error "$return"
+		fi
+	;;
+	restart_miner)
+		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
+		screen_kill $2
+		miner_now=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
+		if [[ $miner ]]; then
+			if [[ ! $miner_now ]]; then
+				msg "Restart $2" success \
+				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) succesfully restarted."
+			else
+				msg "Restart $2" error\
+				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) cannot be closed. Propably reboot will help."
+			fi
+		else
+			. $RIG_CFG
+			if [[ $2 -eq "miner1" ]]; then
+				miner=$MINER
+			elseif [[ $2 -eq "miner2" ]]
+				miner=$MINER2
+			fi
+			msg "Restart $2" warning \
+			"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) is not working.\nMay be this miner isn\`t suitable for your GPU."
+		fi
+	;;
+	change_amd_oc)
+		echo -e "CORE_CLOCK="$(echo $2 | jq ".core_clock") \
+				"\nCORE_STATE="$(echo $2 | jq ".core_state") \
+				"\nCORE_VOLTAGE="$(echo $2 | jq ".core_voltage") \
+				"\nMEMORY_CLOCK="$(echo $2 | jq ".memory_clock") \
+				"\nMEMORY_STATE="$(echo $2 | jq ".memory_state") \
+				"\nFAN="$(echo $2 | jq ".fan") > $AMD_CFG
+		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
+		return=$(amd-oc)
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			msg "AMD OC" success "$return"
+		else
+			msg "AMD OC" warning "Something goes wrong ($exitcode).\n$return"
+		fi
+	;;
+	change_nvidia_oc)
+		echo -e "CORE_CLOCK="$(echo $2 | jq ".core_clock") \
+				"\nMEMORY_CLOCK="$(echo $2 | jq ".memory_clock") \
+				"\nFAN="$(echo $2 | jq ".fan") \
+				"\nPLIMIT="$(echo $2 | jq ".power_limit") \
+				"\nPILL="$(echo $2 | jq ".pill") \
+				"\nPILL_ARGS="$(echo $2 | jq ".pill_args") \
+				"\nLIGHT_OFF="$(echo $2 | jq ".light")> $NVIDIA_CFG
+		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg				
+		return=$(nvidia-oc)
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			msg "NVIDIA OC" success "$return"
+		else
+			msg "NVIDIA OC" warning "Something goes wrong ($exitcode).\n$return"
+		fi
+	;;
+	upgrade)
+		return=`upgrade`
+		exitcode=$?
+		if [[ $exitcode -eq 0 ]]; then
+			msg "Upgrade" success "<b>Upgraded successfully</b>\n$return"
+			while [[ $try -lt 20 ]]; do
+				if [ `ls -a $LOCK_DIR | wc -l` -eq 3 ]; then
+					rm $PID_file
+					systemctl restart sobaka-agent
+				fi
+				sleep 1
+				((try++))
+			done
+			msg "Upgrade" warning "Upgrade was successfull, but I can not restart sobaka services, because some commands are still running.<br>Sometimes we need to reboot or restart Sobaka services (if you need it, try to reboot or send <b>systemctl restart sobaka-agent</b> command to rig."
+		else
+			msg "Upgrade" warning "<b>Something goes wrong</b>\n$return"
+		fi
+	;;
+	reboot)
+		msg "Rebooting" ok "$(date --rfc-3339=seconds)\nRebooting."
+		nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1
+	;;
+	change_wallet)
+		if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
+			echo $2 | jq '.' > /tmp/wallet_raw.cfg
+			jsonwallet2cfg /tmp/wallet_raw.cfg $WALLET_CFG
+			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg, don`t kill miners
+			screen_kill miner1
+			screen_kill miner2
+			msg "Wallet change" ok "$(date --rfc-3339=seconds)\n Wallet changed, miners restarted."
+		else
+			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
+			msg "Wallet change" warning "$(date --rfc-3339=seconds)\n Error occured while wallet change."
+		fi
+	;;
+	batch*)
+		i=$(echo $1 | sed 's/batch//')
+		#if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
+		if [[ $(echo $2 | jq '.') != 'null' ]]; then
+			[[ $2 != "--reconfigure" ]] && echo $2 | jq '.' > /tmp/$1 #I forgot, what is --reconfigure???
+			[[ $3 != "--hello" ]] && screen_kill miner$i #don`t kill miner if there is --hello argument
+			json2batch /tmp/$1
+
+			if [[ $3 != "--hello" && $3 != "--quiet" ]]; then #don`t send msg if there is --hello argument
+				if [[ $(echo $2 | jq -R '.') != '""' ]]; then #if this is not STOP command
+					msg "Batch $i change" ok "$(date --rfc-3339=seconds)\n Batch files changed, miners restarted." 
+				else #it`s STOP command
+					msg "Miner $i stop" ok "$(date --rfc-3339=seconds)\n Miner stopped" 
+				fi
+			fi
+		else
+			[[ $3 != "--hello" ]] && msg "Batch $i change" warning "$(date --rfc-3339=seconds)\n Error occured while wallet change."
+		fi
+	;;
+	change_name)
+		if [[ ! -z $2 && $2 != 'null' ]]; then
+			oldname=$(cat /etc/hostname)
+			if [[ $name != $oldname ]]; then
+				sed -i "s/$oldname/$2/" /etc/hosts
+				echo $2 > /etc/hostname
+				#systemctl restart networking #disable for 18.04
+				hostnamectl set-hostname $2 #for 18.04
+			fi
+			if [[ $3 != '--hello' ]]; then
+				sobaka-work batch1 --reconfigure --quiet
+				sobaka-work batch2 --reconfigure --quiet
+			fi
+			[[ $3 != '--hello' && $3 != '--quiet' ]] && msg "Name change" ok "$(date --rfc-3339=seconds)\n Name successfully changed to $2, may be you need reboot to get effect."
+		else
+			msg "Name change" warning "$(date --rfc-3339=seconds)\nError occured while changing name"
+		fi
+	;;
+	change_password) #doesn`t work now
+		sed -i "s/.*PASSWD=.*/PASSWD=$2/g" $RIG_CFG
+		local return="Password succesfully changed" 
+		echo $(date --rfc-3339=seconds)" "$return
+	;;
+	openvpn_config)
+		. $RIG_CFG
+		#echo $2
+		url=$(echo $2 | jq ".url" | sed 's/"//g')
+		#echo $url
+		if [[ "$url" != "0" ]]; then
+			#echo "It seems like url link"
+			cd /tmp
+			link=$(echo $HOST | sed 's/\/[a-z]*.php//')$url
+			wget -q $link
+			exitcode=$?
+			if [[ ! $exitcode -eq 0 ]]; then
+				msg "OpenVPN config" error "Error occured while download config ($exitcode)\n$return"
+				rm $PID_file
+				exit 1
+			fi
+			file_gz=$(echo $url | sed 's/.*\/\([_.a-z0-9]*\)$/\1/')
+			gzip -df $file_gz
+			exitcode=$?
+			if [[ ! $exitcode -eq 0 ]]; then
+				msg "OpenVPN config" error "Error occured while unzipping config ($exitcode)\n$return"
+				rm $PID_file
+				exit 1
+			fi
+			file=$(echo $file_gz | sed 's/.gz//')
+			mv /tmp/$file /sobaka/cfg/openvpn.conf
+		fi
+		#echo "next step"
+	
+		[[ -f /etc/openvpn/client.conf ]] && rm /etc/openvpn/client.conf		
+		systemctl restart openvpn@client
+		
+		use=$(echo $2 | jq ".openvpn_use")
+		#echo $use
+		if [[ ! -z $use && $use -eq 1 ]]; then
+			echo "Trying to activate openvpn"
+			cp /sobaka/cfg/openvpn.conf /etc/openvpn/client.conf
+			systemctl restart openvpn@client
+			sleep 15
+		fi
+
+		hello
+		exitcode=$?
+		return="$(date --rfc-3339=seconds)\n"$(ifconfig)
+		if [[ $exitcode -eq 0 ]]; then
+			msg "OpenVPN config" success "$return"
+		else
+			msg "OpenVPN config" error "Something goes wrong ($exitcode)\n$return"
+		fi
+	;;
+	telec*)
+		argument=`echo $1 | sed 's/telec //'`
+
+		raw_return=`$1 | sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"` #remove color
+		return=`echo $raw_return | sed '/^\s*$/d'`
+		exitcode=$?
+
+		[[ $exitcode -eq 0 ]] && type='info' || type='warning'
+	
+		data="$(date --rfc-3339=seconds)\n"
+		if [[ $argument == "start" || $argument == "restart" ]]; then
+			link=`echo "$raw_return" | grep "WebUI for this session" | sed 's/.*\(https.*\)$/\1/'`
+			#[[ $link ]] && title="Teleconsole <a href=$link>$argument</a>" || title="Teleconsole $argument"
+			#data="$(date --rfc-3339=seconds)\nLink <a href='$link'>connect to console</a>$return"
+			[[ $link ]] && data=$data"<a href='$link' target='_blank'>Connect to console</a>\n"
+		#else
+		#	#title="Teleconsole $argument"
+		#	data="$(date --rfc-3339=seconds)\n$return"
+		fi
+		data=$data"$return\nExitcode: $exitcode"
+		
+		
+		#echo $return
+		msg "Teleconsole $argument" $type "$data"
+	;;
+	*)
+		#echo "I don\`t know this command($1)"
+		msg "Unknown command ($1)" warning
+	;;
+esac
+
+rm $PID_file
+
+

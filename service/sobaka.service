@@ -1,0 +1,16 @@
+[Unit]
+Description=Sobaka mining daemon
+#After=display-manager.service
+#Requires=display-manager.service
+After=sobaka-boot.service
+#networking.service is not working in 18.04
+
+[Service]
+Type=simple
+ExecStart=/sobaka/sobaka
+WorkingDirectory=/sobaka
+
+[Install]
+WantedBy=multi-user.target
+
+#After=network-online.target

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
+}
+
+n=1
+command=$1
+[[ ! -z $1 && $1 == "2" ]] && n=2 && command=$2
+
+case $command in
+	show|"")
+		screen -d miner$n
+		screen -r miner$n
+	;;
+	restart)
+		screen_kill miner$n
+		echo "Miner screen killed, waiting to restart"
+	;;
+	list)
+		screen -ls
+	;;
+	*)
+		bname=`basename $0`
+		echo "Usage: $bname [2] show|restart|list"
+		echo "You can stop miner completely using site"
+	;;
+esac

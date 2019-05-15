@@ -1,0 +1,12 @@
+[Unit]
+Description=Sobaka start & driver check
+
+[Service]
+Type=oneshot
+ExecStart=/sobaka/sobaka-boot
+WorkingDirectory=/sobaka
+RemainAfterExit=1
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,111 @@
+#!/bin/bash
+#at first make Nvidia & AMD OC, then every 10 sec checks if the miners are closed, return them to live. Logic: second miner closes if it has same name with first
+LOG="/sobaka/log/sobaka.log"
+exec &>>$LOG
+
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+VARIABLES_CFG="/sobaka/cfg/variables.cfg"
+. $VARIABLES_CFG
+
+echo "================================================================"
+echo $(date --rfc-3339=seconds)" Started new session $0"
+
+#returns number of opened screens with argument name
+function screen_check () {
+	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
+}
+
+#kill screen session with name of first argument
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
+}
+
+function check_con () {
+	if [[ $1 == 'ewbf' || $1 == 't_rex' || $1 == 'claymore' || $1 == 'xmrig_amd' || $1 == 'xmrig_nvidia' ]]; then
+		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
+			killcx $con lo $?>/dev/null
+		done
+	fi
+}
+
+#check if config files exists
+[[ ! -f $VARIABLES_CFG || ! -f $BATCH_CFG ]] && echo "Configuration file(s) does not exist! Can\`t mine without configs..."
+
+export "PATH=$PATH:/sobaka:/sobaka/bin:/sobaka/sbin" #need to run sobaka scripts without prefix
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sobaka/lib
+export CUDA_DEVICE_ORDER
+
+#OC
+[[ $(gpu-detect AMD) -gt 0 ]] && amd-oc --firstrun
+[[ $(gpu-detect NVIDIA) -gt 0 ]] && sleep 7 && nvidia-oc --pill-delay
+
+while true; do
+	#source here for online updates
+	if [[ -f $BATCH_CFG ]];  then
+		. $BATCH_CFG
+		batch1="while true; do $batch1; echo -e \"\n>Miner exited, waiting 3 seconds to restart\n\"; sleep 3; done"
+		batch2="while true; do $batch2; echo -e \"\n>Miner exited, waiting 3 seconds to restart\n\"; sleep 3; done"
+
+		if [[ ! $miner1 ]]; then
+			if [[ $(screen_check miner1) -gt 0 ]]; then
+				screen_kill miner1
+				echo $(date --rfc-3339=seconds)" Killed previous miner1 screen [code 3: miner is not selected/stopped]"
+			fi
+		elif [[ $(screen_check miner1) -eq 0 ]]; then #miner is set up, screens = 0
+			check_con $miner1
+			screen -dmS miner1.$miner1 bash -c "$batch1"
+			echo -n $(date --rfc-3339=seconds)" Started miner1 screen with $miner1 "
+			[[ $miner1 == $lastcheck ]] && echo "[code 2: miner is not changed, but closed]" || echo "[code 0: simple start]"
+		elif [[	$miner1 != $lastcheck ]]; then #miner is set up, screens > 0, just check if miner changed, if not, everething is ok
+			screen_kill miner1
+			check_con $miner1
+			screen -dmS miner1.$miner1 bash -c "$batch1"
+			echo $(date --rfc-3339=seconds)" Restarted miner1 screen with $miner1 [code 1: miner changed]"
+		fi
+		
+		if [[ ! $miner2 ]]; then #check if miner2 is set up
+			if [[ $(screen_check miner2) -gt 0 ]]; then
+				screen_kill miner2
+				echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 3: miner is not selected/stopped]"
+			fi
+		elif [[ $miner2 == $lastcheck2 ]]; then #ok, miner is set up and miner = last check
+			if [[ $(screen_check miner2) == 0 ]]; then
+				if [[ $miner2 != $miner1 ]]; then #if miner2 is set up, screen = 0, miner2 != miner1
+					check_con $miner2
+					screen -dmS miner2.$miner2 bash -c "$batch2"
+					echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 2: miner is not changed, but closed]"
+				fi
+			else #ok, miner is set up and miner = last check and miner2 = miner1
+				if [[ $miner2 == $miner1 ]]; then
+					screen_kill miner2
+					echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 5: you can\`t start two same miners]"
+				fi
+			fi
+		elif [[ $(screen_check miner2) == 0 ]]; then 
+			if [[ ! $miner2 == $miner1 ]]; then #miner is set up, miner != last check (changed or first run) and screen = 0 and miner1 != miner2
+				check_con $miner2
+				screen -dmS miner2.$miner2 bash -c "$batch2"
+				echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 0: simple start]"
+			fi
+		else #miner is set up, miner != last check, screen > 0
+			if [[ ! $miner2 == $miner1 ]]; then  #miner is set up, miner != last check (changed or first run), screen > 0, miner1 != miner2
+				screen_kill miner2
+				check_con $miner2
+				screen -dmS miner2.$miner2 bash -c "$batch2"
+				echo $(date --rfc-3339=seconds)" Restarted miner2 screen with $miner2 [code 1: miner changed]"
+			else #miner is set up, miner != last check (changed or first run), screen > 0, miner1 = miner2 => miner2 changed to the same to miner 
+				screen_kill miner2
+				echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 5: you can\`t start two same miners]"
+			fi
+		fi
+
+		lastcheck=$miner1
+		lastcheck2=$miner2
+	else
+		echo $(date --rfc-3339=seconds)" Batch file $BATCH_CFG doesn\`t exist, sleep 10 seconds"	
+	fi
+	sleep 10
+	echo "$(tail -n 1000 $LOG)" > $LOG 
+	
+done

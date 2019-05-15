@@ -1,0 +1,24 @@
+#!/bin/bash
+
+CLAYMORE_LOG="/sobaka/log"
+
+#save last messages about hanging cards
+if [[ -e $CLAYMORE_LOG/claymore_noappend.log ]]; then
+	tail -n 100 $CLAYMORE_LOG/claymore_noappend.log > $CLAYMORE_LOG/claymore_reboot.log
+	lastmsg=`tac $CLAYMORE_LOG/claymore_reboot.log | grep -m1 -E "WATCHDOG|hangs" | sed -e 's/.*WATCHDOG: //' | tr -dc '[:print:]'`
+	#sed 's/^[0-9]\{0,2\}\:[0-9]\{0,2\}\:[0-9]\{0,2\}\:[0-9]\{0,4\}\s[a-zA-Z0-9]\{0,8\}/LOL/'`
+fi
+#echo "Lastmsg: "$lastmsg
+if [[ -z $lastmsg ]]; then
+	lastmsg="Claymore Reboot"
+else
+	lastmsg="Claymore Reboot: $lastmsg"
+fi
+if [[ -e $CLAYMORE_LOG/claymore_reboot.log ]]; then
+	return=$(date --rfc-3339=seconds)" Last 50 strings of Claymore log:\n"`tail -n 50 $CLAYMORE_LOG/claymore_reboot.log | sed -e 's/\"//g; /^\s*$/d;'`
+	msg "$lastmsg" danger "$return"
+else
+	msg "$lastmsg" danger "$return"
+fi
+
+nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &

@@ -1,0 +1,79 @@
+#!/bin/bash
+[ -t 1 ] && . colors #source colors only if running in terminal
+NVIDIA_CFG="/sobaka/cfg/nvidia.cfg"
+#whoami
+#echo $DISPLAY
+export DISPLAY=:0
+#export DISPLAY=:1.0 #only for 18.04 wayland
+#export DISPLAY=:1
+#export XAUTHORITY=/var/run/lightdm/root/:0
+
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z $MINER_PID ]]&& kill $MINER_PID
+}
+
+screen_kill pill
+
+echo -e $BROWN"================================================================"$WHITE
+n=$(gpu-detect NVIDIA)
+[[ $n == 0 ]]&&	echo $(date --rfc-3339=seconds)" 0 NVIDIA GPU detected" && exit 1
+echo -e $(date --rfc-3339=seconds)" $n ${GREEN}NVIDIA${WHITE} GPU detected"
+
+[[ ! -f $NVIDIA_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $NVIDIA_CFG does not exist!" && exit 1
+. $NVIDIA_CFG
+
+#Making arrays
+CORE_CLOCK=($CORE_CLOCK)
+MEMORY_CLOCK=($MEMORY_CLOCK)
+FAN=($FAN)
+PLIMIT=($PLIMIT)
+
+for (( i=0; i < $n; ++i )); do
+	[[ ! ${CORE_CLOCK[$i]} && ! -z ${CORE_CLOCK[0]} ]]&& CORE_CLOCK[$i]=${CORE_CLOCK[-1]}
+	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
+	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
+	[[ ! ${PLIMIT[$i]} && ! -z ${PLIMIT[0]} ]]&& PLIMIT[$i]=${PLIMIT[-1]}
+done
+
+echo "Trying to apply next settings:"
+echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
+echo -e ${CYAN}"Memory:${WHITE}\t\t${MEMORY_CLOCK[@]}"
+echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
+echo -e ${CYAN}"Power limit:${WHITE}\t${PLIMIT[@]}"
+[[ $LIGHT_OFF == 1 ]] && echo -e ${CYAN}"Light:${WHITE}\t\tTurn off"
+
+#We need to do persistence-mode just once
+nvidia-persistenced --persistence-mode
+nvidia-smi -pm 1
+echo -e $BROWN"================================================================"$WHITE
+#starting overclocking
+for (( i=0; i < $n; ++i )); do
+	gpunum=`nvidia-settings -q PCIBus | grep "gpu:$i" | sed 's/^.*\(gpu:[0-9]*\)]): \([0-9]*\).$/\1 (PCI Bus \2:00.0)/g'`
+	echo -e ${GREEN}$gpunum${WHITE}
+	args=
+	[[ ! -z ${CORE_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUGraphicsClockOffset[3]=${CORE_CLOCK[$i]}"
+	[[ ! -z ${MEMORY_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUMemoryTransferRateOffset[3]=${MEMORY_CLOCK[$i]}"
+	if [[ ! -z ${FAN[$i]} && ${FAN[$i]} != "A" ]]; then
+		args+=" -a [gpu:$i]/GPUFanControlState=1"
+		args+=" -a [fan:$i]/GPUTargetFanSpeed=${FAN[$i]}"
+	else
+		args+=" -a [gpu:$i]/GPUFanControlState=0"
+	fi
+	[[ ! -z $LIGHT_OFF ]] && args+=" -a [gpu:$i]/GPULogoBrightness=0"
+	#echo $args
+	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
+	[[ ! -z ${PLIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${PLIMIT[$i]}
+	[[ $(($i + 1)) < $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
+done
+if [[ $PILL == 1 ]]; then
+	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
+		sleep=30 
+		echo "Pill will be served after $sleep seconds"
+	else
+		sleep=0
+ 		echo "Pill is served"
+	fi
+ 	screen -dmS pill bash -c "sleep $sleep; /sobaka/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
+fi
+echo -e $BROWN"================================================================"$WHITE

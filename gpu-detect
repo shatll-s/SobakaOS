@@ -1,0 +1,75 @@
+#!/bin/bash
+
+[ -t 1 ] && . colors
+
+case $1 in
+	all)
+		lspci | lspci | grep -c "VGA"
+	;;
+	list)
+		NVIDIASMI_FILE=/tmp/nvidiagpudetect
+		AMDMEMINFO_FILE=/tmp/amdmeminfo
+		core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
+		for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
+			gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
+		done
+		
+		IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
+		unset IFS
+
+		for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
+			for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
+				[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
+			done
+		done
+
+		for (( i=0; i < ${#core_addr[@]}; i++ )); do
+			if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
+			sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
+				[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
+				fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+				#gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
+				gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
+				gpu_info[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5; print ","; print $4 }')
+				gpu_info[$i]=$(echo ${gpu_info[$i]} | sed 's/ ,/,/')
+				gpu_brand[$i]="A"
+			elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
+			sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
+				[[ ! -f $NVIDIASMI_FILE ]] &&
+					#nvidia-smi --query-gpu=gpu_bus_id,name,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader> $NVIDIASMI_FILE
+					nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader > $NVIDIASMI_FILE
+				nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
+				gpu_name[$i]=`awk -F ', ' '{print $2}' <<< $nvidiainfo`
+				gpu_info[$i]=`awk -F ', ' '{print $6$7$8 }' <<< $nvidiainfo`
+				gpu_info[$i]="Pow Lim (min/def/max): "$(echo ${gpu_info[$i]} | sed -e 's/\.00//g; s/ W/\//g; s/\/$/ W/')
+				gpu_brand[$i]="N"
+			else #GPU is INTEL
+				gpu_name=$(lspci | grep VGA | grep Intel | sed 's/.*controller: //')
+				#gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
+				gpu_brand[$i]="I"
+			fi
+			#echo "Name: "${gpu_name[$i]}", Bus "${gpu_busid_sys[$i]} #no need
+			echo -en ${CYAN}$i${WHITE}" "
+			#[[ ${gpu_busid_sys[$i]} -lt 10 ]] & gpu_busid_sys[$i]="0"${gpu_busid_sys[$i]}
+			echo -n ${gpu_busid_sys[$i]}":00.0 "
+			if [[ ${gpu_brand[$i]} == "A" ]]; then
+				echo -en $RED
+			elif [[ ${gpu_brand[$i]} == "N" ]]; then
+				echo -en $GREEN
+			else
+				echo -en $YELLOW
+			fi
+			echo -en ${gpu_name[$i]}$WHITE" "
+			echo -n ${gpu_info[$i]}
+			echo ""
+		done
+	;;
+	NVIDIA|AMD)
+		[[ -z $2 ]] && lspci | grep  "VGA" | grep -c "$1" && exit 0
+		[[ ! -z $2 && $1 == "NVIDIA" && $2 == "list" ]] &&  nvidia-smi --query-gpu=gpu_bus_id,name --format=csv,noheader | sed -e 's/[0]*://; s/^0//' 
+	;;
+	*)
+		bname=`basename $0`
+		echo "Usage: $bname AMD|NVIDIA|all|list|NVIDIA list"
+	;;
+esac

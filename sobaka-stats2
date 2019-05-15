@@ -1,0 +1,708 @@
+#!/bin/bash
+API_TIMEOUT=10
+RIG_CFG="/sobaka/cfg/rig.cfg"
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+#WALLET_CFG="/sobaka/cfg/wallet.cfg"
+VARIABLES_CFG="/sobaka/service/variables"
+NVIDIASMI_FILE=/tmp/nvidiasmi #need to get some info from nvidia-smi
+RESPONSE_FILE=/sobaka/log/response.log
+COMMANDS_FILE=/sobaka/log/commands.log
+LOG="/sobaka/log/sobaka-agent.log"
+. colors
+#exec &>>$LOG
+
+#####################################################
+#get miner stats							  		#
+#####################################################
+function miner_stats() {
+. $VARIABLES_CFG
+port=${APIPORT["$1"]}
+echo $port
+
+case $1 in
+	ewbf)
+		stats_template=`echo "GET /getstat" | nc -w $API_TIMEOUT localhost 42000 | tail -n 1`
+		miner_online=(`echo $stats_template | jq -r '.result[].start_time'`) 
+		#miner_busid=(`echo $stats_template | jq -c '.result[].busid' | sed -e 's/\"//g; s/0000://g'`)
+		miner_busid=(`echo $stats_template | jq -c '.result[].busid' | sed 's/.*0000:\([0-9]*\):.*"/\1/g'`)
+		for ((i=0; i < ${#miner_busid[@]}; i++)); do
+			let miner_busid[$i]=${miner_busid[$i]}+0
+		done
+		miner_power=(`echo $stats_template | jq -r '.result[].gpu_power_usage' | sed 's/;/\n/g'`)
+		miner_temp=(`echo $stats_template | jq -r '.result[].temperature' | sed 's/;/\n/g'`)
+		miner_hr=(`echo $stats_template | jq -r '.result[].speed_sps' | sed 's/;/\n/g'`)
+		miner_share=(`echo $stats_template | jq -r '.result[].accepted_shares'`)
+		miner_badshare=(`echo $stats_template | jq -r '.result[].rejected_shares'`)
+		miner_algo="equihash"
+		miner_total_hr=0 #ewbf doesn`t give total hr, calculating
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do
+			miner_total_hr=$(($miner_total_hr+${miner_hr[$i]}))
+		done
+		miner_total_share=0 #ewbf doesn`t give total share, calculating
+		for ((i=0; i < ${#miner_share[@]}; i++)); do
+			miner_total_share=$(($miner_total_share+${miner_share[$i]}))
+		done
+		miner_total_badshare=0 #ewbf doesn`t give total badshare, calculating
+		for ((i=0; i < ${#miner_badshare[@]}; i++)); do
+			miner_total_badshare=$(($miner_total_badshare+${miner_badshare[$i]}))
+		done
+	;;
+	claymore)
+		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat2"}' | nc -w $API_TIMEOUT localhost 3333 | jq '.result'`
+		miner_ver=`echo $stats_template | jq -r '.[0]'`
+		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
+		if (($miner_online_raw)); then
+			miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
+		fi
+		miner_algo="ethash"
+		local miner_hr=(`echo $stats_template | jq -r '.[3]' | sed 's/;/\n/g'`)
+		miner_share=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		miner_badshare=(`echo $stats_template | jq -r '.[10]' | sed 's/;/\n/g'`)
+		miner_invshare=(`echo $stats_template | jq -r '.[11]' | sed 's/;/\n/g'`)
+		miner_busid=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		miner_total_hr=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $1}'`
+		miner_total_share=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $2}'`
+		miner_total_badshare=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $3}'`
+		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
+		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
+		#dual
+		miner_dual_total_hr=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $1}'`
+		miner_dual_total_share=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $2}'`
+		miner_dual_total_badshare=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $3}'`
+		local miner_dual_hr=(`echo $stats_template | jq -r '.[5]' | sed 's/;/\n/g'`)
+		#[[ $miner_dual_total_hr ]] && . $WALLET_CFG && miner_dual_algo=$CLAYMORE_DUALCOIN
+	;;
+	bminer)
+		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:1880/api/status`
+		miner_online=(`echo $stats_template | jq -r '.start_time'`)
+		miner_ver=(`echo $stats_template | jq -r '.version'`)
+		miner_power=(`echo $stats_template | jq -r '.miners[].device.power' | sed 's/;/\n/g'`)
+		miner_temp=(`echo $stats_template | jq -r '.miners[].device.temperature' | sed 's/;/\n/g'`)
+		miner_fan=(`echo $stats_template | jq -r '.miners[].device.fan_speed' | sed 's/;/\n/g'`)
+		miner_hr=(`echo $stats_template | jq -r '.miners[].solver.solution_rate' | sed 's/;/\n/g'`)
+		miner_total_hr=0 #bminer doesn`t give total hr, calculating
+		miner_algo=`echo $stats_template | jq -r '.algorithm'`
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do
+			miner_total_hr=$(echo "$miner_total_hr + ${miner_hr[$i]}" | bc -l)
+		done
+		miner_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares'`)
+		miner_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares'`)
+	;;
+	ccminer)
+		#port='4068'
+		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
+		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s)
+		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_total_hr=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*\nKHS=\([0-9.]*\)\n.*/\1/; s/\.[0-9]*//'`
+		miner_total_share=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ACC=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_total_badshare=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*REJ=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		threads=`echo "threads" | nc -w 5 localhost $port | tr -d '\0'`
+		gpuarr=`echo "$threads" | sed -e 's/|/\n/g; s/;/\n/g'`
+		miner_temp=(`echo "$gpuarr" | grep 'TEMP=' | sed 's/TEMP=\([0-9]*\).*/\1/'`)
+		miner_fan=(`echo "$gpuarr" | grep 'FAN=' | sed 's/FAN=\([0-9]*\).*/\1/'`)
+		miner_busid=(`echo "$gpuarr" | grep 'BUS=' | sed 's/BUS=\([0-9]*\).*/\1/'`)
+		miner_hr=(`echo "$gpuarr" | grep 'KHS=' | sed 's/KHS=\([0-9]*\).*/\1/'`)
+		miner_share=(`echo "$gpuarr" | grep 'ACC=' | sed 's/ACC=\([0-9]*\).*/\1/'`)
+		miner_badshare=(`echo "$gpuarr" | grep 'REJ=' | sed 's/REJ=\([0-9]*\).*/\1/'`)
+		miner_hr=(`echo "$gpuarr" | grep 'KHS=' | sed 's/KHS=\([0-9]*\).*/\1/'`)
+
+		if [[ $miner_algo == "x16r" ]]; then
+			miner_total_hr=`echo "$miner_total_hr * 1000" | bc`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "${miner_hr[$i]} * 1000" | bc`
+				done
+			fi
+		fi
+	;;
+	ethminer)
+		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}' | nc -w $API_TIMEOUT localhost 3000 | jq '.result'`
+		miner_ver=`echo $stats_template | jq -r '.[0]'`
+		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
+		if (($miner_online_raw)); then
+			miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
+		fi
+		miner_algo="ethash"
+		local miner_hr=(`echo $stats_template | jq -r '.[3]' | sed 's/;/\n/g'`)
+		miner_total_hr=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $1}'`
+		miner_total_share=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $2}'`
+		miner_total_badshare=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $3}'`
+		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
+		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
+	;;
+	cpuminer)
+		port='4048'
+		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port`
+		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s)
+		#miner_total_hr=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*\nKHS=\([0-9.]*\)\n.*/\1/; s/\.[0-9]*//'`
+		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_total_share=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ACC=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_total_badshare=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*REJ=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		threads=`echo "threads" | nc -w 5 localhost $port`
+		cpuarr=`echo "$threads" | sed -e 's/|/\n/g; s/;/\n/g'`
+		miner_hr=(`echo "$cpuarr" | grep 'KHS=' | sed 's/KHS=\([0-9]*\).*/\1/'`)
+		#if [[ $miner_total_hr == "0" && ! -z $miner_hr ]]; then #strange bug: sometimes cpuminer shows 0 total hr
+		miner_total_hr=0	
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do
+			#let miner_hr[$i]=miner_hr[$i]/1000
+			#[[ ${miner_hr[$i]} -lt 1000 ]] && 
+			miner_hr[$i]=$(echo "scale=2; ${miner_hr[$i]}/1000" | bc -l)
+			#echo ${miner_hr[$i]}
+			#miner_total_hr=$(($miner_total_hr+${miner_hr[$i]}))
+			miner_total_hr=$(echo "scale=2;$miner_total_hr+${miner_hr[$i]}" | bc -l)
+
+		done
+		#fi
+	;;
+	claymore_*)
+		case $1 in
+			claymore_z)
+				port="3337" && miner_algo="equihash"
+			;;
+			claymore_c)
+				port="3335" && miner_algo="cryptonight"
+		esac
+		#[[ $1 == "claymore_z" ]] && port="3337" || port="3335"
+		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}' | nc -w $API_TIMEOUT localhost $port | jq '.result'`
+		miner_ver=`echo $stats_template | jq -r '.[0]'`
+		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
+		[[ $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
+		local miner_hr=(`echo $stats_template | jq -r '.[3]' | sed 's/;/\n/g'`)
+		miner_busid=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		miner_total_hr=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $1}'`
+		miner_total_share=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $2}'`
+		miner_total_badshare=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $3}'`
+		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
+		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
+	;;
+	sgminer)
+		stats_template=`echo "{\"command\":\"summary\"}" | nc -w $API_TIMEOUT localhost 5598`;
+		miner_ver=`echo $stats_template | jq -r '.STATUS[0].Description'`
+		miner_online_raw=`echo $stats_template | jq -r '.SUMMARY[0].Elapsed'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
+		miner_total_hr=`echo $stats_template | jq -r '.SUMMARY[0]."MHS 5s"' | sed 's/\.[0-9]*//g'`
+		miner_total_share=`echo $stats_template | jq -r '.SUMMARY[0].Accepted'`
+		miner_total_badshare=`echo $stats_template | jq -r '.SUMMARY[0].Rejected'`
+		gpuarr=`echo "{\"command\":\"devs\"}" | nc -w $API_TIMEOUT localhost 5598 | jq '.DEVS'`;
+		miner_hr=(`echo $gpuarr | jq '.[]."MHS 5s"' | sed 's/\.[0-9]*//g'`)
+		miner_temp=(`echo $gpuarr | jq '.[].Temperature'`)
+		miner_fan=(`echo $gpuarr | jq '.[]."Fan Percent"'`)
+		miner_share=(`echo $gpuarr | jq '.[]."Accepted"'`)
+		miner_badshare=(`echo $gpuarr | jq '.[]."Rejected"'`)
+		#. $WALLET_CFG
+		#[[ ! -z $SGMINER_ALGO ]] && miner_algo=$SGMINER_ALGO
+	;;
+	t_rex)
+		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost ${APIPORT[$1]}`
+		miner_ver=`echo $stats_template | jq -r '.version'`
+		miner_algo=`echo $stats_template | jq -r '.algorithm'`
+		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		miner_total_hr=`echo $stats_template | jq -r '.hashrate'`
+		miner_total_share=`echo $stats_template | jq -r '.accepted_count'`
+		miner_total_badshare=`echo $stats_template | jq -r '.rejected_count'`
+		miner_hr=(`echo $stats_template | jq '.gpus[].hashrate'`)
+		miner_temp=(`echo $stats_template | jq '.gpus[].temperature'`)
+		miner_fan=(`echo $stats_template | jq '.gpus[].fan_speed'`)
+		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
+	;;
+	nanominer)
+		#miner_ver=`echo $stats_template | jq -r '.[0]'` #no miner version in API
+		local stats_template=$(curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET '127.0.0.1:9090/stats')
+		miner_online_raw=`echo $stats_template | jq -r '.WorkTime'`
+		if (($miner_online_raw)); then
+			miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		fi
+		miner_algo=`echo $stats_template | jq '.Algorithms[]' | jq -r 'keys[]' | tr '[:upper:]' '[:lower:]'`
+		miner_total_hr_raw=`echo $stats_template | jq -r '.Algorithms[][].Total.Hashrate' | jq '.'`
+		miner_total_hr=$(echo "scale=0; `echo $miner_total_hr_raw | jq '.'`/1000" | bc -l)
+		miner_total_share=`echo $stats_template | jq -r '.Algorithms[][].Total.Accepted'`
+		miner_total_badshare=`echo $stats_template | jq -r '.Algorithms[][].Total.Denied'`
+
+		miner_busid=(`echo $stats_template | jq -r '.Devices[][].Pci'`)
+		miner_temp=(`echo $stats_template | jq -r '.Devices[][].Temperature'`)
+		miner_fan=(`echo $stats_template | jq -r '.Devices[][].Fan'`)
+		miner_power=(`echo $stats_template | jq -r '.Devices[][].Power' | sed 's/\.[0-9]*//g'`)
+
+		devices=`echo $stats_template | jq ".Algorithms[][]" | jq 'del(.CurrentPool)' | jq 'del(.Total)' | jq 'del(.ReconnectionCount)'`
+
+		miner_hr_raw=(`echo $devices | jq -r '.[].Hashrate' | jq '.'`)
+		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
+			miner_hr[$i]=$(echo "scale=0; ${miner_hr_raw[$i]}/1000" | bc -l)
+		done
+		miner_share=(`echo $devices | jq -r '.[].Accepted'`)
+		miner_badshare=(`echo $devices | jq -r '.[].Denied'`)
+	;;
+	lolminer)
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:8080/summary`
+		
+		miner_ver=`echo $stats_template | jq -r '.Software'`
+		miner_online=`echo $stats_template | jq -r '.Session.Startup'`
+		miner_algo=`echo $stats_template | jq -r '.Mining.Algorithm' | sed 's/ -.*//'`
+		
+		miner_total_hr=`echo $stats_template | jq -r '.Session.Performance_Summary'`
+		miner_total_share=`echo $stats_template | jq -r '.Session.Accepted'`
+		miner_total_badshare=$(echo "`echo $stats_template | jq -r '.Session.Submitted'` - $miner_total_share" | bc -l)
+		miner_busid=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
+
+		miner_hr=(`echo $stats_template | jq -r '.GPUs[].Performance'`)
+		miner_share=(`echo $stats_template | jq -r '.GPUs[].Session_Accepted'`)
+		miner_submitted=(`echo $stats_template | jq -r '.GPUs[].Session_Submitted'`)
+		for ((i=0; i < ${#miner_share[@]}; i++)); do
+			miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
+		done
+	;;
+	gminer)
+		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/stat`
+		miner_ver=`echo $stats_template | jq -r '.miner' | sed 's/GMiner //'`
+		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
+		if (($miner_online_raw)); then
+			miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		fi
+		miner_algo=`echo $stats_template | jq -r '.algorithm' | sed 's/\"//g'`
+		miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares'`
+		miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares'`
+		miner_busid=(`echo $stats_template | jq -r '.devices[].bus_id' | sed 's/0000:\([0-9][0-9]\):.*/\1/g'`)
+		
+		miner_temp=(`echo $stats_template | jq -r '.devices[].temperature'`)
+		miner_hr=(`echo $stats_template | jq -r '.devices[].speed'`)
+		miner_total_hr=0
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do
+			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+		done
+	;;
+	xmrig*)
+		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/api/status`
+		miner_ver=`echo $stats_template | jq -r '.version'`
+		miner_online_raw=`echo $stats_template | jq -r '.connection.uptime'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+
+		miner_algo=`echo $stats_template | jq -r '.algo'`
+		miner_all_share=`echo $stats_template | jq -r '.results.shares_total'`
+		miner_total_share=`echo $stats_template | jq -r '.results.shares_good'`
+		miner_total_badshare=$(($miner_all_share - $miner_total_share))
+		miner_total_hr=`echo $stats_template | jq -r '.hashrate.total[0]'`
+		miner_threads_hr=(`echo $stats_template | jq -r '.hashrate.threads[][0]'`)
+		#echo "Miner threads hr: "${miner_threads_hr[@]}
+	;;
+	z_enemy)
+		stats_template=`echo 'summary' | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
+		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
+		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s)
+		#miner_total_hr=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*\nKHS=\([0-9.]*\)\n.*/\1/; s/\.[0-9]*//'`
+		miner_total_share=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ACC=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		miner_total_badshare=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*REJ=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+				
+		threads=`echo "threads" | nc -w 5 localhost $port | tr -d '\0'`
+		gpuarr=`echo "$threads" | sed -e 's/|/\n/g; s/;/\n/g'`
+		miner_temp=(`echo "$gpuarr" | grep 'TEMP=' | sed 's/TEMP=\([0-9]*\).*/\1/'`)
+		miner_fan=(`echo "$gpuarr" | grep 'FAN=' | sed 's/FAN=\([0-9]*\).*/\1/'`)
+		miner_busid=(`echo "$gpuarr" | grep 'BUS=' | sed 's/BUS=\([0-9]*\).*/\1/'`)
+		miner_hr=(`echo "$gpuarr" | grep 'KHS=' | sed 's/KHS=\([0-9]*\).*/\1/'`)
+		miner_share=(`echo "$gpuarr" | grep 'ACC=' | sed 's/ACC=\([0-9]*\).*/\1/'`)
+		miner_badshare=(`echo "$gpuarr" | grep 'REJ=' | sed 's/REJ=\([0-9]*\).*/\1/'`)
+		miner_total_hr=0
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do #total hr from summary is incorrect
+			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+		done
+	;;
+	xmr_stak)
+		port=10060
+		stats_template=`curl --connect-timeout 2 --silent --max-time 10 --noproxy '*' http://127.0.0.1:$port/api.json`
+		echo $stats_template | jq '.'
+		
+		#stupid xmr_stak API doesn`t give algo, let`s get it from config
+		[[ $miner1 == "xmr_stak" ]] && pools_txt=`echo $batch1 | sed 's/.*-C //'` || pools_txt=`echo $batch2 | sed 's/.*-C //'`
+		pools_json="{"`cat $pools_txt`"}"
+		miner_algo=`echo $pools_json | jq -r ".currency" `
+		#ok, we got it
+
+		miner_ver=`echo $stats_template | jq -r ".version" | awk -F '/' '{print $2}'`
+		miner_online_raw=`echo $stats_template | jq -r '.connection.uptime'`
+		if [[ ! -z $miner_online_raw && $miner_online_raw != null ]]; then
+			miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		fi
+		miner_all_share=`echo $stats_template | jq -r '.results.shares_total'`
+		miner_total_share=`echo $stats_template | jq -r '.results.shares_good'`
+		[[ ! -z $miner_all_share && ! -z $miner_total_share ]] && miner_total_badshare=$(($miner_all_share - $miner_total_share))
+
+		miner_total_hr=`echo $stats_template | jq -r '.hashrate.total[0]'`
+		miner_threads_hr=(`echo $stats_template | jq -r '.hashrate.threads[][0]'`)
+	;;
+esac
+
+
+}
+
+. $BATCH_CFG
+miner_stats $miner1
+
+exit 0
+
+
+##################################################################
+#making json array of some miner stats
+
+if [[ ! -z $miner_temp ]]; then #if miner temperature stats exist
+	miner_temp_json='{}' #nullify json
+	for ((i=0; i < ${#miner_temp[@]}; i++)); do
+		miner_temp_json=$(jq -n --arg data "$miner_temp_json" \
+			--arg key "$i" \
+			--arg value "${miner_temp[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_fan ]]; then #if miner fan stats exist
+	miner_fan_json='{}' #nullify json
+	for ((i=0; i < ${#miner_fan[@]}; i++)); do
+		miner_fan_json=$(jq -n --arg data "$miner_fan_json" \
+			--arg key "$i" \
+			--arg value "${miner_fan[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+	miner_hr_json='{}' #nullify json
+	for ((i=0; i < ${#miner_hr[@]}; i++)); do
+		miner_hr_json=$(jq -n --arg data "$miner_hr_json" \
+			--arg key "$i" \
+			--arg value "${miner_hr[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_threads_hr ]]; then #if miner dual hr stats exist
+	miner_threads_hr_json='{}' #nullify json
+	for ((i=0; i < ${#miner_threads_hr[@]}; i++)); do
+		miner_threads_hr_json=$(jq -n --arg data "$miner_threads_hr_json" \
+			--arg key "$i" \
+			--arg value "${miner_threads_hr[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_busid ]]; then #if miner busid stats exist
+	miner_busid_json='{}' #nullify json
+	for ((i=0; i < ${#miner_busid[@]}; i++)); do
+		miner_busid_json=$(jq -n --arg data "$miner_busid_json" \
+			--arg key "$i" \
+			--arg value "${miner_busid[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_power ]]; then #if miner power stats exist
+	miner_power_json='{}' #nullify json
+	for ((i=0; i < ${#miner_power[@]}; i++)); do
+		miner_power_json=$(jq -n --arg data "$miner_power_json" \
+			--arg key "$i" \
+			--arg value "${miner_power[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_share ]]; then #if miner share stats exist
+	miner_share_json='{}' #nullify json
+	for ((i=0; i < ${#miner_share[@]}; i++)); do
+		miner_share_json=$(jq -n --arg data "$miner_share_json" \
+			--arg key "$i" \
+			--arg value "${miner_share[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_invshare ]]; then #if miner invalid share stats exist
+	miner_invshare_json='{}' #nullify json
+	for ((i=0; i < ${#miner_invshare[@]}; i++)); do
+		miner_invshare_json=$(jq -n --arg data "$miner_invshare_json" \
+			--arg key "$i" \
+			--arg value "${miner_invshare[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_badshare ]]; then #if miner badshare stats exist
+	miner_badshare_json='{}' #nullify json
+	for ((i=0; i < ${#miner_badshare[@]}; i++)); do
+		miner_badshare_json=$(jq -n --arg data "$miner_badshare_json" \
+			--arg key "$i" \
+			--arg value "${miner_badshare[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ ! -z $miner_dual_hr ]]; then #if miner dual hr stats exist
+	miner_dual_hr_json='{}' #nullify json
+	for ((i=0; i < ${#miner_dual_hr[@]}; i++)); do
+		miner_dual_hr_json=$(jq -n --arg data "$miner_dual_hr_json" \
+			--arg key "$i" \
+			--arg value "${miner_dual_hr[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+miner_json=$(jq -n "{\"miner\": \"$1\"}")
+
+if [[ $miner_algo ]]; then
+	miner_algo=`echo $miner_algo | tr '[:upper:]' '[:lower:]'`
+	#[[ $miner_algo == *"equihash 150,5"* || $miner_algo == *"equihash 150/5"* ]] && miner_algo="equihash 150.5"
+	#[[ $miner_algo == *"cuckaroo"*"29"* ]] && miner_algo="cuckaroo29"
+	
+	if [[ $miner_algo == *"equihash"* ]];then
+		miner_algo=`echo $miner_algo | sed "s/\s//g; s#[,/]#.#g; s/beam-pow//"`
+	elif [[ $miner_algo == *"cuckaroo"* ]];then
+		miner_algo=`echo $miner_algo | sed "s/\s//g; s/grin//"`
+	fi
+
+	miner_json=`jq ". + {\"miner_algo\": \"$miner_algo\"}" <<< "$miner_json"`
+fi
+
+[[ $miner_online ]] && 			miner_json=`jq ". + {\"miner_online\": \"$miner_online\"}" <<< "$miner_json"`
+[[ $miner_total_hr ]] && 		miner_json=`jq ". + {\"miner_total_hr\": \"$miner_total_hr\"}" <<< "$miner_json"`
+[[ $miner_total_share ]] && 	miner_json=`jq ". + {\"miner_total_share\": \"$miner_total_share\"}" <<< "$miner_json"`
+[[ $miner_total_badshare ]] && 	miner_json=`jq ". + {\"miner_total_badshare\": \"$miner_total_badshare\"}" <<< "$miner_json"`
+[[ $miner_ver ]] && 			miner_json=`jq ". + {\"miner_ver\": \"$miner_ver\"}" <<< "$miner_json"`
+[[ $miner_temp_json ]] && 		miner_json=`jq ". + {\"miner_temp\": $miner_temp_json}" <<< "$miner_json"`
+[[ $miner_fan_json ]] && 		miner_json=`jq ". + {\"miner_fan\": $miner_fan_json}" <<< "$miner_json"`
+[[ $miner_hr_json ]] && 		miner_json=`jq ". + {\"miner_hr\": $miner_hr_json}" <<< "$miner_json"`
+[[ $miner_threads_hr_json ]] && miner_json=`jq ". + {\"miner_threads_hr\": $miner_threads_hr_json}" <<< "$miner_json"`
+[[ $miner_power_json ]] && 		miner_json=`jq ". + {\"miner_power\": $miner_power_json}" <<< "$miner_json"`
+[[ $miner_share_json ]] && 		miner_json=`jq ". + {\"miner_share\": $miner_share_json}" <<< "$miner_json"`
+[[ $miner_badshare_json ]] && 	miner_json=`jq ". + {\"miner_badshare\": $miner_badshare_json}" <<< "$miner_json"`
+[[ $miner_invshare_json ]] && 	miner_json=`jq ". + {\"miner_invshare\": $miner_invshare_json}" <<< "$miner_json"`
+[[ $miner_busid_json ]] && 		miner_json=`jq ". + {\"miner_busid\": $miner_busid_json}" <<< "$miner_json"`
+
+if [[ $miner_dual_hr ]]; then
+	dual_json=$(
+		jq -n \
+		--arg miner_dual_algo "$miner_dual_algo" \
+		--arg miner_dual_total_hr "$miner_dual_total_hr" \
+		--arg miner_dual_total_share "$miner_dual_total_share" \
+		--arg miner_dual_total_badshare "$miner_dual_total_badshare" \
+		--argjson miner_dual_hr "$miner_dual_hr_json" \
+		'{	
+			$miner_dual_algo,
+			$miner_dual_total_hr,			
+			$miner_dual_total_share,
+			$miner_dual_total_badshare,
+			$miner_dual_hr
+		}'
+	)
+	miner_json=`jq ". + { \"dual\": $dual_json }" <<< "$miner_json"`
+fi
+
+echo $miner_json | jq '.' 
+echo $miner_total_hr > /tmp/hr.$1
+}
+
+##################################################################
+function stats {
+
+core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
+for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
+	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
+done
+
+IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
+unset IFS
+
+for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
+	for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
+		[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
+	done
+done
+
+for (( i=0; i < ${#core_addr[@]}; i++ )); do
+	#echo "Card $i, core addr ${core_addr[$i]}"
+	#local gpu_busid_sys[$i]=$(cat ${core_addr[$i]}/uevent | grep "PCI_SLOT_NAME" | sed -e 's/PCI_SLOT_NAME\=//; s/0000://')
+	#echo ${gpu_busid_sys[$i]} #no need
+	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
+		#echo "GPU $i is AMD" #no need
+		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+		local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
+		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
+		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is something like 65000
+		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
+		local power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
+	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
+		#echo "GPU $i is NVIDIA" #no need
+		#echo "BUSID: "${gpu_busid_sys[$i]}
+		nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader> $NVIDIASMI_FILE
+        local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i "${gpu_busid_sys[$i]}:"`
+		local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
+		local fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
+		local rig_gpu_fan_raw[$i]=$(echo ${fan_raw[$i]} | sed 's/ %//')
+		local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`
+		local power[$i]=$(echo ${power_raw[$i]} | sed 's/\.[0-9]* W//')
+	fi
+done
+
+##################################################################
+#making json array of temp
+local rig_gpu_temp_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local rig_gpu_temp_json=$(jq -n --arg data "$rig_gpu_temp_json" \
+        	--arg key "$i" \
+        	--arg value "${rig_gpu_temp_raw[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+#making json array of fan
+local rig_gpu_fan_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	local rig_gpu_fan_json=$(jq -n --arg data "$rig_gpu_fan_json" \
+        	--arg key "$i" \
+        	--arg value "${rig_gpu_fan_raw[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+#making json array of HR
+local gpu_hr_json='{}' #nullify json
+for ((i=0; i < ${#gpu_hr[@]}; i++)); do
+	local gpu_hr_json=$(jq -n --arg data "$gpu_hr_json" \
+        	--arg key "$i" \
+        	--arg value "${gpu_hr[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+local gpu_share_json='{}' #nullify json
+for ((i=0; i < ${#gpu_share[@]}; i++)); do
+	local gpu_share_json=$(jq -n --arg data "$gpu_share_json" \
+                --arg key "$i" \
+                --arg value "${gpu_share[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+local gpu_badshare_json='{}' #nullify json
+for ((i=0; i < ${#gpu_badshare[@]}; i++)); do
+	local gpu_badshare_json=$(jq -n --arg data "$gpu_badshare_json" \
+       	--arg key "$i" \
+       	--arg value "${gpu_badshare[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+local power_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+        local power_json=$(jq -n --arg data "$power_json" \
+        --arg key "$i" \
+        --arg value "${power[$i]}" \
+                '$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
+ip_json='{}'
+for ((i=0; i < ${#ip[@]}; i++)); do
+	ip_json=$(jq -n --arg data "$ip_json" \
+		--arg key "$i" \
+		--arg value "${ip[$i]}" \
+		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+
+[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats $miner1) || miner1_stats='{}'
+[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats $miner2) || miner2_stats='{}'
+
+local request=$(
+	jq -n \
+	--arg password "$PASSWD" \
+	--arg refresh "$(date +%s)" \
+	--arg online "$up" \
+	--argjson ip "$ip_json" \
+	--argjson gpu_temp "$rig_gpu_temp_json" \
+	--argjson gpu_fan "$rig_gpu_fan_json" \
+	--argjson gpu_power "$power_json" \
+	--arg cpu_avg "`uptime | awk -F': ' '{print $2}' | sed 's/\, /X/g' | sed 's/\,/\./g' | sed 's/X/\, /g'`" \
+	--argjson miner1 "$miner1_stats" \
+	--argjson miner2 "$miner2_stats" \
+	'{	
+		"method": "sendstats",
+		"jsonrpc": "2.0",
+		"stats": {
+			$password,
+			$refresh,
+			$online,
+			$ip,
+			$gpu_temp,
+			$gpu_fan,
+			$gpu_power,
+			$cpu_avg,
+			$miner1,
+			$miner2
+		}
+	}'
+
+)
+
+echo $request | jq '.' -c #echo in screen
+
+#get server answer
+local response=$(echo $request | curl -s --data @- \
+	--connect-timeout 7 --max-time 15 \
+	"${HOST}?id=${RIG_ID}&method=sendstats" -H "Content-Type: application/json; charset=utf-8\r\n")
+
+if [[ $? -eq 0 ]]; then
+	if [[ $msg_count -eq 1 ]]; then 
+		echo -n $(date --rfc-3339=seconds)" Stats are sending correctly..." >> $LOG
+	elif [[ $msg_count -eq 0 ]]; then
+		echo $(date --rfc-3339=seconds)" Stats sent" >> $LOG
+	fi
+	((msg_count++))
+	echo $(date --rfc-3339=seconds)" Stats sent" #echo in screen
+else
+	[[ $msg_count -gt 1 ]] && echo " until "$(date --rfc-3339=seconds) >> $LOG && msg_count=0
+	echo $(date --rfc-3339=seconds)" Error while sending stats" >> $LOG
+	echo $(date --rfc-3339=seconds)" Error while sending stats"
+fi
+
+##################################################################
+#Analysing server answer, put commands in file
+##################################################################
+if [[ $response ]] ; then #if we get answer (pass is ok, etc)
+	#echo $response | jq -R '.'
+	[[ $msg_count -gt 1 ]] && echo "... until "$(date --rfc-3339=seconds) >> $LOG
+	echo -n $(date --rfc-3339=seconds)" Host answer received " >> $LOG
+	echo -n $(date --rfc-3339=seconds)" Host answer received " #echo in screen
+	local count=$(echo $response | jq '.|length') #count number of comands (if > 0, then executing)
+	if [ $count ] && (($count >= 1)); then
+		echo "($count commands)" >> $LOG
+		echo "($count commands)" #echo in screen
+		for ((i=0; i < $count; i++)); do
+			local command_type=$(echo $response | jq ".[$i].command_type" --raw-output)
+			local command_argument=$(echo $response | jq ".[$i].command_argument" --raw-output)
+			local title=$(echo $response | jq ".[$i].title" --raw-output)
+			sobaka-work "$command_type" "$command_argument" >> $LOG &
+		done
+	#else #if $count < 1, no commands received
+	#	echo "($count commands)" >> $LOG
+	fi
+	msg_count=0
+fi
+
+sync
+echo -e $BROWN"================================================================"$WHITE #echo in screen
+}
+echo "3333333333333"
+export DISPLAY=":0"
+export "PATH=$PATH:/sobaka:/sobaka/bin:/sobaka/sbin"
+export CUDA_DEVICE_ORDER
+. $RIG_CFG
+. $BATCH_CFG
+up_time=$(uptime -s)
+up=$(date --date "$up_time" +%s)
+msg_count=0
+echo "333"
+[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats $miner1) || miner1_stats='{}'
+echo miner1_stats
+[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats $miner2) || miner2_stats='{}'
+echo miner2_stats
+	#stats
+
+

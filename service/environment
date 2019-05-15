@@ -1,0 +1,2 @@
+PATH="/sobaka:/sobaka/bin:/sobaka/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+CUDA_DEVICE_ORDER=PCI_BUS_ID

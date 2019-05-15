@@ -1,0 +1,9 @@
+[Unit]
+Description=Sobaka X server
+
+[Service]
+Type=simple
+ExecStart=/sobaka/sobakax
+EnvironmentFile=/etc/environment
+
+[Install]

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+#returns number of opened screens with argument name
+function screen_check () {
+	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
+}
+
+#kill screen session with name of first argument
+function screen_kill () {
+	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
+	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
+}
+
+case $1 in
+	run)
+		while true; do
+			[[ $(screen_check agent) -eq 0 ]] && echo "Starting agent screen" && screen -dmS agent bash -c "/sobaka/sobaka-stats"
+			sleep 10
+		done
+	;;
+	*)
+		screen -r agent
+	;;
+esac

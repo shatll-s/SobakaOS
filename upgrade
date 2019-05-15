@@ -1,0 +1,64 @@
+#!/bin/bash
+#apt-get -q=2 install sed ssh openvpn nano mc jq curl screen libnet-rawip-perl #recomended packages
+RIG_CFG="/sobaka/cfg/rig.cfg"
+. $RIG_CFG
+[ -t 1 ] && . colors
+
+function upgrade_deb () {
+	local debname=$1
+	local latest_ver=$2
+	local ver=`apt-cache policy $debname | grep Installed | sed 's/Installed://; s/\s*//'`
+
+	if [[ ! -z $ver && `echo "$ver >= $latest_ver" | bc` -eq 1  ]]; then
+		echo -e "${GREEN}>Package $debname ($ver) is up-to-date${WHITE}"
+	else
+		echo -e "${CYAN}>Package $debname ($ver) needs to be updated${WHITE}"
+		
+		local download_link=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/$debname-latest.deb"
+		wget -q $download_link
+		local exitcode=$?
+		[[ $exitcode -ne 0 ]] && echo -e "${RED}>Error occured while downloading sobaka-libs package${WHITE}" && return
+
+		echo -e "${GREEN}>Package $debname downloaded${WHITE}"
+		dpkg -i "$debname-latest.deb"
+		local exitcode=$?
+		[[ $exitcode -eq 0 ]] && echo -e "${GREEN}>Package $debname successfully installed${WHITE}" ||
+			echo -e "${RED}>Error occured while installing $debname${WHITE}"
+		rm "$debname-latest.deb"
+	fi
+}
+
+#help section
+if [[ $1 == "--help" || $1 == "-h" ]]; then
+	echo "$0 upgrades Sobaka OS to the latest available version."&&
+	echo "At first, it\`s trying to download package, so if you have weak speed, it may take much time." &&
+	echo "You can install specified version by typing upgrade -v [version here]" &&
+	echo "F.e. upgrade -v 0.9 will upgrade to version 0.9, even current version is higher;" &&
+	echo "upgrade -v full-0.8 will upgrade to version 0.8. While installing full package, miners and drivers will be provided too." &&
+	exit 0
+fi
+#end of help section
+
+[[ $1 == "-v" && ! -z $2 ]]&& VER=$2 || VER="latest"
+
+cd /sobaka/downloads
+[[ -f /sobaka/downloads/sobaka-$VER.deb ]] && rm /sobaka/downloads/sobaka-$VER.deb
+DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/sobaka-$VER.deb"
+wget -q $DOWNLOAD
+[[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)" && exit 1
+
+echo -e "${GREEN}>Upgrade files downloaded${WHITE}"
+dpkg -i --force-confold "sobaka-$VER.deb"
+rm /sobaka/downloads/sobaka-$VER.deb
+
+echo -e "${CYAN}>Getting latest version of packages${WHITE}"
+versions_url="https://sobaka.group/downloads/deb_versions.txt"
+versions=`curl -sLk $versions_url`
+[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}"
+eval "$versions"
+
+upgrade_deb sobaka-libs $sobaka_libs
+upgrade_deb sobaka-sbin $sobaka_sbin
+
+hello
+echo -e "${CYAN}>Reboot is recommended after upgrade${WHITE}"

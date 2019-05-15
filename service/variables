@@ -1,0 +1,37 @@
+#!/bin/bash
+
+unset PREFIX
+declare -A PREFIX
+PREFIX[claymore]="export GPU_MAX_HEAP_SIZE=100; export GPU_MAX_ALLOC_PERCENT=100; export GPU_USE_SYNC_OBJECTS=1; "
+PREFIX[ethminer]="export GPU_MAX_HEAP_SIZE=100; export GPU_MAX_ALLOC_PERCENT=100; export GPU_USE_SYNC_OBJECTS=1; "
+PREFIX[ccminer]="LD_PRELOAD=libcurl.so.3 "
+PREFIX[sgminer]="export GPU_FORCE_64BIT_PTR=1; export GPU_USE_SYNC_OBJECTS=1; export GPU_MAX_ALLOC_PERCENT=100; export GPU_SINGLE_ALLOC_PERCENT=100; export GPU_MAX_HEAP_SIZE=100; LD_PRELOAD=libcurl.so.3 "
+#PREFIX[t_rex]="LD_PRELOAD=libcurl.so.3 "
+PREFIX[gminer]="export GPU_MAX_ALLOC_PERCENT=100; export GPU_SINGLE_ALLOC_PERCENT=100; "
+PREFIX[z_enemy]="LD_PRELOAD=libcurl.so.3 "
+PREFIX[phoenix]="export GPU_MAX_HEAP_SIZE=100; export GPU_MAX_ALLOC_PERCENT=100; export GPU_USE_SYNC_OBJECTS=1; "
+
+#api ports
+unset APIPORT
+declare -A APIPORT
+APIPORT[claymore]=3333
+APIPORT[bminer]=1880
+APIPORT[ewbf]=42000
+APIPORT[ethminer]=3000
+APIPORT[ccminer]=4068
+APIPORT[sgminer]=5598
+APIPORT[claymore_z]=3337
+APIPORT[claymore_c]=3335
+APIPORT[cpuminer]=4048
+APIPORT[t_rex]=42356
+APIPORT[nanominer]=9090
+APIPORT[lolminer]=8080
+APIPORT[gminer]=10050
+APIPORT[xmrig_amd]=10051
+APIPORT[xmrig_nvidia]=10052
+APIPORT[z_enemy]=4070
+APIPORT[xmr_stak]=10060
+APIPORT[wildrig_multi]=10062
+APIPORT[phoenix]=3344
+APIPORT[teamredminer]=10065
+APIPORT[cryptodredge]=10066

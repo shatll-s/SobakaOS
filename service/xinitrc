@@ -1,0 +1,10 @@
+tint2 -c /sobaka/service/tint2rc &
+(sleep 2 && feh --bg-scale --no-fehbg /sobaka/service/dog.jpg) &
+setxkbmap -option "terminate:ctrl_alt_bksp" &
+xrdb -merge -I$HOME ~/.Xresources &
+lxterminal -t miner --geometry=78x42 -e bash -c "date;
+echo 'Miner will be displayed here soon'; sleep 20; sudo /sobaka/miner; sudo su" &
+lxterminal --geometry=78x42 -e bash -c "/sobaka/sobaka-info; sudo su" &
+
+openbox-session
+

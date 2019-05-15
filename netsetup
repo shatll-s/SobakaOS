@@ -1,0 +1,316 @@
+#!/bin/bash
+interfaces="/etc/netplan/config.yaml"
+RIG_CFG="/sobaka/cfg/rig.cfg"
+NETWORK_CFG="/sobaka/cfg/network.txt"
+NETWORK_CFG_FLASH="/sobaka-flash/network.txt"
+TMP_FILE="/tmp/network"
+
+[ -t 1 ] && . colors
+
+function net_check()
+{
+	ping -c 3 8.8.8.8 1>/tmp/ping 2>/tmp/ping
+    ping_answer=$(cat /tmp/ping)
+    [[ $ping_answer == *"Network is unreachable"* ]] && echo 0 || echo 1
+}
+
+function write_config()
+{
+	cfg="#Network configuration generated at $(date --rfc-3339=seconds)\n"
+	cfg+="SSID=\"$SSID\"\n"
+	cfg+="WIFI_PASSWORD=\"$WIFI_PASSWORD\"\n"
+	cfg+="STATIC_IP_WIFI=\"$STATIC_IP_WIFI\"\n\n"
+	cfg+="GATEWAY4_WIFI=\"$GATEWAY4_WIFI\"\n"
+	cfg+="########## LAN settings ##########\n"
+	cfg+="STATIC_IP_LAN=\"$STATIC_IP_LAN\"\n"
+	cfg+="GATEWAY4_LAN=\"$GATEWAY4_LAN\"\n"
+	echo -e $cfg > $NETWORK_CFG
+	echo "Network settings are written to $NETWORK_CFG"
+}
+
+function manual_setup()
+{
+	#LAN settings
+	[[ -f $NETWORK_CFG ]] && . $NETWORK_CFG
+	tip="(type ${GREEN}\"\"${WHITE} for empty value)"
+
+#	echo -e "Do you want to set up static IP for LAN manually?"
+#	[[ ! -z $STATIC_IP_LAN ]] && var="$STATIC_IP_LAN" || var="auto IP"
+#	var="[${CYAN}$var${WHITE}]"
+#	echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
+#	read answer
+#	if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
+#		echo -e "Enter ${CYAN}static IP/netmask${WHITE}, e.g. 192.168.88.105/24 $tip"
+#		read STATIC_IP_LAN
+#	fi
+	var=$STATIC_IP_LAN && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+	echo -e "Enter ${CYAN}static IP/netmask${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+	echo -e "e.g. 192.168.88.105/24"
+	read answer && [[ ! -z $answer ]] && STATIC_IP_LAN=$answer
+
+	var=$GATEWAY4_LAN && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+	echo -e "Enter ${CYAN}LAN gateway${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+	echo -e "e.g. 192.168.88.1"
+	read answer && [[ ! -z $answer ]] && GATEWAY4_LAN=$answer
+
+#	echo -e "Do you want to set up gateway for LAN manually?"
+#	[[ ! -z $GATEWAY4_LAN ]] && var="$GATEWAY4_LAN" || var="no gateway"
+#	var="[${CYAN}$var${WHITE}]"
+#	echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
+#	read answer
+#	if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
+#		echo -e "Enter ${CYAN}gateway${WHITE}, e.g. 192.168.88.1 $tip"
+#		read GATEWAY4_LAN
+#	fi
+
+	#WiFi settings
+	echo -e "Do you want to set up WiFi manually?"
+	var="["
+	[[ ! -z $SSID ]] && var+="${CYAN}$SSID${WHITE}" || var+="${RED}empty${WHITE}"
+	var+="|"
+	[[ ! -z $WIFI_PASSWORD ]] && var+="${CYAN}$WIFI_PASSWORD${WHITE}" || var+="${RED}empty${WHITE}"
+	[[ ! -z $STATIC_IP_WIFI ]] && var+="| ${CYAN}$STATIC_IP_WIFI${WHITE}"
+	[[ ! -z $GATEWAY4_WIFI ]] && var+="| ${CYAN}$GATEWAY4_WIFI${WHITE}"
+	var+="]"
+
+	echo -en "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
+	read answer
+	if [[ $answer == "y" ]]; then
+		var=$SSID && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+		echo -e "Enter ${CYAN}SSID${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+		read answer && [[ ! -z $answer ]] && SSID=$answer
+		
+		var=$WIFI_PASSWORD && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+		echo -e "Enter ${CYAN}password${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+		read answer && [[ ! -z $answer ]] && WIFI_PASSWORD=$answer
+
+		var=$STATIC_IP_WIFI && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+		echo -e "Enter ${CYAN}static IP/netmask${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+		echo -e "e.g. 192.168.88.105/24" #(type \"\" if you don\`t need it):"
+		read answer && [[ ! -z $answer ]] && STATIC_IP_WIFI=$answer
+
+		var=$GATEWAY4_WIFI && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+		echo -e "Enter ${CYAN}WiFi gateway${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
+		echo -e "e.g. 192.168.88.1"
+		read answer && [[ ! -z $answer ]] && GATEWAY4_WIFI=$answer
+
+#		var=$GATEWAY4_WIFI && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
+#		echo -e "Do you want to set up gateway for WiFi?"
+#		[[ ! -z $GATEWAY4_WIFI ]] && var="$GATEWAY4_WIFI" || var="no gateway"
+#		var="[${CYAN}$var${WHITE}]"
+#		echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
+#		read answer
+#		if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
+#			echo -e "Enter ${CYAN}gateway${WHITE}, e.g. 192.168.88.1 $tip"
+#			read GATEWAY4_LAN
+#		fi
+	fi
+
+	if [[ ! -z $STATIC_IP_LAN || ! -z $SSID || ! -z $WIFI_PASSWORD ]]; then
+		write_config
+	fi
+}
+
+function setup()
+{
+	#get config
+	if [[ ! -f $NETWORK_CFG ]]; then #if wifi is no set up
+		if [[ -f $NETWORK_CFG_FLASH ]]; then #if file on flash exist
+			dos2unix -n $NETWORK_CFG_FLASH $TMP_FILE
+			. $TMP_FILE #read, if something is inside, copy
+			cp $TMP_FILE $NETWORK_CFG 
+			if [[ ! -z $SSID && ! -z $WIFI_PASSWORD ]]; then
+				dos2unix -n $NETWORK_CFG_FLASH $NETWORK_CFG
+			elif [[ -t 1 ]]; then #if not, set up manual
+				manual_setup
+			fi
+		elif [[ -t 1 ]]; then #if not, set up manual
+			manual_setup
+		fi
+	fi
+	[[ -f $NETWORK_CFG ]] && . $NETWORK_CFG
+
+	#lan section
+	echo -e $BROWN"================================================================"$WHITE
+	#Check LAN settings start	
+	if [[ ! -z $STATIC_IP_LAN || ! -z $GATEWAY4_LAN ]]; then
+		echo -e "Trying to apply next LAN settings:"
+		if [[ ! -z $STATIC_IP_LAN ]]; then
+		 	echo -e "${YELLOW}Static IP: ${CYAN}$STATIC_IP_LAN${WHITE}"
+			
+			ip=`echo $STATIC_IP_LAN | sed 's#/.*$##'`
+			netmask=`echo $STATIC_IP_LAN | sed "s#$ip##" | sed "s#/##"`
+
+			if [[ `echo $ip | awk -F "." '{if ( NF != 4 ) print "Not IP"; else if ( $1 > 0 && $1 <= 255 && $2 >=0 && $2 <= 255 && $3 >=0 && $3 <= 255 && $4 > 0 && $4 <= 255 ) print "ok"; else print "Not valid IP"}'` == "ok" ]]; then #if it`s ip
+				if [[ -z $netmask || -n ${netmask//[0-9]/} ]] || [[ $netmask -gt 32 ]]; then
+					echo "Uncorrect/empty netmask. It can be 0..32, using default value 24"
+					netmask=24
+				fi
+				[[ $STATIC_IP_LAN != "$ip/$netmask" ]] && echo -e "${RED}Something wrong with user data, using ${LIGHTCYAN}$ip/$netmask${WHITE}" && STATIC_IP_LAN="$ip/$netmask"
+			else
+				echo -e "Wrong IP address. It can be like 192.168.88.105. Use auto IP."
+				STATIC_IP_LAN=""
+			fi
+		fi
+
+		if [[ ! -z $GATEWAY4_LAN ]]; then
+			echo -e "${YELLOW}Gateway: ${CYAN}$GATEWAY4_LAN${WHITE}"
+			if [[ `echo $GATEWAY4_LAN | awk -F "." '{if ( NF != 4 ) print "Not IP"; else if ( $1 > 0 && $1 <= 255 && $2 >=0 && $2 <= 255 && $3 >=0 && $3 <= 255 && $4 > 0 && $4 <= 255 ) print "ok"; else print "Not valid IP"}'` != "ok" ]]; then #if it`s ip
+				echo -e "${RED}Wrong gateway address. It can be like 192.168.88.1. Using empty value.${WHITE}"
+				GATEWAY4_LAN=""
+			fi
+		fi
+
+	fi
+	#Check LAN settings end	
+
+	iface=($(ifconfig -a | grep Ethernet -B4 | grep ": flags=" | grep -v "lo" | sed 's/:.*//'));
+	wifi_iface=()
+	string="#File generated by Sobaka at $(date --rfc-3339=seconds)\n"
+	string+="network:\n"
+	string+="    ethernets:\n"
+	for ((i=0; i < ${#iface[@]}; i++)); do
+		eth_trigger=`iwconfig 2>&1 ${iface[$i]} | grep -c "no wireless extensions."`
+		if [[ $eth_trigger -eq 1 ]]; then
+			string+="        ${iface[$i]}:\n"
+			string+="            addresses: [$STATIC_IP_LAN]\n"
+			if [[ ! -z $GATEWAY4_LAN ]]; then
+				string+="            dhcp4: no\n"
+				string+="            gateway4: $GATEWAY4_LAN\n"
+				string+="            nameservers:\n"
+				string+="                addresses: [8.8.8.8, 8.8.4.4]\n"
+			else
+				string+="            dhcp4: yes\n"
+			fi
+			string+="            dhcp6: yes\n"
+			string+="            optional: true\n"
+			((wired_count++))
+		else
+			wifi_iface+=${iface[$i]}
+		fi
+	done
+
+	#wifi section
+	if [[ ${#wifi_iface[@]} -gt 0 ]]; then
+		echo -e $BROWN"================================================================"$WHITE
+		if [[ ! -z $SSID && ! -z $WIFI_PASSWORD ]]; then
+			echo -e "Trying to apply next WiFi settings:"
+			echo -e "${YELLOW}SSID: ${CYAN}$SSID${WHITE}"
+			echo -e "${YELLOW}Password: ${CYAN}$WIFI_PASSWORD${WHITE}"
+			
+			#Check WiFi static IP start			
+			if [[ ! -z $STATIC_IP_WIFI ]]; then
+				echo -e "${YELLOW}Static IP: ${CYAN}$STATIC_IP_WIFI${WHITE}"
+
+				ip=`echo $STATIC_IP_WIFI | sed 's#/.*$##'`
+				netmask=`echo $STATIC_IP_WIFI | sed "s#$ip##" | sed "s#/##"`
+
+				if [[ `echo $ip | awk -F "." '{if ( NF != 4 ) print "Not IP"; else if ( $1 > 0 && $1 <= 255 && $2 >=0 && $2 <= 255 && $3 >=0 && $3 <= 255 && $4 > 0 && $4 <= 255 ) print "ok"; else print "Not valid IP"}'` == "ok" ]]; then #if it`s ip
+					if [[ -z $netmask || -n ${netmask//[0-9]/} ]] || [[ $netmask -gt 32 ]]; then
+						echo "Uncorrect/empty netmask. It can be 0..32, using default value 24"
+						netmask=24
+					fi
+					[[ $STATIC_IP_WIFI != "$ip/$netmask" ]] && echo -e "${RED}Something wrong with user data, using ${LIGHTCYAN}$ip/$netmask${WHITE}" && STATIC_IP_WIFI="$ip/$netmask"
+				else
+					echo "Wrong IP address. It can be like 192.168.88.105. Use auto IP."
+					STATIC_IP_WIFI=""
+				fi
+			fi
+			#Check WiFi static IP end
+
+			#Check WiFi gateway4 start
+			if [[ ! -z $GATEWAY4_WIFI ]]; then
+				echo -e "${YELLOW}Gateway: ${CYAN}$GATEWAY4_WIFI${WHITE}"
+
+				if [[ `echo $GATEWAY4_WIFI | awk -F "." '{if ( NF != 4 ) print "Not IP"; else if ( $1 > 0 && $1 <= 255 && $2 >=0 && $2 <= 255 && $3 >=0 && $3 <= 255 && $4 > 0 && $4 <= 255 ) print "ok"; else print "Not valid IP"}'` != "ok" ]]; then #if it`s ip
+					echo -e "${RED}Wrong gateway address. It can be like 192.168.88.1. Using empty value.${WHITE}"
+					GATEWAY4_WIFI=""
+				fi
+			fi
+			#Check WiFi gateway4 end
+			
+			string+="    wifis:\n"
+			for ((i=0; i < ${#wifi_iface[@]}; i++)); do
+				string+="        ${wifi_iface[$i]}:\n"
+				string+="            addresses: [$STATIC_IP_WIFI]\n"
+				if [[ ! -z $GATEWAY4_WIFI ]]; then
+					string+="            dhcp4: no\n"
+					string+="            gateway4: $GATEWAY4_WIFI\n"
+					string+="            nameservers:\n"
+					string+="                addresses: [8.8.8.8, 8.8.4.4]\n"
+				else
+					string+="            dhcp4: yes\n"
+				fi
+				string+="            dhcp6: yes\n"
+				string+="            access-points:\n"
+				((wifi_count++))
+			done
+			string+="                \"$SSID\":\n"
+			string+="                    password: \"$WIFI_PASSWORD\"\n"
+		else
+			echo "WiFi SSID or PASSWORD is not set"
+		fi
+	fi
+
+	string+="    version: 2"
+	#echo -e "$string"
+	rm /etc/netplan/*
+	echo -e "$string" > $interfaces
+
+	netplan apply
+
+	echo -en "${GREEN}$wired_count wired "
+	[[ $wifi_count -gt 0 ]] && echo -en "and $wifi_count wireless "
+ 	echo -e "interfaces are written to $interfaces${WHITE}"
+}
+
+case $1 in
+	-f)
+		setup
+	;;
+	-manual|-m)
+		manual_setup
+		setup
+	;;
+	-s)
+	shift
+	while [ -n "$1" ]; do
+		option=`echo $1 | sed 's/=.*//'`
+		value=`echo $1 | sed "s/$option=//"`
+		if [[ ! "SSID WIFI_PASSWORD STATIC_IP_WIFI GATEWAY4_WIFI STATIC_IP_LAN GATEWAY4_LAN " == *$option* ]]; then
+			echo -e "Uncorrect parameter ${RED}$option${WHITE}"
+		else 
+			eval "`echo $option`=$value"
+		fi
+		shift
+	done
+	write_config
+	setup
+	;;
+	--help|-h)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname [-f|-m|-s|-h]${WHITE}"
+		echo -e "no options\tCheck net, setup if network is unreachable"
+		echo -e "-h, --help\tShow this message"
+		echo -e "-f\t\tForce setup"
+		echo -e "-m, -manual\tEnter all parameters in the dialog"
+		echo -e "-s\t\tEnter all parameters in command line, just for pro"
+		echo -e "\t\te.g. netsetup -s STATIC_IP_LAN=192.168.88.133 GATEWAY4_LAN=192.168.88.1"
+		echo -e "\t\tAll unspecified parametres will be empty"
+		echo -e "\t\tAvailable parametres:"
+		echo -e "\t\t SSID"
+		echo -e "\t\t WIFI_PASSWORD"
+		echo -e "\t\t STATIC_IP_WIFI"
+		echo -e "\t\t GATEWAY4_WIFI"
+		echo -e "\t\t STATIC_IP_LAN"
+		echo -e "\t\t GATEWAY4_LAN"
+	;;
+	*)
+		if [[ $(net_check) == 1 ]]; then
+			echo -e "Network is OK, no need to setup.\nBut you can run netsetup -f to force network setup."
+		else
+			echo "Network is unreachable"
+			setup
+		fi
+	;;
+esac

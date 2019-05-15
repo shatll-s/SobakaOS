@@ -1,0 +1,16 @@
+#!/bin/bash
+RIG_CFG="/sobaka/cfg/rig.cfg"
+
+if [[ -f $RIG_CFG ]]; then
+	#echo "File exists"
+	. $RIG_CFG
+	[[ -z $PASSWD ]] && PASSWD="12345678"
+else
+	PASSWD="12345678"
+fi
+
+#echo "Password = $PASSWD"
+
+x11vnc -storepasswd $PASSWD /sobaka/cfg/.vncpasswd
+
+/usr/bin/x11vnc -rfbauth /sobaka/cfg/.vncpasswd -noxdamage -shared -dontdisconnect -many -noxfixes -display :0

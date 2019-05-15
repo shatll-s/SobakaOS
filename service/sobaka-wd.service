@@ -1,0 +1,12 @@
+[Unit]
+Description=Sobaka Watchdog Service
+After=sobaka.service
+Requires=sobaka.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/sobaka/wd screen
+
+[Install]
+WantedBy=multi-user.target
