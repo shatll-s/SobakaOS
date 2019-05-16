@@ -636,6 +636,17 @@ for ((i=0; i < ${#ip[@]}; i++)); do
 		'$data | fromjson + { ($key) : ($value)}')
 done
 ##################################################################
+if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
+	cpu_temp=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	if [[ ! -z $cpu_temp ]]; then
+		sum_cpu_temp=0
+		for ((i=0; i < ${#cpu_temp[@]}; i++)); do
+			sum_cpu_temp=`echo "scale=0; $sum_cpu_temp + ${cpu_temp[$i]}" | bc -l`
+		done
+		avg_cpu_temp=`echo "scale=0; $sum_cpu_temp/${#cpu_temp[@]}" | bc -l`
+	fi
+fi
+##################################################################
 
 [[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats $miner1) || miner1_stats='{}'
 [[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats $miner2) || miner2_stats='{}'
@@ -670,6 +681,8 @@ local request=$(
 	}'
 
 )
+
+[[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
 
 echo $request | jq '.' -c #echo in screen
 

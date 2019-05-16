@@ -125,6 +125,18 @@ for ((i=0; i < ${#ip[@]}; i++)); do
 		--arg value "${ip[$i]}" \
 		'$data | fromjson + { ($key) : ($value)}')
 done
+##################################################################
+if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
+	cpu_temp=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	if [[ ! -z $cpu_temp ]]; then
+		sum_cpu_temp=0
+		for ((i=0; i < ${#cpu_temp[@]}; i++)); do
+			sum_cpu_temp=`echo "scale=0; $sum_cpu_temp + ${cpu_temp[$i]}" | bc -l`
+		done
+		avg_cpu_temp=`echo "scale=0; $sum_cpu_temp/${#cpu_temp[@]}" | bc -l`
+	fi
+fi
+##################################################################
 
 driver_amd=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
 driver_nvidia=$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
@@ -184,6 +196,10 @@ local request=$(
 		}
 	}'
 )
+
+
+[[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
+
 #echo $request | jq '.' 
 
 try=0
