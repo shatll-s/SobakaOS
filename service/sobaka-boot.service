@@ -3,7 +3,7 @@ Description=Sobaka start & driver check
 
 [Service]
 Type=oneshot
-ExecStart=/home/user/bin/sobaka-boot
+ExecStart=/sobaka/sobaka-boot
 WorkingDirectory=/sobaka
 RemainAfterExit=1
 TimeoutSec=300
