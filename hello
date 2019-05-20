@@ -247,7 +247,7 @@ while [[ $try -lt 3 ]]; do
 			exit 0
 		fi
 	else
-	[ -t 1 ] && echo -e "${RED}>IError while sending first stats${WHITE}" ||
+	[ -t 1 ] && echo -e "${RED}>Error while sending first stats${WHITE}" ||
 		echo $(date --rfc-3339=seconds)" Error while sending first stats"
 	fi
 	sleep 5
