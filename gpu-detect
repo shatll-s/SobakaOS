@@ -4,7 +4,7 @@
 
 case $1 in
 	all)
-		lspci | lspci | grep -c "VGA"
+		lspci | lspci | grep -Ec "VGA|3D controller"
 	;;
 	list)
 		NVIDIASMI_FILE=/tmp/nvidiagpudetect
@@ -65,7 +65,7 @@ case $1 in
 		done
 	;;
 	NVIDIA|AMD)
-		[[ -z $2 ]] && lspci | grep  "VGA" | grep -c "$1" && exit 0
+		[[ -z $2 ]] && lspci | grep -E "VGA|3D controller" | grep -c "$1" && exit 0
 		[[ ! -z $2 && $1 == "NVIDIA" && $2 == "list" ]] &&  nvidia-smi --query-gpu=gpu_bus_id,name --format=csv,noheader | sed -e 's/[0]*://; s/^0//' 
 	;;
 	*)

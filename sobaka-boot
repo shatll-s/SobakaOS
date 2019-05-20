@@ -51,7 +51,7 @@ fi
 #install NVIDIA drivers
 if (( `gpu-detect NVIDIA` > 0 )); then
 	echo -n $(gpu-detect NVIDIA)" NVIDIA GPU detected. "
-	if (( `lspci -k | grep VGA -EA2 | grep NVIDIA -EA2 | grep -c "driver in use: nvidia"` <= 0 )); then
+	if (( `lspci -k | grep -E "VGA|3D controller" -EA2 | grep NVIDIA -EA2 | grep -c "driver in use: nvidia"` <= 0 )); then
 		driver-update nvidia
 		#echo "Driver is not found. Trying to install..."
 		#cp /sobaka/service/blacklist-sobaka.conf /etc/modprobe.d
@@ -124,12 +124,10 @@ if [[ ! -f /sobaka/log/firstrun.txt ]]; then
 	echo -e "\n========== After netsetup ==========\n" >> /sobaka/log/firstrun.txt
 	tech_info >> /sobaka/log/firstrun.txt
 else
-	:
-	#netsetup -f #disable for PC
+	netsetup -f
 fi
 hello
-#sudo systemctl start sobakax #disable for PC
-sudo systemctl start sobakax-pc
+sudo systemctl start sobakax 
 
 time_stop=`date +%s`
 let "time=time_stop - time_start"
