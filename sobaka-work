@@ -184,7 +184,7 @@ case $1 in
 		return=`upgrade`
 		exitcode=$?
 		if [[ $exitcode -eq 0 ]]; then
-			msg "Upgrade" success "<b>Upgraded successfully</b>\n$return"
+			msg "Upgrade" success "<b>Upgraded successfully</b> at $(date --rfc-3339=seconds)\n$return"
 			while [[ $try -lt 20 ]]; do
 				if [ `ls -a $LOCK_DIR | wc -l` -eq 3 ]; then
 					rm $PID_file
