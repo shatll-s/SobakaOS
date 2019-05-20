@@ -294,7 +294,7 @@ case $1 in
 		miner_algo=`echo $stats_template | jq -r '.algorithm' | sed 's/\"//g'`
 		miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares'`
 		miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares'`
-		miner_busid=(`echo $stats_template | jq -r '.devices[].bus_id' | sed 's/0000:\([0-9][0-9]\):.*/\1/g'`)
+		miner_busid=(`echo $stats_template | jq -r '.devices[].bus_id' | awk -F ':' '{print $2}'`)
 		
 		miner_temp=(`echo $stats_template | jq -r '.devices[].temperature'`)
 		miner_hr=(`echo $stats_template | jq -r '.devices[].speed'`)
@@ -536,7 +536,7 @@ echo $miner_total_hr > /tmp/hr.$1
 ##################################################################
 function stats {
 
-core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
+core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device`)
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
 done
