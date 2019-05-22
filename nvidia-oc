@@ -46,14 +46,27 @@ echo -e ${CYAN}"Power limit:${WHITE}\t${PLIMIT[@]}"
 #We need to do persistence-mode just once
 nvidia-persistenced --persistence-mode
 nvidia-smi -pm 1
+
 echo -e $BROWN"================================================================"$WHITE
 #starting overclocking
-for (( i=0; i < $n; ++i )); do
-	gpunum=`nvidia-settings -q PCIBus | grep "gpu:$i" | sed 's/^.*\(gpu:[0-9]*\)]): \([0-9]*\).$/\1 (PCI Bus \2:00.0)/g'`
-	echo -e ${GREEN}$gpunum${WHITE}
+
+i=0
+while read string; do
+	echo -e ${GREEN}"gpu $i (PCI Bus $string)"${WHITE}
+	name=`echo $string | awk -F ', ' '{print $2}'`
+	
+	if [[ $name =~ "1050" ]]; then x=2
+		elif [[ $name =~ "P106-100" ]]; then x=2
+		elif [[ $name =~ "P106-090" ]]; then x=1
+		elif [[ $name =~ "P104-100" ]]; then x=1
+		elif [[ $name =~ "P102-100" ]]; then x=1
+		elif [[ $name =~ "1660" ]]; then x=4
+		else x=3;
+	fi
+
 	args=
-	[[ ! -z ${CORE_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUGraphicsClockOffset[3]=${CORE_CLOCK[$i]}"
-	[[ ! -z ${MEMORY_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUMemoryTransferRateOffset[3]=${MEMORY_CLOCK[$i]}"
+	[[ ! -z ${CORE_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUGraphicsClockOffset[$x]=${CORE_CLOCK[$i]}"
+	[[ ! -z ${MEMORY_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUMemoryTransferRateOffset[$x]=${MEMORY_CLOCK[$i]}"
 	if [[ ! -z ${FAN[$i]} && ${FAN[$i]} != "A" ]]; then
 		args+=" -a [gpu:$i]/GPUFanControlState=1"
 		args+=" -a [fan:$i]/GPUTargetFanSpeed=${FAN[$i]}"
@@ -65,7 +78,10 @@ for (( i=0; i < $n; ++i )); do
 	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
 	[[ ! -z ${PLIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${PLIMIT[$i]}
 	[[ $(($i + 1)) < $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
-done
+
+	((i++))
+done < <(/sobaka/gpu-detect NVIDIA list)
+
 if [[ $PILL == 1 ]]; then
 	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
 		sleep=30 
