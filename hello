@@ -14,7 +14,7 @@ export DISPLAY=":0"
 function firststats {
 
 #core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
-core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device`)
+core_addr_raw=(`ls -d /sys/class/drm/card[[:digit:]]/device`)
 
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')

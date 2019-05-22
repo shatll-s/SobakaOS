@@ -38,7 +38,7 @@ echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 [ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
 echo -e $BROWN"================================================================"$WHITE
 
-core_addr=(`ls -d /sys/class/drm/card?/device/hwmon/hwmon? | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+core_addr=(`ls -d /sys/class/drm/card[[:digit:]]/device/hwmon/hwmon? | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
 
 #restoring default pp_table
 #if [[ -z $1 && $1 -ne "--firstrun" ]]; then
