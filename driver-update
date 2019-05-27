@@ -66,8 +66,8 @@ function nvidia_install () {
 	#chmod 700 "$driver_name"
 	echo -e "${CYAN}> Installing${WHITE}"
 	apt update
-	apt-get install -y dkms
-	sh "$driver_name" --accept-license --no-questions --ui=none --install-libglvnd --dkms 
+	#apt-get install -y dkms
+	sh "$driver_name" --accept-license --no-questions --ui=none --install-libglvnd #--dkms 
 	exitcode=$?
 
 	if [[ $exitcode -eq 0 ]]; then
