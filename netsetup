@@ -173,7 +173,7 @@ function setup()
 		eth_trigger=`iwconfig 2>&1 ${iface[$i]} | grep -c "no wireless extensions."`
 		if [[ $eth_trigger -eq 1 ]]; then
 			string+="        ${iface[$i]}:\n"
-			string+="            addresses: [$STATIC_IP_LAN]\n"
+			[[ ! -z $STATIC_IP_LAN ]] && string+="            addresses: [$STATIC_IP_LAN]\n"
 			if [[ ! -z $GATEWAY4_LAN ]]; then
 				string+="            dhcp4: no\n"
 				string+="            gateway4: $GATEWAY4_LAN\n"
@@ -232,7 +232,8 @@ function setup()
 			string+="    wifis:\n"
 			for ((i=0; i < ${#wifi_iface[@]}; i++)); do
 				string+="        ${wifi_iface[$i]}:\n"
-				string+="            addresses: [$STATIC_IP_WIFI]\n"
+				[[ ! -z $STATIC_IP_WIFI ]] && string+="            addresses: [$STATIC_IP_WIFI]\n"
+				#string+="            addresses: [$STATIC_IP_WIFI]\n"
 				if [[ ! -z $GATEWAY4_WIFI ]]; then
 					string+="            dhcp4: no\n"
 					string+="            gateway4: $GATEWAY4_WIFI\n"
@@ -242,6 +243,7 @@ function setup()
 					string+="            dhcp4: yes\n"
 				fi
 				string+="            dhcp6: yes\n"
+				string+="            optional: true\n"
 				string+="            access-points:\n"
 				((wifi_count++))
 			done
