@@ -297,7 +297,7 @@ case $1 in
 		echo -e "-f\t\tForce setup"
 		echo -e "-m, -manual\tEnter all parameters in the dialog"
 		echo -e "-s\t\tEnter all parameters in command line, just for pro"
-		echo -e "\t\te.g. netsetup -s STATIC_IP_LAN=192.168.88.133 GATEWAY4_LAN=192.168.88.1"
+		echo -e "\t\te.g. netsetup -s STATIC_IP_LAN=192.168.88.133/24 GATEWAY4_LAN=192.168.88.1"
 		echo -e "\t\tAll unspecified parametres will be empty"
 		echo -e "\t\tAvailable parametres:"
 		echo -e "\t\t SSID"
