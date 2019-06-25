@@ -56,7 +56,7 @@ if [[ ! -f /sobaka/log/firstrun.txt ]]; then
 else
 	netsetup -f
 fi
-sudo /sobaka/sbin/watchdog-opendev
+/sobaka/sbin/watchdog-opendev initial
 hello
 sudo systemctl start sobakax 
 

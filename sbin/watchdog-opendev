@@ -2,15 +2,17 @@
 [ -t 1 ] && . colors #source colors only if running in terminal
 LOG="/tmp/opendev.log"
 
-for sysdevpath in $(find /sys/bus/usb/devices/usb*/ -name dev); do
-	syspath=`echo $sysdevpath | sed 's/\/dev$//'`
-	[[ -f $syspath/uevent ]] && . $syspath/uevent #DEVNAME=bus/usb/001/001
-	[[ "$DEVNAME" == "bus/"* ]] && continue
-	eval "$(udevadm info -q property --export -p $syspath | grep -E 'ID_VENDOR_ID|DEVNAME|ID_MODEL_ID|ID_SERIAL')" 
-	[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $ID_VENDOR_ID != "0483" ]] && continue
-	echo -e "${GREEN}>Detected open-dev watchdog ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
-	PORT=$DEVNAME
-done
+if [[ `lsusb | grep -E '0483:5740|0483:a26d' | wc -l` -gt 0 ]]; then
+	for sysdevpath in $(find /sys/bus/usb/devices/usb*/ -name dev); do
+		syspath=`echo $sysdevpath | sed 's/\/dev$//'`
+		[[ -f $syspath/uevent ]] && . $syspath/uevent #DEVNAME=bus/usb/001/001
+		[[ "$DEVNAME" == "bus/"* ]] && continue
+		eval "$(udevadm info -q property --export -p $syspath | grep -E 'ID_VENDOR_ID|DEVNAME|ID_MODEL_ID|ID_SERIAL')" 
+		[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $ID_VENDOR_ID != "0483" ]] && continue
+		echo -e "${GREEN}>Detected open-dev watchdog ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
+		PORT=$DEVNAME
+	done
+fi
 
 [[ -z $PORT ]] && echo -e "${RED}>There is no open-dev watchdog in system, exiting${WHITE}" && exit 1
 [[ $PORT == "/dev/sg0" ]] && echo -e "${RED}>Detected wrong port (${PORT}), exiting${WHITE}" && exit 1
