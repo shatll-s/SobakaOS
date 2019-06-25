@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#reboots or shutdowns the system using sysrq
+#Usage: sreboot [shutdown]
+
+sync
+
+mount -o remount,ro /sobaka-flash
+
+echo 1 > /proc/sys/kernel/sysrq
+echo s > /proc/sysrq-trigger
+echo u > /proc/sysrq-trigger
+
+[[ $1 == "shutdown" ]] &&
+	echo "Shutting down" &&
+	echo o > /proc/sysrq-trigger &&
+	exit 0
+
+echo "Rebooting"
+echo b > /proc/sysrq-trigger

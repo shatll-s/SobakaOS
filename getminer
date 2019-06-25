@@ -23,7 +23,8 @@ function getminer () {
 
 	[[ ! -f $RIG_CFG ]] && echo -e "${RED}There is no $RIG_CFG. Exiting...${WHITE}" && exit 1
 	. $RIG_CFG
-	[[ -z $HOST ]] && echo -e "${RED}Host is not set in $RIG_CFG. Exiting...${WHITE}" && exit 1
+	[[ -z $HOST ]] && HOST="https://sobaka.group/message.php"
+	#echo -e "${RED}Host is not set in $RIG_CFG. Exiting...${WHITE}" && exit 1
 	file="$miner@$ver.tar.gz"	
 	link=`echo $HOST | sed "s/message\.php/downloads\/miners\/$file/"`
 	cd /tmp
