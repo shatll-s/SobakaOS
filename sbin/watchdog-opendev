@@ -19,7 +19,7 @@ fi
 
 function watchdog_query() {
 	local query=$1
-	echo -e ">Making query ${CYAN}\"$query\"${WHITE} to port ${CYAN}${PORT}${WHITE}"
+	#echo -e ">Making query ${CYAN}\"$query\"${WHITE} to port ${CYAN}${PORT}${WHITE}"
 	stty -F $PORT 115200 raw -echo
 	for (( i=1; i <= 10; i++ )); do
 		exec 9< $PORT
@@ -59,6 +59,20 @@ case $1 in
 		echo -e "${GREEN}>Reading settings${WHITE}"
 		watchdog_query "~F"
 	;;
+	setup-time)
+		[[ -z $2 ]] && echo -e "${RED}> You need to input time-before-reset, f.e. watchdog-opendev setup-time 5${WHITE}" && exit 1
+		[[ $2 -lt 1 || $2 -gt 15 ]] && echo -e "${RED}> You need to input time-before-reset, in 5-15 range${WHITE}" && exit 1
+		time=`echo "obase=16; ibase=10; $2" | bc`
+		old_settings=`watchdog_query "~F"`
+		new_settings=`echo $old_settings | sed "s/^F//; s/^./$time/"`
+		echo -e "${GREEN}>Writing settings ${CYAN}${new_settings}${WHITE}"
+		watchdog_query "~W${new_settings}"
+	;;
+	write)
+		[[ -z $2 ]] && echo -e "${RED}> You need to input settings-string, like, 52532120300${WHITE}" && exit 1
+		echo -e "${GREEN}>Writing settings ${CYAN}${2}${WHITE}"
+		watchdog_query "~W${2}"
+	;;
 	firmware|fw)
 		echo -e "${GREEN}>Reading firmware version${WHITE}"
 		watchdog_query "~I"
@@ -73,6 +87,6 @@ case $1 in
 	;;
 	*|-h|--help)
 		bname=`basename $0`
-		echo -e "Usage: ${CYAN}$bname initial|ping|reset|power|firmware|settings${WHITE}"
+		echo -e "Usage: ${CYAN}$bname initial|ping|reset|power|firmware|settings|setup-time${WHITE}"
 	;;
 esac
