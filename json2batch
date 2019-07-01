@@ -365,6 +365,14 @@ if [[ ! -z $manifest ]]; then
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api-bind ${APIPORT[$miner]} --log /sobaka/log/cryptodredge.txt"
 		;;
+		nbminer)
+			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=":$pass"
+			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --log" #log in miner folder :(
+		;;
 		*)
 			: #do nothing
 		;;

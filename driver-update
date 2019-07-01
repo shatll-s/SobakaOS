@@ -92,6 +92,7 @@ case $1 in
 		nvidia_stop
 		nvidia_install $2
 		nvidia_start
+		hello
 		echo -e "${GREEN}Installation complete, reboot please${WHITE}"
 	;;
 	nvidia_stop)
