@@ -26,7 +26,7 @@ echo -en ${WHITE}
 df -h /
 uptime | sed 's/^\s//'
 $LINE
-sleep 2
+
 gpu-detect list
 $LINE
 echo "Some commands:"
