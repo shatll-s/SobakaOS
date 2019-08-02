@@ -573,7 +573,8 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	#echo ${gpu_busid_sys[$i]} #no need
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
 		#echo "GPU $i is AMD" #no need
-		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+		#fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
 		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
 		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is something like 65000
