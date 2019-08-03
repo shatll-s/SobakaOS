@@ -1,5 +1,5 @@
 #!/bin/bash
-#SobakaOS Autofan v 0.1. Visit www.sobaka.group
+#SobakaOS Autofan v 0.2. Visit www.sobaka.group
 #Dependencies: NVIDIA, AMD drivers; jq
 AF_CFG="/sobaka/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
@@ -29,19 +29,6 @@ BROWN="\e[33m"
 BLUE="\e[34m"
 PURPLE="\e[35m"
 CYAN="\e[36m"
-GRAY="\e[37m"
-
-LIGHTRED="\e[1;31m" #good for AMD
-YELLOW="\e[1;33m"
-LIGHTGREEN="\e[1;32m" #good for Nvidia
-LIGHTBLUE="\e[1;34m"
-LIGHTPURPLE="\e[1;35m" #comments?
-LIGHTCYAN="\e[1;36m" #very bright
-LIGHTWHITE="\e[1;37m" #bold white
-
-UNDERLINE="\e[4m"
-ITALIC="\e[3m"
-STANDART='\e[0m'
 
 up="↗"
 down="↘"
@@ -63,6 +50,19 @@ function screen_kill () {
 }
 
 function set_fan_amd () {
+	local timer=0
+	while [[ $timer -le 20 ]]; do
+		if  [[ ! -f $LOCK_FILE_AMD ]]; then #no lock file
+			break
+		else #lock file exist
+			pid=`cat $LOCK_FILE_AMD`
+			ps --pid $pid &>/dev/null
+			[[ $? != 0 ]] && rm $LOCK_FILE_AMD && break #process already died
+		fi
+		sleep 0.5
+		((timer+=1))
+		[[ $timer -eq 20 ]] && echo "${RED}Error (active OC)${WHITE}" && return 1
+	done
 	local fan=$1
 	local fan_addr=$2
 	echo 1 > $fan_addr/pwm1_enable
@@ -73,16 +73,17 @@ function set_fan_amd () {
 
 function set_fan_nvidia () {
 	local timer=0
-	until [[ $timer -ge 11 ]]; do
-		if  [[ -f $LOCK_FILE ]]; then
+	while [[ $timer -le 20 ]]; do
+		if  [[ ! -f $LOCK_FILE_NVIDIA ]]; then #no lock file
 			break
-		else
-			pid=`cat $LOCK_FILE`
+		else #lock file exist
+			pid=`cat $LOCK_FILE_NVIDIA`
 			ps --pid $pid &>/dev/null
-			[[ $? != 0 ]] && rm $LOCK_FILE && break
+			[[ $? != 0 ]] && rm $LOCK_FILE_NVIDIA && break #process already died
 		fi
 		sleep 0.5
-		[[ $timer -ge 10 ]] && return "Error"
+		((timer+=1))
+		[[ $timer -eq 20 ]] && echo "${RED}Error (active OC)${WHITE}" && return 1
 	done
 	local fan=$1
 	local i=$2
@@ -119,43 +120,52 @@ function autofan () {
 			local temp_color=$RED
 			if [[ ${gpu_fan[$i]} -ge $fan_max ]]; then
 				local fan_color=$RED
-				local message="\t${LIGHTRED}Max %${WHITE}"
+				local message="${RED}Max %${WHITE}"
 			else
 				local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
-				local message="\t${LIGHTCYAN}$up ${new_fan[$i]}${WHITE}"
+				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			fi
 		elif (( ${gpu_temp[$i]} + $hyst < $target_temp )); then #low temp
 			local temp_color=$BLUE
 			if [[ ${gpu_fan[$i]} -le $fan_min ]];then
 				local fan_color=$BLUE
-				local message="\t${LIGHTBLUE}Min %${WHITE}" 
+				local message="${BLUE}Min %${WHITE}" 
 			else
 				local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
-				local message="\t${LIGHTCYAN}$down ${new_fan[$i]}${WHITE}"
+				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			fi
 		fi
 		[[ -z $temp_color ]] && temp_color=$WHITE
 		[[ -z $fan_color ]] && fan_color="$WHITE"
 		
-		string="${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 ${gpu_brand[$i]}\t\t"
+		string="${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 ${gpu_brand[$i]}\t"
 		string+="Temp: ${temp_color}${gpu_temp[$i]}${WHITE}°C\t"
-		[[ "$temp_color" != "$WHITE" ]] && string+=" " #fucking bug because white is shorter than red
-		string+="Fan: ${fan_color}${gpu_fan[$i]}${WHITE}$message"
-		#echo $string
-		echo -e "$string"
 		
-		unset temp_color fan_color message
+		#fucking bug because white is shorter than red
+		[[ "$temp_color" != "$WHITE" ]] && string+=" " 
+		string+="Fan: ${fan_color}${gpu_fan[$i]}${WHITE} "
+		if [[ ${gpu_fan[$i]} -ge 10 &&  ${gpu_fan[$i]} -lt 100 ]]; then
+			string+=" "
+		elif [[ ${gpu_fan[$i]} -lt 10 ]]; then
+			string+="  "
+		fi
+		string+="$message"
+		#echo $string
+		echo -en "$string"
 		
 		#Set fan if something changed
 		if [[ ! -z ${new_fan[$i]} ]]; then
 			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
-				set_fan_amd ${new_fan[i]} ${fan_addr[$i]}
+				local result=`set_fan_amd ${new_fan[i]} ${fan_addr[$i]}`
 			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
-				set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}
+				local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
 			fi
 		fi
+		echo -e " $result"
+		
+		unset temp_color fan_color message result
 	done
 	$LINE
 }
@@ -171,7 +181,7 @@ function start () {
 	fan_min=`echo $cfg | jq '.af_fanmin'`
 	delay=`echo $cfg | jq '.af_delay'`
 	
-	echo -e "${GREEN}Thank you for using ${CYAN}SobakaOS${GREEN} autofan v 0.1"
+	echo -e "${GREEN}Thank you for using ${CYAN}SobakaOS${GREEN} autofan v 0.2"
 	echo -e "${BROWN}$LOGO${GREEN}"
 	echo -e "Visit ${CYAN}www.sobaka.group${WHITE}"
 	$LINE
@@ -197,8 +207,6 @@ function start () {
 		sleep $delay
 	done
 }
-
-
 
 case $1 in
 	show|"")

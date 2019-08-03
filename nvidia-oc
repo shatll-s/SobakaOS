@@ -98,3 +98,5 @@ if [[ $PILL == 1 ]]; then
  	screen -dmS pill bash -c "sleep $sleep; /sobaka/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
 fi
 echo -e $BROWN"================================================================"$WHITE
+
+rm $LOCK_FILE

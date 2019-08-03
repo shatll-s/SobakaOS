@@ -2,12 +2,12 @@
 
 [ -t 1 ] && . colors #source colors only if running in terminal
 AMD_CFG="/sobaka/cfg/amd.cfg"
-LOCK_FILE="/tmp/amd-oc.lock"
+LOCK_FILE="/tmp/.amd-oc.lock"
 
 if  [[ -e $LOCK_FILE ]]; then
 	pid=`cat $LOCK_FILE`
 	ps --pid $pid &>/dev/null
-	[[ $? == 0 ]] && echo -e "${RED}It seems another copy of AMD Overclocking script is already running\nCooldown a bit :)${WHITE}" && exit 1	
+	[[ $? == 0 ]] && echo -e "${RED}It seems another copy of AMD Overclocking script is already running\nCooldown a bit :)${WHITE}" && exit 1
 fi
 
 echo $$ > $LOCK_FILE
@@ -126,11 +126,4 @@ for  ((i=0; i < $n; i++)); do
 	echo -e $BROWN"================================================================"$WHITE
 done
 
-
-
-
-
-
-
-
-
+rm $LOCK_FILE
