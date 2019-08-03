@@ -43,16 +43,17 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		gpu_brand[$i]="A"
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 		[[ ! -f $NVIDIASMI_FILE ]] &&
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
 		local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		if [[ -z $nvidiainfo ]]; then
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
 			sleep 2
 			local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		fi
 		local gpu_name[$i]=`awk -F ', ' '{print $2}' <<< $nvidiainfo`
+		local gpu_mem[$i]=`awk -F ', ' '{print $9}' <<< $nvidiainfo`
 		local gpu_info[$i]=`awk -F ', ' '{print $6$7$8 }' <<< $nvidiainfo`
-		gpu_info[$i]="Power Limit (min/default/max): "$(echo ${gpu_info[$i]} | sed -e 's/\.00//g; s/ W/\//g; s/\/$/ W/')
+		gpu_info[$i]="${gpu_mem[$i]}, Power Limit (min/default/max): "$(echo ${gpu_info[$i]} | sed -e 's/\.00//g; s/ W/\//g; s/\/$/ W/')
 		local gpu_brand[$i]="N"
 	else #GPU is INTEL
 		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')

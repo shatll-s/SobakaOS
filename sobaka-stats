@@ -590,7 +590,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 		#echo "GPU $i is NVIDIA" #no need
 		#echo "BUSID: "${gpu_busid_sys[$i]}
-		nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader> $NVIDIASMI_FILE
+		nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader> $NVIDIASMI_FILE
         local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i "${gpu_busid_sys[$i]}:"`
 		local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 		local fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
