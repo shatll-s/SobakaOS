@@ -343,6 +343,7 @@ case $1 in
 					return="$(screen -ls)"
 					msg "Autofan log" error "$return"
 				fi
+				rm /tmp/af_hardcopy
 			;;
 			*)
 			af="$2"

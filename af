@@ -3,6 +3,10 @@
 #Dependencies: NVIDIA, AMD drivers; jq
 AF_CFG="/sobaka/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
+
+LOCK_FILE_AMD="/tmp/.amd-oc.lock"
+LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
+
 #Sample af.cfg:
 #Don`t forget to delete braces
 #{
@@ -68,6 +72,18 @@ function set_fan_amd () {
 }
 
 function set_fan_nvidia () {
+	local timer=0
+	until [[ $timer -ge 11 ]]; do
+		if  [[ -f $LOCK_FILE ]]; then
+			break
+		else
+			pid=`cat $LOCK_FILE`
+			ps --pid $pid &>/dev/null
+			[[ $? != 0 ]] && rm $LOCK_FILE && break
+		fi
+		sleep 0.5
+		[[ $timer -ge 10 ]] && return "Error"
+	done
 	local fan=$1
 	local i=$2
 	local args=" -a [gpu:$i]/GPUFanControlState=1"
