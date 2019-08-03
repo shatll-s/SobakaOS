@@ -58,7 +58,7 @@ else
 fi
 /sobaka/sbin/watchdog-opendev initial
 hello
-sudo systemctl start sobakax 
+[[ `gpu-detect AMD` -lt 8 ]] && sudo systemctl start sobakax
 
 time_stop=`date +%s`
 let "time=time_stop - time_start"
