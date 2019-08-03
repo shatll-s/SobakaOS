@@ -184,7 +184,7 @@ case $1 in
 		return=`upgrade`
 		exitcode=$?
 		if [[ $exitcode -eq 0 ]]; then
-			msg "Upgrade" success "<b>Upgraded successfully</b> at $(date --rfc-3339=seconds)\n$return"
+			msg "Upgrade" success "<b>Upgraded successfully</b>\n$return"
 			while [[ $try -lt 20 ]]; do
 				if [ `ls -a $LOCK_DIR | wc -l` -eq 3 ]; then
 					rm $PID_file
@@ -331,6 +331,32 @@ case $1 in
 		
 		#echo $return
 		msg "Teleconsole $argument" $type "$data"
+	;;
+	af)
+		case $2 in
+			log)
+				screen -S af -X hardcopy /tmp/af_hardcopy
+				if [[ $? -eq 0 ]]; then
+					return=$(cat -v /tmp/af_hardcopy | sed -e 's/M-0/\&deg/g; s/M-^X/\&#x2798/g; s/M-^W/\&#x279a/g;')
+					msg "Autofan log" success "$return"
+				else
+					return="$(screen -ls)"
+					msg "Autofan log" error "$return"
+				fi
+			;;
+			*)
+			af="$2"
+			echo "$af" > /sobaka/cfg/af.cfg
+			if [[ `echo $af | jq '.af_enabled'` -eq 1 ]]; then
+				af restart
+				text="Autofan (re)started"
+			else
+				af stop
+				text="Autofan stopped"
+			fi
+			[[ $3 != '--hello' ]] && msg "$text" info "$(date --rfc-3339=seconds) $text"
+			;;
+		esac
 	;;
 	*)
 		#echo "I don\`t know this command($1)"

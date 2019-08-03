@@ -7,11 +7,12 @@ if [ $n == 0 ]; then
 	exit
 fi
 echo -e "$n "$LIGHTRED"AMD"$WHITE" GPU detected "$(date --rfc-3339=seconds)"\n"
-core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon? | egrep 'card[0-9]{1,2}/' | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+#core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon? | egrep 'card[0-9]{1,2}/' | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+core_addr=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 
 for  ((i=0; i < $n; i++)); do
 	card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9]*\)\/device/\1/')
-	fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+	fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
     temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
     temp[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is something like 65000
     fan_raw[$i]=`cat "${fan_addr[$i]}/pwm1"`

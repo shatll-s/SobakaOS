@@ -214,10 +214,17 @@ case $1 in
 		miner_share=(`echo $stats_template | jq '.devs.DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
 		if [[ $miner_algo == "phi2" ]]; then
+			local x=1000
+		elif [[ $miner_algo == "cnr" ]]; then
+			local x=1000000
+		else
+			local x=1
+		fi
+		if [[ $x -ne 1 ]]; then
 			for ((i=0; i < ${#miner_hr[@]}; i++)); do
-				miner_hr[$i]=$(echo "scale=0; ${miner_hr[$i]}*1000/1" | bc -l) #without /1 it gives value like 4635.000
+				miner_hr[$i]=$(echo "scale=0; ${miner_hr[$i]}*$x/1" | bc -l) #without /1 it gives value like 4635.000
 			done
-			miner_total_hr=$(echo "scale=0; $miner_total_hr*1000/1" | bc -l)
+			miner_total_hr=$(echo "scale=0; $miner_total_hr*$x/1" | bc -l)
 		fi
 	;;
 	t_rex)

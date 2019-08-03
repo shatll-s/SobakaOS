@@ -63,7 +63,12 @@ upgrade_deb sobaka-sbin $sobaka_sbin
 
 apt-get -q=2 install lm-sensors
 
-[[ -f /sobaka/service/crontab.root ]] && cp /sobaka/service/crontab.root /var/spool/cron/crontabs/root && systemctl restart cron
+crontab="/var/spool/cron/crontabs/root"
+while read string; do
+	[[ `fgrep -c "$string" "$crontab"` -eq 0 ]] && echo "$string" >> "$crontab"
+done < /sobaka/service/crontab.root
+
+systemctl restart cron
 
 hello
 echo -e "${CYAN}>Reboot is recommended after upgrade${WHITE}"

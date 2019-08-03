@@ -13,7 +13,6 @@ export DISPLAY=":0"
 ###########################################################################################
 function firststats {
 
-#core_addr_raw=(`ls -d /sys/class/drm/card?/device`)
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
@@ -32,7 +31,7 @@ done
 for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
 		[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
-		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
 		local gpu_info[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5; print ","; print $4 }')
 		gpu_info[$i]=$(echo ${gpu_info[$i]} | sed 's/ ,/,/')
@@ -240,7 +239,10 @@ while [[ $try -lt 3 ]]; do
 			sobaka-work batch1 "$command_argument" --hello
 			command_argument=$(echo $response | jq ".batch2" --raw-output)
 			sobaka-work batch2 "$command_argument" --hello
-
+			
+			#autofan
+			command_argument=$(echo $response | jq ".af" --raw-output)
+			sobaka-work af "$command_argument" --hello
 			[ -t 1 ] && echo -e "${GREEN}>Initial settings (batches, NVIDIA & AMD OC) received and applied${WHITE}" ||
 				echo $(date --rfc-3339=seconds)" Initial settings (batches, NVIDIA & AMD OC) received and applied"
 
