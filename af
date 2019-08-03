@@ -191,7 +191,7 @@ case $1 in
 	;;
 	stop)
 		screen_kill af
-		echo "Autofan stopped"
+		echo `date -R`" Autofan stopped"
 	;;
 	loop)
 		start
@@ -199,7 +199,7 @@ case $1 in
 	start|restart)
 		screen_kill af
 		screen -dmS af bash -c "/sobaka/af loop"
-		echo "Autofan (re)started"
+		echo `date -R`" Autofan (re)started"
 	;;
 	*)
 		bname=`basename $0`

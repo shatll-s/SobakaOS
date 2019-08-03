@@ -64,9 +64,19 @@ upgrade_deb sobaka-sbin $sobaka_sbin
 apt-get -q=2 install lm-sensors
 
 crontab="/var/spool/cron/crontabs/root"
+crontab_remove="/sobaka/service/crontab.root.remove"
+
 while read string; do
 	[[ `fgrep -c "$string" "$crontab"` -eq 0 ]] && echo "$string" >> "$crontab"
 done < /sobaka/service/crontab.root
+
+if [[ -f $crontab_remove ]]; then
+	while read string; do
+		echo ">Looking to remove some strings from crontab..."
+		slashed_string=`echo "$string" | sed -e 's/\([[\/.*]\|\]\)/\\\\\1/g'`
+		sed -i "/$slashed_string/d" $crontab
+	done < $crontab_remove
+fi
 
 systemctl restart cron
 
