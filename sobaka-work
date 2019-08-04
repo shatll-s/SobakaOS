@@ -338,7 +338,7 @@ case $1 in
 				screen -S af -X hardcopy /tmp/af_hardcopy
 				if [[ $? -eq 0 ]]; then
 					return=$(cat -v /tmp/af_hardcopy | sed -e 's/M-0/\&deg/g; s/M-^X/\&#x2798/g; s/M-^W/\&#x279a/g;')
-					msg "Autofan log" success "$return"
+					msg "Autofan log" info "$return"
 				else
 					return="$(screen -ls)"
 					msg "Autofan log" error "$return"
