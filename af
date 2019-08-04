@@ -100,7 +100,7 @@ function autofan () {
 		if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
 			sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
 	
-			local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+			local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 			local gpu_fan[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
 			local gpu_temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
 			local gpu_temp[$i]=$(echo "scale=0; ${gpu_temp_raw[$i]}/1000" | bc -l) #temp format is something like 65000
