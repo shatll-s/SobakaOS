@@ -153,7 +153,7 @@ case $1 in
 				"\nCORE_VOLTAGE="$(echo $2 | jq ".core_voltage") \
 				"\nMEMORY_CLOCK="$(echo $2 | jq ".memory_clock") \
 				"\nMEMORY_STATE="$(echo $2 | jq ".memory_state") \
-				"\AMDMEMTWEAK="$(echo $2 | jq ".memory_tweak") \
+				"\nAMDMEMTWEAK="$(echo $2 | jq ".memory_tweak") \
 				"\nFAN="$(echo $2 | jq ".fan") > $AMD_CFG
 		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
 		return=$(amd-oc)
