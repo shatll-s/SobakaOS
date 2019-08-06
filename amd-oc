@@ -24,7 +24,7 @@ CORE_STATE=($CORE_STATE)
 CORE_VOLTAGE=($CORE_VOLTAGE)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
-AMDMEMTWEAK=($AMDMEMTWEAK)
+#AMDMEMTWEAK=$AMDMEMTWEAK #no need
 
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
@@ -35,7 +35,8 @@ for (( i=0; i < $n; ++i )); do
 	[[ ! ${CORE_VOLTAGE[$i]} && ! -z ${CORE_VOLTAGE[0]} ]]&& CORE_VOLTAGE[$i]=${CORE_VOLTAGE[-1]}
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${MEMORY_STATE[$i]} && ! -z ${MEMORY_STATE[0]} ]]&& MEMORY_STATE[$i]=${MEMORY_STATE[-1]}
-	[[ ! ${AMDMEMTWEAK[$i]} && ! -z ${AMDMEMTWEAK[0]} ]]&& MEMORY_STATE[$i]=${AMDMEMTWEAK[-1]}
+	#[[ ! ${AMDMEMTWEAK[$i]} && ! -z ${AMDMEMTWEAK[0]} ]]&& MEMORY_STATE[$i]=${AMDMEMTWEAK[-1]}
+	#AMDMemTweak is only one for all cards
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
 done
 
@@ -100,7 +101,7 @@ for  ((i=0; i < $n; i++)); do
 	fi
 	[[ $(echo $str | awk '{print length}') -gt 30 ]] && bash -c "$str"
 	#29 is "wolfamdctrl -i 5", so it`s useless to do
-	amdmemtweak --$i ${AMDMEMTWEAK[$i]}
+	amdmemtweak --$i $AMDMEMTWEAK
 	
 #####################################################
 #Core State section
