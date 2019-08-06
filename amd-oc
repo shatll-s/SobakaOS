@@ -100,7 +100,7 @@ for  ((i=0; i < $n; i++)); do
 	fi
 	[[ $(echo $str | awk '{print length}') -gt 30 ]] && bash -c "$str"
 	#29 is "wolfamdctrl -i 5", so it`s useless to do
-	amdmemtweak ${AMDMEMTWEAK[$i]}
+	amdmemtweak --$i ${AMDMEMTWEAK[$i]}
 	
 #####################################################
 #Core State section
