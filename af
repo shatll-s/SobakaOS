@@ -1,5 +1,5 @@
 #!/bin/bash
-#SobakaOS Autofan v 0.2. Visit www.sobaka.group
+#SobakaOS Autofan v 0.3. Visit www.sobaka.group
 #Dependencies: NVIDIA, AMD drivers; jq
 AF_CFG="/sobaka/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
@@ -84,7 +84,15 @@ function set_fan_amd () {
 	echo $fan_adapted > $fan_addr/pwm1
 }
 
-function set_fan_nvidia () {
+function prepare_nvidia_args () {
+	local fan=$1
+	local i=$2
+	nv_args+=" -a [gpu:$i]/GPUFanControlState=1"
+	nv_args+=" -a [fan:$i]/GPUTargetFanSpeed=$fan"
+	echo "$nv_args"
+}
+
+function nvidia_oc () {
 	local timer=0
 	while [[ $timer -le 20 ]]; do
 		if  [[ ! -f $LOCK_FILE_NVIDIA ]]; then #no lock file
@@ -96,16 +104,13 @@ function set_fan_nvidia () {
 		fi
 		sleep 0.5
 		((timer+=1))
-		[[ $timer -eq 20 ]] && echo "${RED}Error (active OC)${WHITE}" && return 1
+		[[ $timer -eq 20 ]] && echo "${RED}Error (active NVIDIA OC)${WHITE}" && return 1
 	done
-	local fan=$1
-	local i=$2
-	local args=" -a [gpu:$i]/GPUFanControlState=1"
-	args+=" -a [fan:$i]/GPUTargetFanSpeed=$fan"
-	nvidia-settings$args >/dev/null 2>&1
+	nvidia-settings "$@" >/dev/null 2>&1
 }
 
 function autofan () {
+	local nv_args=""
 	local time=`date +%s`
 	local secs=`echo "$time - $start_time" | bc -l`
 	local hr_time=`displaytime $secs`
@@ -135,23 +140,31 @@ function autofan () {
 		
 		if (( ${gpu_temp[$i]} - $hyst > $target_temp )); then #high temp
 			local temp_color=$RED
-			if [[ ${gpu_fan[$i]} -ge $fan_max ]]; then
+			if [[ ${gpu_fan[$i]} -gt $fan_max ]]; then
+				local new_fan[i]=$fan_max
 				local fan_color=$RED
-				local message="${RED}Max %${WHITE}"
-			else
+				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
+			elif [[ ${gpu_fan[$i]} -lt $fan_max ]]; then
 				local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
+			else
+				local fan_color=$RED
+				local message="${RED}Max %${WHITE}"
 			fi
 		elif (( ${gpu_temp[$i]} + $hyst < $target_temp )); then #low temp
 			local temp_color=$BLUE
-			if [[ ${gpu_fan[$i]} -le $fan_min ]];then
+			if [[ ${gpu_fan[$i]} -lt $fan_min ]];then
+				local new_fan[i]=$fan_min
 				local fan_color=$BLUE
-				local message="${BLUE}Min %${WHITE}" 
-			else
+				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
+			elif [[ ${gpu_fan[$i]} -gt $fan_min ]];then
 				local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
+			else
+				local fan_color=$BLUE
+				local message="${BLUE}Min %${WHITE}" 
 			fi
 		fi
 		[[ -z $temp_color ]] && temp_color=$WHITE
@@ -175,15 +188,18 @@ function autofan () {
 		#Set fan if something changed
 		if [[ ! -z ${new_fan[$i]} ]]; then
 			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
-				local result=`set_fan_amd ${new_fan[i]} ${fan_addr[$i]}`
+				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]}`
 			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
-				local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
+				#local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
+				nv_args=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
 			fi
 		fi
-		echo -e " $result"
-		
-		unset temp_color fan_color message result
+		echo "" #sometimes amd say something
+		unset temp_color fan_color message
 	done
+	#echo $nv_args
+	[[ ! -z $nv_args ]] && local nv_result=`nvidia_oc $nv_args`
+	[[ ! -z $nv_result ]] && echo -e $nv_result
 	$LINE
 }
 
