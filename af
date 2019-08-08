@@ -19,8 +19,6 @@ LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
 #  "af_delay": 12
 #}
 
-NVIDIASMI_AF_FILE="/tmp/nvidiasmi_autofan"
-
 #colors section (somebody can use it without SobakaOS)
 RED="\e[31m"
 WHITE="\e[0m"
@@ -49,18 +47,18 @@ function screen_kill () {
 	[[ ! -z $MINER_PID ]]&& kill $MINER_PID
 }
 
-function displaytime {
-  local T=$1
-  local D=$((T/60/60/24))
-  local H=$((T/60/60%24))
-  local M=$((T/60%60))
-  local S=$((T%60))
-  [[ $D > 0 ]] && printf '%d days ' $D
-  [[ $H > 0 ]] && printf '%d hours ' $H
-  [[ $M > 0 ]] && printf '%d min ' $M
-  #[[ $D > 0 || $H > 0 || $M > 0 ]] && printf 'and '
-  printf '%d sec\n' $S
-}
+function displaytime () {
+	local T=$1
+	local D=$((T/60/60/24))
+	local H=$((T/60/60%24))
+	local M=$((T/60%60))
+	local S=$((T%60))
+	[[ $D > 0 ]] && printf '%d days ' $D
+	[[ $H > 0 ]] && printf '%d hours ' $H
+	[[ $M > 0 ]] && printf '%d min ' $M
+	#[[ $D > 0 || $H > 0 || $M > 0 ]] && printf 'and '
+	printf '%d sec\n' $S
+	}
 
 function set_fan_amd () {
 	local timer=0
@@ -114,7 +112,7 @@ function autofan () {
 	local time=`date +%s`
 	local secs=`echo "$time - $start_time" | bc -l`
 	local hr_time=`displaytime $secs`
-	nvidia-smi --query-gpu=index,gpu_bus_id,temperature.gpu,fan.speed --format=csv,noheader> $NVIDIASMI_AF_FILE
+	local nvidia_smi=`nvidia-smi --query-gpu=index,gpu_bus_id,temperature.gpu,fan.speed --format=csv,noheader`
 	echo -e "${GREEN}Target temp ${CYAN}$target_temp${GREEN}$C, hyst ${CYAN}$hyst${GREEN}, fan min/max ${BLUE}$fan_min${GREEN}/${RED}$fan_max${GREEN}, shift ${CYAN}$fan_shift${GREEN}, delay ${CYAN}$delay${WHITE}"
 	
 	echo -e `date -R`" (working "$hr_time")\n"
@@ -130,7 +128,7 @@ function autofan () {
 		elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
 			sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 	
-			local nvidiainfo=`cat $NVIDIASMI_AF_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
+			local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
 			local gpu_index[$i]=`awk -F ', ' '{print $1}' <<< $nvidiainfo`
 			local gpu_temp[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 			local gpu_fan[$i]=$(echo `awk -F ', ' '{print $4}' <<< $nvidiainfo` | sed 's/ %//')
