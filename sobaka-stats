@@ -559,7 +559,7 @@ echo $miner_total_hr > /tmp/hr.$1
 
 ##################################################################
 function stats {
-
+[[ `gpu-detect NVIDIA` -gt 0 ]] && local nvidia_smi=`nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader`
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
@@ -576,23 +576,17 @@ done
 
 for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	#echo "Card $i, core addr ${core_addr[$i]}"
-	#local gpu_busid_sys[$i]=$(cat ${core_addr[$i]}/uevent | grep "PCI_SLOT_NAME" | sed -e 's/PCI_SLOT_NAME\=//; s/0000://')
-	#echo ${gpu_busid_sys[$i]} #no need
-	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
-		#echo "GPU $i is AMD" #no need
-		#fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon?)
+	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
 		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
 		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
-		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is something like 65000
+		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is like 65000
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
 		local power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
-		#echo "GPU $i is NVIDIA" #no need
-		#echo "BUSID: "${gpu_busid_sys[$i]}
-		nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader> $NVIDIASMI_FILE
-        local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i "${gpu_busid_sys[$i]}:"`
-		local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
+		#nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader> $NVIDIASMI_FILE
+		local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
+        local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 		local fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
 		local rig_gpu_fan_raw[$i]=$(echo ${fan_raw[$i]} | sed 's/ %//')
 		local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`

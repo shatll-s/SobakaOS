@@ -48,11 +48,11 @@ if [[ ! -f $RIG_CFG ]]; then
 	fi
 fi
 
+[[ `gpu-detect AMD` -gt 0 ]] && sleep 2 && amdmeminfo -q -s > $AMDMEMINFO_FILE
+
 if [[ ! -f /sobaka/log/firstrun.txt ]]; then
 	tech_info > /sobaka/log/firstrun.txt
 	netsetup -f
-	echo -e "\n========== After netsetup ==========\n" >> /sobaka/log/firstrun.txt
-	tech_info >> /sobaka/log/firstrun.txt
 else
 	netsetup -f
 fi
@@ -64,78 +64,3 @@ time_stop=`date +%s`
 let "time=time_stop - time_start"
 echo "$(date --rfc-3339=seconds) $0 stopped. ($time seconds)"
 echo "================================================================"
-exit 0
-
-
-
-
-#NOW WE DON`t need to install drivers on startup 
-	#install NVIDIA drivers
-	if (( `gpu-detect NVIDIA` > 0 )); then
-		echo -n $(gpu-detect NVIDIA)" NVIDIA GPU detected. "
-		if (( `lspci -k | grep -E "VGA|3D controller" -EA2 | grep NVIDIA -EA2 | grep -c "driver in use: nvidia"` <= 0 )); then
-			driver-update nvidia
-			#echo "Driver is not found. Trying to install..."
-			#cp /sobaka/service/blacklist-sobaka.conf /etc/modprobe.d
-			#update-initramfs -u
-			#/sobaka/downloads/$NVIDIA.run -s --no-install-compat32-libs | sed 's/\(\.\.[.]*\)//g' #sudo
-			#exitcode=$?
-			#if [[ $exitcode -eq 0 ]]; then
-			#	echo "Driver $NVIDIA installed successfully."
-			#else
-			#	echo "Error occured while installing driver $NVIDIA."
-			#fi
-		else
-			driver=$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
-			echo "Driver $driver is installed."
-		fi
-		[[ ! -f $NVIDIASMI_FILE ]] &&
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit --format=csv,noheader > $NVIDIASMI_FILE
-	else
-		echo "No NVIDIA GPU was found."
-	fi
-
-	#install amd drivers
-	if (( `gpu-detect AMD` > 0 )); then
-		if (! dpkg -l | grep -q amdgpu-core); then
-			echo -n $(gpu-detect AMD)" AMD GPU detected. "
-			echo "Driver is not found. Trying to install..."
-			cd /sobaka/downloads
-			tar -Jxf "$AMD.tar.xz"
-			cd /sobaka/downloads/$AMD/
-			./amdgpu-install -y --opencl=legacy,pal
-			rm*
-			cd /sobaka
-			rmdir /sobaka/downloads/$AMD/
-			exitcode=$?
-			if [[ $exitcode -eq 0 ]]; then
-				sed -i 's/.*GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"amdgpu.vm_fragment_size=9\"/g' /etc/default/grub #sudo
-				update-grub #sudo
-				echo "Driver $AMD successfully installed. Now rebooting"
-				time_stop=`date +%s`
-				let "time=time_stop - time_start"
-				echo "$(date --rfc-3339=seconds) $0 stopped. ($time seconds)"
-				echo "================================================================"
-				sreboot
-			else
-				echo "Error occured while installing driver $$AMD."
-			fi
-			unset exitcode
-		else
-			driver=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
-			echo -n $(gpu-detect AMD)" AMD GPU detected. "
-			echo "AMD driver $driver installed"
-		fi
-						#now we save pp tables
-					#	echo "Saving Power Play tables:"
-					#	for ppfile in /sys/class/drm/card*/device/pp_table ; do
-					#		echo -e "\tSaving $ppfile"
-					#		card=$(echo $ppfile | sed 's/.*card\([0-9]*\).*/\1/')
-					#		[[ -z $card ]] && echo "$0: Error matching card number in $ppfile" && continue
-					#		mkdir -p /tmp/pp_tables/card$card
-					#		cp $ppfile /tmp/pp_tables/card$card/pp_table
-					#	done
-		amdmeminfo -q -s > $AMDMEMINFO_FILE
-	else
-		echo "No AMD GPU was found."
-	fi
