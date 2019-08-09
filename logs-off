@@ -1,0 +1,10 @@
+#!/bin/bash
+. colors
+[[ ! -f /sobaka/service/fstab_ram ]] && echo "Error, no fstab file" && exit 1
+cp /sobaka/service/fstab_ram /etc/fstab
+sed -E 's/^[#]?Storage=.*$/Storage=volatile/g' -i /etc/systemd/journald.conf
+systemctl restart systemd-journald
+rm -r /var/log/*
+mkdir -p /var/log/journal
+
+echo -e "${GREEN}Logs are redirected to RAM. You NEED to reboot after this command${WHITE}"

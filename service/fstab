@@ -1,0 +1,2 @@
+/dev/sda3 / ext4 defaults 0 0
+/dev/sda2 /sobaka-flash vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0

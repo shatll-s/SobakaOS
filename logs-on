@@ -1,0 +1,7 @@
+#!/bin/bash
+. colors
+[[ ! -f /sobaka/service/fstab ]] && echo "Error, no fstab file" && exit 1
+cp /sobaka/service/fstab /etc/fstab
+sed -E 's/^[#]?Storage=.*$/Storage=persistent/g' -i /etc/systemd/journald.conf
+
+echo -e "${GREEN}Logs are redirected to disk. You NEED to reboot after this command${WHITE}"
