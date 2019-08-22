@@ -57,6 +57,7 @@ else
 	netsetup -f
 fi
 /sobaka/sbin/watchdog-opendev initial
+/sobaka/sbin/watchdog-qinheng initial
 hello
 [[ `gpu-detect AMD` -lt 8 ]] && sudo systemctl start sobakax
 

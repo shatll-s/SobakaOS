@@ -4,7 +4,7 @@ LOG="/sobaka/log/sobaka.log"
 exec &>>$LOG
 
 BATCH_CFG="/sobaka/cfg/batch.cfg"
-VARIABLES_CFG="/sobaka/cfg/variables.cfg"
+VARIABLES_CFG="/sobaka/service/variables"
 . $VARIABLES_CFG
 
 echo "================================================================"
@@ -22,11 +22,12 @@ function screen_kill () {
 }
 
 function check_con () {
-	if [[ $1 == 'ewbf' || $1 == 't_rex' || $1 == 'claymore' || $1 == 'xmrig_amd' || $1 == 'xmrig_nvidia' ]]; then
-		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
+	#if [[ $1 == 'ewbf' || $1 == 't_rex' || $1 == 'claymore' || $1 == 'xmrig_amd' || $1 == 'xmrig_nvidia' ]]; then
+		#grep -E "TIME_WAIT|FIN_WAIT2"
+		for con in `netstat -anp | grep -E "TIME_WAIT" | grep ${APIPORT[$1]} | awk '{print $5}'`; do
 			killcx $con lo $?>/dev/null
 		done
-	fi
+	#fi
 }
 
 #check if config files exists

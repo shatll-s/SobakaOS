@@ -1,0 +1,68 @@
+#!/bin/bash
+#QinHeng Electronics HL-340
+[ -t 1 ] && . colors #source colors only if running in terminal
+WD_TYPE="china"
+
+if [[ `lsusb | grep -E '1a86:7523|5131:2007|0471:2379' | wc -l` -gt 0 ]]; then
+	for sysdevpath in $(find /sys/bus/usb/devices/usb*/ -name dev); do
+		syspath=`echo $sysdevpath | sed 's/\/dev$//'`
+		[[ -f $syspath/uevent ]] && . $syspath/uevent #DEVNAME=bus/usb/001/001
+		[[ "$DEVNAME" == "bus/"* ]] && continue
+		eval "$(udevadm info -q property --export -p $syspath | grep -E 'ID_VENDOR_ID|DEVNAME|ID_MODEL_ID|ID_SERIAL')" 
+		[[ ! ($ID_MODEL_ID == "7523") || $ID_VENDOR_ID != "1a86" ]] && continue
+		echo -e "${GREEN}>Detected QinHeng HL-340 watchdog ($WD_TYPE) ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
+		PORT=$DEVNAME
+		echo "PORT = $DEVNAME"
+	done
+fi
+
+
+[[ -z $PORT ]] && echo -e "${RED}>There is no qinheng watchdog in system, exiting${WHITE}" && exit 1
+
+if [[ $WD_TYPE == "fixorgua" ]]; then
+	#https://fix.org.ua/index.php/fix-forum/tekhpodderzhka/67-po-dlya-watchdog?start=6#135
+	ping="\x31\x41"
+	reset="\x33\x33"
+else
+	# Default China dog
+	ping="\x1E\x00"
+	reset="\xFF\x55"
+fi
+
+case $1 in
+	initial)
+		MINER_PID=$(screen -ls | grep "watchdog-qinheng" | sed 's/\s\([0-9]*\)..*/\1/')
+		[[ ! -z "$MINER_PID" ]] && echo ">Killing old screens" && kill $MINER_PID
+		echo -e "${GREEN}>Opening screen ${CYAN}watchdog-opendev${GREEN} with endless ping${WHITE}"
+		screen -dmS "watchdog-qinheng" bash -c "watchdog-qinheng ping"
+	;;
+	--set)
+		if [[ $2 == "china" || $2 == "fixorgua" ]]; then
+			sed -i "1,5s/WD_TYPE=.*$/WD_TYPE=\"$2\"/" $0
+			exitcode=$?
+			[[ $exitcode -eq 0 ]] && echo "Watchdog type set to: $2" || echo "Error while changing type"
+		else
+			echo -e "${RED}Available options: ${CYAN}china${RED} and ${CYAN}fixorgua${RED}, but you try to use unknown: $2"
+		fi
+	;;
+	show)
+		screen -d watchdog-qinheng
+		screen -r watchdog-qinheng
+	;;
+	ping)
+		while true; do
+			echo "$(date --rfc-3339=seconds) Pinging watchdog with $ping to $PORT"
+			[[ `nc -w 2 -zv localhost 22 2>&1 | grep -c succeeded` -gt 0 ]] && echo -ne $ping > $PORT
+			sleep 5
+		done
+	;;
+	reset)
+		echo -e "${GREEN}>Pushing Reset with ${reset} to $PORT${WHITE}"
+		echo -ne $reset > $PORT
+	;;
+	*|-h|--help)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|ping|reset|--set${WHITE}"
+		echo -e "F.e. $bname --set china or $bname --set fixorgua"
+	;;
+esac
