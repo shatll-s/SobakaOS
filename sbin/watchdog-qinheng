@@ -26,7 +26,7 @@ if [[ $WD_TYPE == "fixorgua" ]]; then
 else
 	# Default China dog
 	ping="\x1E\x00"
-	reset="\xFF\x55"
+	reset="\xFF\x55" #blue line?
 fi
 
 case $1 in
