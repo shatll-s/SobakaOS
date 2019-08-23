@@ -1,0 +1,41 @@
+*background: #111111
+*foreground: #babdb6
+! Black (not tango) + DarkGrey
+*color0:  #000000
+*color8:  #555753
+! DarkRed + Red
+*color1:  #ff6565
+*color9:  #ff8d8d
+! DarkGreen + Green
+*color2:  #93d44f
+*color10: #c8e7a8
+! DarkYellow + Yellow
+*color3:  #eab93d
+*color11: #ffc123
+! DarkBlue + Blue
+*color4:  #204a87
+*color12: #3465a4
+! DarkMagenta + Magenta
+*color5:  #ce5c00
+*color13: #f57900
+!DarkCyan + Cyan (both not tango)
+*color6:  #89b6e2
+*color14: #46a4ff
+! LightGrey + White 
+*color7:  #cccccc
+*color15: #ffffff
+
+XTerm*utf8Title: true
+XTerm*font: -*-terminus-medium-r-*-*-14-*-*-*-*-*-iso10646-*
+xterm*VT100.geometry:     80x23
+xterm*utf8:               1
+XTerm*locale: 1
+xterm*eightBitInput:      false
+XTerm*metaSendsEscape: true
+xterm*saveLines:          10000
+xterm*scrollKey:          true
+xterm*scrollTtyOutput:    false
+xterm*scrollBar:          true
+xterm*rightScrollBar:     true
+xterm*jumpScroll:         true
+xterm*multiScroll:        true

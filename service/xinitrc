@@ -1,15 +1,10 @@
-options="-bg black -fg gray -fa 'Monospace' -fs 8"
 tint2 -c /sobaka/service/tint2rc &
 (sleep 2 && feh --bg-scale --no-fehbg /sobaka/service/dog.jpg) &
 setxkbmap -option "terminate:ctrl_alt_bksp" &
-xrdb -merge -I$HOME ~/.Xresources &
-
-xterm $options -e bash -c "date;
+setxkbmap -layout "us,ru" &
+setxkbmap -option "grp:ctrl_shift_toggle,grp_led:scroll" &
+xrdb -merge /sobaka/service/Xresources
+xterm -e bash -c "date;
 echo 'Miner will be displayed here soon'; sleep 20; sudo /sobaka/miner; sudo su" &
-xterm $options -e bash -c "/sobaka/sobaka-info; sudo su" &
-
-#lxterminal -t miner --geometry=78x42 -e bash -c "date;
-#echo 'Miner will be displayed here soon'; sleep 20; sudo /sobaka/miner; sudo su" &
-#lxterminal --geometry=78x42 -e bash -c "/sobaka/sobaka-info; sudo su" &
-
+xterm -e bash -c "/sobaka/sobaka-info; sudo su" &
 openbox-session

@@ -1,7 +1,7 @@
 [Unit]
 Description=Start x11vnc at display :0
 After=network.target sobaka-boot.service sobakax.service
-Requires=sobakax.service
+#Requires=sobakax.service #don`t use Requires! sobakax will be "static"
 
 [Service]
 Type=simple
