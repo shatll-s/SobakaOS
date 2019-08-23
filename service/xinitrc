@@ -4,7 +4,7 @@ setxkbmap -option "terminate:ctrl_alt_bksp" &
 setxkbmap -layout "us,ru" &
 setxkbmap -option "grp:ctrl_shift_toggle,grp_led:scroll" &
 xrdb -merge /sobaka/service/Xresources
-xterm -e bash -c "date;
+xterm -geometry +0+0 -e bash -c "date;
 echo 'Miner will be displayed here soon'; sleep 20; sudo /sobaka/miner; sudo su" &
-xterm -e bash -c "/sobaka/sobaka-info; sudo su" &
+xterm -geometry +0+340 -e bash -c "/sobaka/sobaka-info; sudo su" &
 openbox-session
