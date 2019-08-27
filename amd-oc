@@ -2,6 +2,8 @@
 
 [ -t 1 ] && . colors #source colors only if running in terminal
 AMD_CFG="/sobaka/cfg/amd.cfg"
+AMDMEMINFO_FILE=/tmp/amdmeminfo
+[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
 LOCK_FILE="/tmp/.amd-oc.lock"
 
 if  [[ -e $LOCK_FILE ]]; then
@@ -50,8 +52,23 @@ echo -e ${CYAN}"Memory Tweak:${WHITE}\t${AMDMEMTWEAK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 [ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
 echo -e $BROWN"================================================================"$WHITE
-core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon[0-9]* | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+#core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon[0-9]* | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
 #core_addr=(`ls -d /sys/class/drm/card[[:digit:]]/device/hwmon/hwmon? | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
+
+core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
+
+for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
+	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
+done
+
+IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
+unset IFS
+
+for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
+	for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
+		[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
+	done
+done
 
 #restoring default pp_table
 #if [[ -z $1 && $1 -ne "--firstrun" ]]; then
@@ -65,28 +82,42 @@ core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon[0-9]* | sed 's/\/
 #	done
 #fi
 
-for  ((i=0; i < $n; i++)); do
-	echo -e $LIGHTRED"GPU $i"$WHITE
+for (( i=0; i < ${#core_addr[@]}; i++ )); do
+	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
+		
+
+
+#for ((i=0; i < $n; i++)); do
+	
 
 #####################################################
 #Core, mem, volt settings
 #####################################################
 #wolfamdctrl -i 0 --mem-state 2 --mem-clock 2000 --core-state 4 --core-clock 1100 --volt-state 4 --vddc-table-set 900
 	card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9]*\)\/device/\1/')
+	gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
+	echo -e $LIGHTRED"GPU $i: ${gpu_name[$i]}"$WHITE
+	if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
+	  	echo "This is Vega"
+	  	script="vegatool"
+	else
+		script="wolfamdctrl"
+	fi
 	#echo "Card $card, ${core_addr[$i]}"
-	str="wolfamdctrl -i $card"
+	str="$script -i $card"
 	if [[ ! -z ${CORE_STATE[$i]} && ! ${CORE_STATE[$i]} == "A" ]]; then
 		str=$str" --core-state ${CORE_STATE[$i]}"
 		[[ ${CORE_CLOCK[$i]} ]]&& str=$str" --core-clock ${CORE_CLOCK[$i]}"
 		if [ ${CORE_VOLTAGE[$i]} ]; then
-			volt_state=`echo -e $(wolfamdctrl -i $card --show-core | grep "DPM state ${CORE_STATE[$i]}" -A1) \
+			volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$i]}" -A1) \
 			| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
 			str=$str" --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$i]}"
 		fi
 	else
 		if [ ${CORE_VOLTAGE[$i]} ]; then
 			default_clock=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
-			volt_state=`echo -e $(wolfamdctrl -i $card --show-core | grep "DPM state $default_clock" -A1) \
+			volt_state=`echo -e $($script -i $card --show-core | grep "DPM state $default_clock" -A1) \
+			у
 			| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
 			str=$str" --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$i]}"
 		fi
@@ -129,6 +160,7 @@ for  ((i=0; i < $n; i++)); do
 		echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
 	fi
 	echo -e $BROWN"================================================================"$WHITE
+	fi
 done
 
 rm $LOCK_FILE

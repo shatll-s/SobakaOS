@@ -360,6 +360,10 @@ case $1 in
 			;;
 		esac
 	;;
+	autoswitch)
+		echo "$2" > /sobaka/cfg/autoswitch.cfg
+		msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
+	;;
 	*)
 		#echo "I don\`t know this command($1)"
 		msg "Unknown command ($1)" warning
