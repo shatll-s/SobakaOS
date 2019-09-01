@@ -19,6 +19,7 @@ function convert_algo () {
 		;;
 		CNR)
 			local output_algo="CRYPTONIGHTV8"
+		;;
 		*)
 			local output_algo=$input_algo
 		;;
