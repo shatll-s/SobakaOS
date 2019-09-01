@@ -361,8 +361,24 @@ case $1 in
 		esac
 	;;
 	autoswitch)
-		echo "$2" > /sobaka/cfg/autoswitch.cfg
-		msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
+		case $2 in
+			log)
+				screen -S asw -X hardcopy /tmp/asw_hardcopy
+				sleep 0.5
+				if [[ $? -eq 0 ]]; then
+					return=$(cat -v /tmp/asw_hardcopy | sed -e 's/M-0/\&deg/g; s/M-^X/\&#x2798/g; s/M-^W/\&#x279a/g;')
+					msg "AutoSwitch log" info "$return"
+				else
+					return="$(screen -ls)"
+					msg "AutoSwitch log" error "$return"
+				fi
+				rm /tmp/asw_hardcopy
+			;;
+			*)
+				echo "$2" > /sobaka/cfg/autoswitch.cfg
+				msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
+			;;
+		esac
 	;;
 	*)
 		#echo "I don\`t know this command($1)"

@@ -55,12 +55,14 @@ while true; do
 			fi
 		elif [[ $(screen_check miner1) -eq 0 ]]; then #miner is set up, screens = 0
 			check_con $miner1
+			wd restart
 			screen -dmS miner1.$miner1 bash -c "$batch1"
 			echo -n $(date --rfc-3339=seconds)" Started miner1 screen with $miner1 "
 			[[ $miner1 == $lastcheck ]] && echo "[code 2: miner is not changed, but closed]" || echo "[code 0: simple start]"
 		elif [[	$miner1 != $lastcheck ]]; then #miner is set up, screens > 0, just check if miner changed, if not, everething is ok
 			screen_kill miner1
 			check_con $miner1
+			wd restart
 			screen -dmS miner1.$miner1 bash -c "$batch1"
 			echo $(date --rfc-3339=seconds)" Restarted miner1 screen with $miner1 [code 1: miner changed]"
 		fi
@@ -74,6 +76,7 @@ while true; do
 			if [[ $(screen_check miner2) == 0 ]]; then
 				if [[ $miner2 != $miner1 ]]; then #if miner2 is set up, screen = 0, miner2 != miner1
 					check_con $miner2
+					wd restart
 					screen -dmS miner2.$miner2 bash -c "$batch2"
 					echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 2: miner is not changed, but closed]"
 				fi
@@ -86,6 +89,7 @@ while true; do
 		elif [[ $(screen_check miner2) == 0 ]]; then 
 			if [[ ! $miner2 == $miner1 ]]; then #miner is set up, miner != last check (changed or first run) and screen = 0 and miner1 != miner2
 				check_con $miner2
+				wd restart
 				screen -dmS miner2.$miner2 bash -c "$batch2"
 				echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 0: simple start]"
 			fi
@@ -93,6 +97,7 @@ while true; do
 			if [[ ! $miner2 == $miner1 ]]; then  #miner is set up, miner != last check (changed or first run), screen > 0, miner1 != miner2
 				screen_kill miner2
 				check_con $miner2
+				wd restart
 				screen -dmS miner2.$miner2 bash -c "$batch2"
 				echo $(date --rfc-3339=seconds)" Restarted miner2 screen with $miner2 [code 1: miner changed]"
 			else #miner is set up, miner != last check (changed or first run), screen > 0, miner1 = miner2 => miner2 changed to the same to miner 

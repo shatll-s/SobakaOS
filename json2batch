@@ -2,86 +2,31 @@
 
 RIG_CFG="/sobaka/cfg/rig.cfg"
 VARIABLES_CFG="/sobaka/service/variables"
+AUTOSWITCH_TMP="/tmp/autoswitch"
 [[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/sobaka/cfg/batch.cfg"
 . $VARIABLES_CFG
+name=$(cat /etc/hostname)
+manifest=`cat $1`
 
-##################################################################################################################
-#Just command help
-if [[ ! -z $1 ]]; then
-	if [[ -f $1 ]]; then # "First operand is link to json file..."
-		manifest=`cat $1`
-		if [[ -z $(jq -e . >/dev/null 2>&1 <<< "$manifest") && $? != 0 ]]; then
-			basename=`basename $0`
-			echo "$basename: first operand is link to invalid json file. Exiting"
-			exit 1
-		fi
-	else
-		basename=`basename $0`
-		echo "$basename: first operand is not a link to valid json. Exiting"
-		exit 1
-	fi
-else
-	basename=`basename $0`
-	echo "$basename: missing operand"
-	echo -e "You need to put link to json file as first operand"
-	exit 1
-fi
+function convert_algo () {
+	local input_algo=${1^^}
+	case $input_algo in
+		BEAMHASHII|BEAMHASH)
+			local output_algo="BEAMV2"
+		;;
+		ETHASH)
+			local output_algo="DAGGERHASHIMOTO"
+		;;
+		*)
+			local output_algo=$input_algo
+		;;
+	esac
+	echo $output_algo	
+}
 
-miner_i=$(echo $1 | sed 's/\/tmp\/batch//')
-if [[ ! -z $manifest ]]; then
-	##################################################################################################################
-	#WD section
-
-	if [[ $(echo $manifest | jq '.wd.wd_hr') != '""' && $(echo $manifest | jq '.wd.wd_hr') != 'null' ]]; then
-		if (cat $RIG_CFG | grep -qc "WD_HR="); then 
-			sed -i "/.*WD_HR=.*/d" $RIG_CFG
-		fi
-		echo "WD_HR='"$(echo $manifest | jq '.wd.wd_hr')"'" >> $RIG_CFG
-	fi
-
-	if [[ $(echo $manifest | jq '.wd.wd_enabled') != '""' && $(echo $manifest | jq '.wd.wd_enabled') != 'null' ]]; then
-		if (cat $RIG_CFG | grep -qc "WD_ENABLED="); then 
-			sed -i "/.*WD_ENABLED=.*/d" $RIG_CFG
-		fi
-		echo "WD_ENABLED="$(echo $manifest | jq -r '.wd.wd_enabled') >> $RIG_CFG
-
-		#WD_MINER restart time
-		if [[ $(echo $manifest | jq '.wd.wd_restart') != '""' && $(echo $manifest | jq '.wd.wd_restart') != 'null' ]]; then
-			wd_restart=$(echo $manifest | jq -r '.wd.wd_restart')
-		else
-			wd_restart=3
-		fi
-		[[ $(cat $RIG_CFG | grep -c "WD_RESTART=") -gt 0 ]] && sed -i "/.*WD_RESTART=.*/d" $RIG_CFG
-		echo "WD_RESTART="$wd_restart >> $RIG_CFG
-		#WD_REBOOT restart time
-		if [[ $(echo $manifest | jq '.wd.wd_reboot') != '""' && $(echo $manifest | jq '.wd.wd_reboot') != 'null' ]]; then
-			wd_reboot=$(echo $manifest | jq -r '.wd.wd_reboot')
-		else
-			wd_reboot=5
-		fi
-		[[ $(cat $RIG_CFG | grep -c "WD_REBOOT=") -gt 0 ]] && sed -i "/.*WD_REBOOT=.*/d" $RIG_CFG
-		echo "WD_REBOOT="$wd_reboot >> $RIG_CFG
-	fi
-
-	##################################################################################################################
-	#variables
-
-	name=$(cat /etc/hostname)
-#	[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
-#	[[ `echo $manifest | jq ".coin"` != null ]]	&& coin=`echo $manifest | jq -r ".coin"`
-#	[[ `echo $manifest | jq ".wallet"` != null ]]	&& wallet=`echo $manifest | jq -r ".wallet"`
-#	[[ `echo $manifest | jq ".pass"` != null ]]	&& pass=`echo $manifest | jq -r ".pass"`
-#	[[ `echo $manifest | jq ".pool"` != null ]]	&& pool=`echo $manifest | jq -r ".pool"`
-#	pool_without_port=`echo $pool | sed 's/\:[0-9][0-9]*$//'`
-#	port=`echo $pool | sed 's/.*://'`
-#	[[ `echo $manifest | jq ".template"` != null ]]	&&
-#		template=`echo $manifest | jq -r ".template" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`
-#	[[ `echo $manifest | jq ".addition"` != null ]]	&& addition=`echo $manifest | jq -r ".addition"`
-#	[[ `echo $manifest | jq ".algo"` != null ]]	&& algo=`echo $manifest | jq -r ".algo"`
-#	[[ `echo $manifest | jq ".fork"` != null ]]	&& fork=`echo $manifest | jq -r ".fork"`
-#	[[ `echo $manifest | jq ".brand"` != null ]]	&& brand=`echo $manifest | jq -r ".brand"`
-	#config is json
-
+function get_variables () {	
+	#[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
+	local manifest="$1"
 	for option in miner coin wallet pass pool addition algo fork brand; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\"`" #double slash, because eval open it
@@ -105,22 +50,19 @@ if [[ ! -z $manifest ]]; then
 			eval "$option=\"$option_value\""
 		fi
 	done
-	
+}
+
+function make_batch () {
 	[[ ! -z $fork ]] && miner_dir="/sobaka/miners/$miner/$fork/" || miner_dir="/sobaka/miners/$miner/"
-	#[[ $miner == "xmr_stak" ]] && minerexec="cd $miner_dir; " || minerexec=""
-	minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
+	local minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
 	if [[ $miner == "ccminer" && $fork == "tpruvot-2.3.1" ]]; then
 		:
 	else
 		minerexec+="${PREFIX[$miner]}" #prefix=EXPORT MEMORY_ALLOCATION......
 	fi
-	#minerexec+="/sobaka/miners/$miner/"
-	#[[ ! -z $fork ]]	&& minerexec+="$fork/"
 
 	minerexec+="${miner_dir}miner" #now all miners need to have name "miner"
-	/sobaka/getminer $miner $fork	##################################################################################################################
-	#configuring minerexec
-
+	
 	case $miner in
 		claymore)
 			minerexec+=" -epool $pool"
@@ -377,11 +319,107 @@ if [[ ! -z $manifest ]]; then
 			: #do nothing
 		;;
 	esac
-	[[ ! -z $addition && $miner != "nanominer" ]] && minerexec+=" $addition"	
-fi		
+	[[ ! -z $addition && $miner != "nanominer" ]] && minerexec+=" $addition"
+	echo $minerexec
+}
+
+#Help command
+if [[ ! -z $1 ]]; then
+	if [[ -f $1 ]]; then # "First operand is link to json file..."
+		if [[ -z $(jq -e . >/dev/null 2>&1 <<< "$manifest") && $? != 0 ]]; then
+			basename=`basename $0`
+			echo "$basename: first operand is link to invalid json file. Exiting"
+			exit 1
+		fi
+	else
+		basename=`basename $0`
+		echo "$basename: first operand is not a link to valid json. Exiting"
+		exit 1
+	fi
+else
+	basename=`basename $0`
+	echo "$basename: missing operand"
+	echo -e "You need to put link to json file as first operand"
+	exit 1
+fi
+
+miner_i=$(echo $1 | sed 's/\/tmp\/batch//')
+if [[ ! -z $manifest ]]; then
+	get_variables "$manifest"
+	#WD section
+
+	if [[ $(echo $manifest | jq '.wd.wd_hr') != '""' && $(echo $manifest | jq '.wd.wd_hr') != 'null' ]]; then
+		if (cat $RIG_CFG | grep -qc "WD_HR="); then 
+			sed -i "/.*WD_HR=.*/d" $RIG_CFG
+		fi
+		echo "WD_HR='"$(echo $manifest | jq '.wd.wd_hr')"'" >> $RIG_CFG
+	fi
+
+	if [[ $(echo $manifest | jq '.wd.wd_enabled') != '""' && $(echo $manifest | jq '.wd.wd_enabled') != 'null' ]]; then
+		if (cat $RIG_CFG | grep -qc "WD_ENABLED="); then 
+			sed -i "/.*WD_ENABLED=.*/d" $RIG_CFG
+		fi
+		echo "WD_ENABLED="$(echo $manifest | jq -r '.wd.wd_enabled') >> $RIG_CFG
+
+		#WD_MINER restart time
+		if [[ $(echo $manifest | jq '.wd.wd_restart') != '""' && $(echo $manifest | jq '.wd.wd_restart') != 'null' ]]; then
+			wd_restart=$(echo $manifest | jq -r '.wd.wd_restart')
+		else
+			wd_restart=3
+		fi
+		[[ $(cat $RIG_CFG | grep -c "WD_RESTART=") -gt 0 ]] && sed -i "/.*WD_RESTART=.*/d" $RIG_CFG
+		echo "WD_RESTART="$wd_restart >> $RIG_CFG
+		#WD_REBOOT restart time
+		if [[ $(echo $manifest | jq '.wd.wd_reboot') != '""' && $(echo $manifest | jq '.wd.wd_reboot') != 'null' ]]; then
+			wd_reboot=$(echo $manifest | jq -r '.wd.wd_reboot')
+		else
+			wd_reboot=5
+		fi
+		[[ $(cat $RIG_CFG | grep -c "WD_REBOOT=") -gt 0 ]] && sed -i "/.*WD_REBOOT=.*/d" $RIG_CFG
+		echo "WD_REBOOT="$wd_reboot >> $RIG_CFG
+	fi
+	batch=`make_batch`
+	[[ `echo $manifest | jq ".autoswitch"` != null ]] && autoswitch_arr=`echo $manifest | jq ".autoswitch"`
+	if [[ -z $autoswitch_arr ]]; then
+		echo "No autoswitch detected"
+		if [[ ! -z $miner ]]; then
+			/sobaka/getminer $miner $fork
+			
+		fi
+		[[ $miner_i -eq 1 ]] && asw stop
+	else
+		echo "Autoswitch detected"
+		algo=`convert_algo $algo`
+		json=$(
+			jq -n \
+			--arg algo "$algo" \
+			--arg miner "$miner" \
+			--arg batch "$batch" \
+			'{ autoswitch: [ {
+				$algo,
+				$miner,
+				$batch}]
+			}'
+		)
+		for (( i=0; i < `echo $autoswitch_arr | jq 'length'`; i++ )); do
+			autoswitch=`echo $autoswitch_arr | jq ".[$i]"`
+			get_variables "$autoswitch"
+			/sobaka/getminer $miner $fork #not optimal - need to download all miners at start
+			batch=`make_batch`
+			algo=`convert_algo $algo`
+			json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"batch\": \"$batch\"}]"`
+		done
+		echo $json | jq '.' > $AUTOSWITCH_TMP
+		miner="" #this is to empty batch.cfg
+		batch="" #this is to empty batch.cfg
+		asw restart
+	fi
+
+fi
+	
 [[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
 [[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
-echo -e "batch$miner_i=\"$minerexec\"" >> $BATCH_CFG
+echo -e "batch$miner_i=\"$batch\"" >> $BATCH_CFG
 echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
 
 echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"

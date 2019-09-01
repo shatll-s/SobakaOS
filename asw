@@ -1,0 +1,240 @@
+#!/bin/bash
+########## variables ##########
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+AUTOSWITCH_CFG="/sobaka/cfg/autoswitch.cfg"
+AUTOSWITCH_TMP="/tmp/autoswitch"
+. colors
+
+#later need to fill up more algo
+algo_dividers='
+{
+	"DAGGERHASHIMOTO": 1000,
+	"X16R": 1000,
+	"BEAM": 1000000000,
+	"BEAMV2": 1000000000
+}'
+
+########## functions ##########
+function set_fixstr () {
+	[[ ! -z $2 ]] && need=$2 || need=21
+	local str="$1"
+	local length=`echo $str | wc -c`
+	local output=${str:0:$need-1}
+	for (( y=$length; y < $need; y++ )); do
+		output+=" "
+	done
+	echo "$output"
+}
+
+function set_active () {
+	local json=`echo $1 | jq 'del (.autoswitch[].active)'`
+	local best_algo="$2"
+	for (( i=0; i < `echo $json | jq '.autoswitch | length'`; i++ )); do
+		if [[ `echo $json | jq -r ".autoswitch[$i].algo"` == $best_algo ]]; then
+			local miner=`echo $json | jq -r ".autoswitch[$i].miner"`
+			local batch=`echo $json | jq -r ".autoswitch[$i].batch"`
+			#strange bug - if use sed directly on file, I can`t cat this file later, so use ebanie kostyli
+			local batch_cfg=`cat $BATCH_CFG | sed -e "s%batch1=.*%batch1=\"$batch\"%; s%miner1=.*%miner1=\"$miner\"%" `
+			echo -e "$batch_cfg" > $BATCH_CFG
+			json=`jq ".autoswitch[$i] += {\"active\": 1}" <<< "$json"`
+			echo "$json" > $AUTOSWITCH_TMP
+		break
+		fi
+	done	
+}
+
+function get_new_nicehash_stats () {
+	local api="https://api2.nicehash.com/main/api/v2/public/simplemultialgo/info/"
+	nh_stats=$(echo `curl -s $api` | jq '.miningAlgorithms[]')
+	echo -e "Algo                 Price       Hr    BTC/day     USD/day"
+	echo -e "----------------------------------------------------------"
+	for (( i=0; i < ${#algo[@]}; i++ )); do
+		divider[$i]=`echo $algo_dividers | jq ".${algo[$i]}"`
+		[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
+		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]}\") | .paying"`
+		profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1) print 0; x" | bc -l`
+		if [[ -z $max_profit || `echo "if (${profit_btc[$i]} > $max_profit) print 1" | bc -l` -eq 1 ]]; then
+			max_profit=${profit_btc[$i]}
+			max_profit_i=$i
+		fi
+		profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1) print 0; x" | bc -l`
+		string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
+		echo -e "$string"
+	done
+	echo -e "----------------------------------------------------------"
+}
+
+function get_old_nicehash_stats () {
+	local api="https://api.nicehash.com/api?method=simplemultialgo.info"
+	nh_algos='
+	{
+		"SCRYPT" : 0,
+		"SHA256" : 1,
+		"SCRYPTNF" : 2,
+		"X11" : 3,
+		"X13" : 4,
+		"KECCAK" : 5,
+		"X15" : 6,
+		"NIST5" : 7,
+		"NEOSCRYPT" : 8,
+		"LYRA2RE" : 9,
+		"WHIRLPOOLX" : 10,
+		"QUBIT" : 11,
+		"QUARK" : 12,
+		"AXIOM" : 13,
+		"LYRA2REV2" : 14,
+		"SCRYPTJANENF16" : 15,
+		"BLAKE256R8" : 16,
+		"BLAKE256R14" : 17,
+		"BLAKE256R8VNL" : 18,
+		"HODL" : 19,
+		"DAGGERHASHIMOTO" : 20,
+		"DECRED" : 21,
+		"CRYPTONIGHT" : 22,
+		"LBRY" : 23,
+		"EQUIHASH" : 24,
+		"PASCAL" : 25,
+		"X11GOST" : 26,
+		"SIA" : 27,
+		"BLAKE2S" : 28,
+		"SKUNK" : 29,
+		"CRYPTONIGHTV7" : 30,
+		"CRYPTONIGHTHEAVY" : 31,
+		"LYRA2Z" : 32,
+		"X16R" : 33,
+		"CRYPTONIGHTV8" : 34,
+		"SHA256ASICBOOST" : 35,
+		"ZHASH" : 36,
+		"BEAM" : 37,
+		"GRINCUCKAROO29" : 38,
+		"GRINCUCKATOO31" : 39,
+		"LYRA2REV3" : 40,
+		"MTP" : 41,
+		"CRYPTONIGHTR" : 42,
+		"CUCKOOCYCLE" : 43
+	}'
+	nh_stats=$(echo `curl -s $api` | jq '.result.simplemultialgo[]')
+	echo -e "Algo                 Price       Hr    BTC/day     USD/day"
+	echo -e "----------------------------------------------------------"
+	for (( i=0; i < ${#algo[@]}; i++ )); do
+		if [[ `echo $nh_algos | jq ".${algo[$i]}"` != null ]]; then
+			divider[$i]=`echo $algo_dividers | jq ".${algo[$i]}"`
+			[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
+			key[$i]=`echo $nh_algos | jq ".${algo[$i]}"`
+			price[$i]=`echo $nh_stats | jq -r ". | select (.algo == ${key[$i]}) | .paying"`
+			profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1) print 0; x" | bc -l`
+			if [[ -z $max_profit || `echo "if (${profit_btc[$i]} > $max_profit) print 1" | bc -l` -eq 1 ]]; then
+				max_profit=${profit_btc[$i]}
+				max_profit_i=$i
+				#echo "Set max_profit ${profit_btc[$i]}, max_profit_i $max_profit_i"
+			fi
+			profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1) print 0; x" | bc -l`
+			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
+		else
+			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} not supported"
+		fi
+		echo -e "$string"
+	done
+	echo -e "----------------------------------------------------------"
+}
+
+########## main ##########
+function main () {
+	as_cfg=`cat $AUTOSWITCH_CFG`
+	[[ `echo $as_cfg | jq ".algos"` != null ]]	&& benchmark=`echo $as_cfg | jq ".algos"`
+	[[ `echo $as_cfg | jq ".hyst"` != null ]]	&& hyst=`echo $as_cfg | jq -r ".hyst"`
+	[[ `echo $as_cfg | jq ".provider"` != null ]]	&& provider=`echo $as_cfg | jq -r ".provider"`
+	[[ `echo $as_cfg | jq ".delay"` != null ]]	&& delay=`echo $as_cfg | jq -r ".delay"`
+	[[ `echo $as_cfg | jq ".notifications"` != null ]]	&& notifications=`echo $as_cfg | jq -r ".notifications"`
+	[[ $notifications -eq 1 ]] && hr_notifications="on" || hr_notifications="off"
+	
+	algo=(`echo $benchmark | jq -r 'keys_unsorted | .[]'`)
+	hr=(`echo $benchmark | jq -r '.[]'`)
+	
+	bitaps_api=`curl -s https://api.bitaps.com/market/v1/ticker/btcusd`
+	btcusd=`echo $bitaps_api | jq '.data.last'`
+	[[ -z $btcusd ]] && echo "BitAPS API is not available, using default BTC price " && btcusd=12000
+
+	echo -e "$(date -R) BTC/USD ${GREEN}${btcusd}${WHITE}"
+	echo -e "State ${GREEN}$provider${WHITE} | hyst ${GREEN}$hyst${WHITE} | delay ${GREEN}$delay${WHITE} | notifications ${GREEN}$hr_notifications${WHITE}\n"
+	
+	case $provider in
+		"Nicehash OLD")
+			get_old_nicehash_stats
+		;;
+		"Nicehash NEW"|*)
+			get_new_nicehash_stats
+		;;
+	esac
+	
+	if [[ ! -z $max_profit_i ]]; then
+		best_algo=${algo[$max_profit_i]}
+		string="${CYAN}${best_algo}${WHITE} is the best algo now"
+		#echo -e "$string"
+		
+		as_tmp=`cat $AUTOSWITCH_TMP`
+		active_algo=`echo $as_tmp | jq -r ".autoswitch[] | select (.active == 1) | .algo"`
+		
+		if [[ -z $active_algo ]]; then
+			string+=" and there is no active algo, set it"
+			set_active "$as_tmp" "$best_algo"
+			[[ $notifications -eq 1 ]] && msg "Algo switch: ${best_algo}" info "$(date --rfc-3339=seconds) There is no active algo, set ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
+		elif [[ $active_algo == ${algo[$max_profit_i]} ]]; then
+			string+=" and it is already set. Nothing to do"
+		else	
+			for (( i=0; i < ${#algo[@]}; i++ )); do
+				[[ ${algo[$i]} == $active_algo ]] && active_profit=${profit_btc[$i]} && break
+			done
+			
+			[[ ! -z $active_profit && $active_profit -ne 0 ]] && delta=`echo "scale=2;($max_profit/$active_profit - 1)*100" | bc -l` || delta=100
+			string+=" and $delta% better than $active_algo"
+			if [[ `echo "if ($delta > $hyst) print 1" | bc -l` -eq 1 ]]; then
+				string+=", switching to it"
+				set_active "$as_tmp" "$best_algo"
+				[[ $notifications -eq 1 ]] && msg "Algo switch: ${best_algo}" info "$(date --rfc-3339=seconds) Switch to ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
+			else
+				string+=", but hysteresis is $hyst%, nothing to do"
+			fi
+		fi
+		echo -e "$string"
+	else
+		echo "Error occured while getting max profit. Dev info: max_profit_i @${max_profit_i}@, max_profit @${max_profit}@"
+	fi
+	$LINE
+	echo ""
+	unset max_profit max_profit_i best_algo algo active_algo as_tmp key price profit_btc profit_usd nh_stats divider i string delta
+}
+
+function loop () {
+	while true; do
+		main
+		sleep $delay
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d asw
+		screen -r asw
+	;;
+	stop)
+		screen_kill asw
+		echo "$(date --rfc-3339=seconds) AutoSwitch stopped"
+	;;
+	test)
+		main
+	;;
+	loop)
+		loop
+	;;
+	start|restart)
+		screen_kill asw
+		screen -dmS asw bash -c "/sobaka/asw loop"
+		echo "$(date --rfc-3339=seconds) AutoSwitch (re)started"
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "${GREEN}Autoswitch for Nicehash${WHITE}"
+		echo -e "Usage: ${CYAN}$bname show|test|start|stop|restart${WHITE}"
+	;;
+esac
