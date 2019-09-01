@@ -380,6 +380,16 @@ case $1 in
 			;;
 		esac
 	;;
+	settings)
+		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
+		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".notify_on_boot"` || NOTIFY=1
+		
+		[[ ! -z $(grep "NOTIFY_ON_BOOT=" $RIG_CFG) ]]&& sed -i "s/.*NOTIFY_ON_BOOT=.*/NOTIFY_ON_BOOT=$NOTIFY/g" $RIG_CFG || echo "NOTIFY_ON_BOOT=$NOTIFY" >> $RIG_CFG
+		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
+		
+		msg "Rig settings" ok \
+			"$(date --rfc-3339=seconds)\nRig settings applied:\n$2"
+	;;
 	*)
 		#echo "I don\`t know this command($1)"
 		msg "Unknown command ($1)" warning

@@ -194,15 +194,17 @@ function main () {
 		if [[ -z $active_algo ]]; then
 			string+=" and there is no active algo, set it"
 			set_active "$as_tmp" "$best_algo"
-			[[ $notifications -eq 1 ]] && msg "Algo switch: ${best_algo}" info "$(date --rfc-3339=seconds) There is no active algo, set ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
+			[[ $notifications -eq 1 ]] && msg "Algo setup: ${best_algo}" info "$(date --rfc-3339=seconds) There is no active algo, set ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
 		elif [[ $active_algo == ${algo[$max_profit_i]} ]]; then
 			string+=" and it is already set. Nothing to do"
 		else	
 			for (( i=0; i < ${#algo[@]}; i++ )); do
 				[[ ${algo[$i]} == $active_algo ]] && active_profit=${profit_btc[$i]} && break
 			done
+			#echo "active_profit: _${active_profit}_, max_profit: _${max_profit}_"
+			#[[ ! -z $active_profit && $active_profit -ne 0 ]] && delta=`echo "scale=2;($max_profit/$active_profit - 1)*100" | bc -l` || delta=100
+			[[ ! -z $active_profit && `echo "if ($active_profit != 0) print 1" | bc -l` -eq 1 ]] && delta=`echo "scale=2;($max_profit/$active_profit - 1)*100" | bc -l` || delta=100
 			
-			[[ ! -z $active_profit && $active_profit -ne 0 ]] && delta=`echo "scale=2;($max_profit/$active_profit - 1)*100" | bc -l` || delta=100
 			string+=" and $delta% better than $active_algo"
 			if [[ `echo "if ($delta > $hyst) print 1" | bc -l` -eq 1 ]]; then
 				string+=", switching to it"

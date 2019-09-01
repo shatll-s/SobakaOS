@@ -59,7 +59,14 @@ fi
 /sobaka/sbin/watchdog-opendev initial
 /sobaka/sbin/watchdog-qinheng initial
 hello
-[[ `gpu-detect AMD` -lt 8 ]] && sudo systemctl start sobakax
+. $RIG_CFG
+if [[ ! -z $NOTIFY_ON_BOOT || $NOTIFY_ON_BOOT == 1 ]]; then
+	msg "Rig booted" info "`uptime`"
+fi
+
+if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
+	[[ `gpu-detect AMD` -lt 8 ]] && sudo systemctl start sobakax
+fi
 
 time_stop=`date +%s`
 let "time=time_stop - time_start"
