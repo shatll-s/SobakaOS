@@ -17,6 +17,8 @@ function convert_algo () {
 		ETHASH)
 			local output_algo="DAGGERHASHIMOTO"
 		;;
+		CNR)
+			local output_algo="CRYPTONIGHTV8"
 		*)
 			local output_algo=$input_algo
 		;;
