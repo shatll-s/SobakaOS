@@ -11,7 +11,10 @@ algo_dividers='
 	"DAGGERHASHIMOTO": 1000,
 	"X16R": 1000,
 	"BEAM": 1000000000,
-	"BEAMV2": 1000000000
+	"BEAMV2": 1000000000,
+	"CRYPTONIGHTV7" : 1000,
+	"CRYPTONIGHTV8" : 1000,
+	"CRYPTONIGHTHEAVY" : 1000
 }'
 
 ########## functions ##########
@@ -48,17 +51,30 @@ function get_new_nicehash_stats () {
 	nh_stats=$(echo `curl -s $api` | jq '.miningAlgorithms[]')
 	echo -e "Algo                 Price       Hr    BTC/day     USD/day"
 	echo -e "----------------------------------------------------------"
+	#echo ${algo[@]}
+	#echo ${algo_dividers[@]}
 	for (( i=0; i < ${#algo[@]}; i++ )); do
+		#echo "algo "${algo[$i]}
+		available=`echo $as_tmp | jq -r ".autoswitch[] | select (.algo == \"${algo[$i]}\")"`
+		#echo $algo_dividers | jq ".${algo[$i]}"
 		divider[$i]=`echo $algo_dividers | jq ".${algo[$i]}"`
+		divider[$i]=`echo "scale=0; ${divider[$i]} / 10" | bc -l` #new nicehash bug 
 		[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
+		#echo "divider "${divider[$i]}
 		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]}\") | .paying"`
-		profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1) print 0; x" | bc -l`
-		if [[ -z $max_profit || `echo "if (${profit_btc[$i]} > $max_profit) print 1" | bc -l` -eq 1 ]]; then
-			max_profit=${profit_btc[$i]}
-			max_profit_i=$i
+		profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1 && x != 0) print 0; x" | bc -l`
+		profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1 && x != 0) print 0; x" | bc -l`
+		string="${CYAN}`set_fixstr ${algo[$i]} 20`"
+		if [[ ! -z $available ]]; then
+			if [[ -z $max_profit || `echo "if (${profit_btc[$i]} > $max_profit) print 1" | bc -l` -eq 1 ]]; then
+				max_profit=${profit_btc[$i]}
+				max_profit_i=$i
+			fi
+			string+=" "
+		else
+			string+="${RED}-${WHITE}"
 		fi
-		profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1) print 0; x" | bc -l`
-		string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
+		string+="${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
 		echo -e "$string"
 	done
 	echo -e "----------------------------------------------------------"
@@ -122,13 +138,13 @@ function get_old_nicehash_stats () {
 			[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
 			key[$i]=`echo $nh_algos | jq ".${algo[$i]}"`
 			price[$i]=`echo $nh_stats | jq -r ". | select (.algo == ${key[$i]}) | .paying"`
-			profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1) print 0; x" | bc -l`
+			profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1 && x != 0) print 0; x" | bc -l`
 			if [[ -z $max_profit || `echo "if (${profit_btc[$i]} > $max_profit) print 1" | bc -l` -eq 1 ]]; then
 				max_profit=${profit_btc[$i]}
 				max_profit_i=$i
 				#echo "Set max_profit ${profit_btc[$i]}, max_profit_i $max_profit_i"
 			fi
-			profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1) print 0; x" | bc -l`
+			profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1 && x != 0) print 0; x" | bc -l`
 			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
 		else
 			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} not supported"
@@ -154,7 +170,9 @@ function main () {
 	bitaps_api=`curl -s https://api.bitaps.com/market/v1/ticker/btcusd`
 	btcusd=`echo $bitaps_api | jq '.data.last'`
 	[[ -z $btcusd ]] && echo "BitAPS API is not available, using default BTC price " && btcusd=12000
-
+	
+	as_tmp=`cat $AUTOSWITCH_TMP`
+	
 	echo -e "$(date -R) BTC/USD ${GREEN}${btcusd}${WHITE}"
 	echo -e "State ${GREEN}$provider${WHITE} | hyst ${GREEN}$hyst${WHITE} | delay ${GREEN}$delay${WHITE} | notifications ${GREEN}$hr_notifications${WHITE}\n"
 	
@@ -171,8 +189,6 @@ function main () {
 		best_algo=${algo[$max_profit_i]}
 		string="${CYAN}${best_algo}${WHITE} is the best algo now"
 		#echo -e "$string"
-		
-		as_tmp=`cat $AUTOSWITCH_TMP`
 		active_algo=`echo $as_tmp | jq -r ".autoswitch[] | select (.active == 1) | .algo"`
 		
 		if [[ -z $active_algo ]]; then
