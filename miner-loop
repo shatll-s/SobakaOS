@@ -1,0 +1,20 @@
+#!/bin/bash
+. colors
+
+miner="$1"
+batch="$2"
+
+[[ -z $1 || -z $2 ]] && echo -e "${RED}No config given${WHITE}" && exit 1
+while true; do
+	bash -c "$batch"
+	exitcode=$?
+	echo "Error on miner start: exitcode $exitcode"
+	if [[ $exitcode -eq 127 ]]; then
+		fork=`echo $batch | sed "s#cd /.* /sobaka/miners/$miner/\([.a-zA-Z0-9]*\)/miner.*#\1#"`
+		echo ">Trying to download miner by command getminer $miner $fork"
+		/sobaka/getminer $miner $fork
+	else
+		echo -e "\n${RED}>Miner exited, waiting 3 seconds to restart${WHITE}\n"
+	fi
+	sleep 3
+done
