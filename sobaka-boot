@@ -9,6 +9,13 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 
 exec &>>$LOG
 
+cp /sobaka/service/environment /etc/environment
+. /etc/environment
+export PATH=$PATH
+export LC_ALL="en_US.UTF-8"
+echo "$(date --rfc-3339=seconds) $0 started."
+echo "================================================================"
+
 function tech_info()
 {
 	local info="#This is some technical information\n"
@@ -20,14 +27,8 @@ function tech_info()
 	echo -e "$info"
 }
 
-echo "================================================================"
-export LC_ALL="en_US.UTF-8"
-time_start=`date +%s`
-echo "$(date --rfc-3339=seconds) $0 started."
 
-cp /sobaka/service/environment /etc/environment
-. /etc/environment
-export PATH=$PATH
+time_start=`date +%s`
 
 if [[ ! -f $RIG_CFG ]]; then
 	echo -n "There is no config file on rig..."
@@ -43,9 +44,24 @@ if [[ ! -f $RIG_CFG ]]; then
 			echo "user:$PASSWD" | chpasswd #Change password
 			echo "Config copied"
 		else
-			echo "There is no enough data in rig.cfg on flash. Check HOST, PASSWD or RIG_ID"
+			echo "There is not enough data in rig.cfg on flash. Check HOST, PASSWD or RIG_ID"
 		fi
 	fi
+fi
+
+disksize=`fdisk -l /dev/sda | grep "Disk /dev/sda:" | sed "s#Disk /dev/sda: \([0-9.]*\) GiB.*#\1#"`
+echo "Disk size: $disksize Gb"
+if [[ `echo "if ($disksize < 17) print 1" | bc -l` -eq 1 ]]; then
+	. colors
+	echo -e "######################################################################################\nIt seems this is flash drive\n######################################################################################\n"
+	. $RIG_CFG
+	if [[ -z $LOGS ]]; then
+		logs-off
+		echo "LOGS=\"OFF\"" >> $RIG_CFG
+		sreboot
+	fi
+else
+	echo "It seems this is not flash drive"
 fi
 
 [[ `gpu-detect AMD` -gt 0 ]] && sleep 2 && amdmeminfo -q -s > $AMDMEMINFO_FILE
