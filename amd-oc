@@ -148,8 +148,18 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		else 
 			echo -e "${CYAN}Manual${WHITE} fan (${FAN[$y]})." 
 			echo 1 > ${fan_addr[$i]}/pwm1_enable
-			let fan_adapted[$i]=${FAN[$y]}*255/100 #fan power is beetween 0 and 255
-			echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
+			if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
+				rpm_min=`cat ${fan_addr[$i]}/fan1_min`
+				rpm_max=`cat ${fan_addr[$i]}/fan1_max`
+				fan_target=`echo "scale=0; ${FAN[$y]} * $rpm_max / 100" | bc -l`
+				[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
+				[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
+				#echo "Fan target: $fan_target"
+				echo $fan_target > ${fan_addr[$i]}/fan1_target
+			else
+				let fan_adapted[$i]=${FAN[$y]}*255/100 #fan power is beetween 0 and 255
+				echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
+			fi
 		fi
 		echo -e $BROWN"================================================================"$WHITE
 		(( y++ ))

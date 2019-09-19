@@ -3,7 +3,7 @@
 #Dependencies: NVIDIA, AMD drivers; jq
 AF_CFG="/sobaka/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
-
+AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE_AMD="/tmp/.amd-oc.lock"
 LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
 
@@ -77,9 +77,20 @@ function set_fan_amd () {
 	local fan=$1
 	local fan_addr=$2
 	echo 1 > $fan_addr/pwm1_enable
-	let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
-	[[ $fan_adapted -gt 255 ]] && fan_adapted=255
-	echo $fan_adapted > $fan_addr/pwm1
+	if [[ $3 -ne 1 ]]; then
+		let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
+		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
+		echo $fan_adapted > $fan_addr/pwm1
+	else #this is VEGA
+		local rpm_min=`cat ${fan_addr[$i]}/fan1_min`
+		local rpm_max=`cat ${fan_addr[$i]}/fan1_max`
+		local fan_target=`echo "scale=0; $fan * $rpm_max / 100" | bc -l`
+		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
+		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
+		#echo "Fan target: $fan_target"
+		echo "echo $fan_target > ${fan_addr[$i]}/fan1_target"
+		echo $fan_target > ${fan_addr[$i]}/fan1_target
+	fi
 }
 
 function prepare_nvidia_args () {
@@ -119,7 +130,7 @@ function autofan () {
 	for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
 			sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
-	
+			local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 			local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 			local gpu_fan[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
 			local gpu_temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
@@ -186,7 +197,8 @@ function autofan () {
 		#Set fan if something changed
 		if [[ ! -z ${new_fan[$i]} ]]; then
 			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
-				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]}`
+				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega=1
+				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]} $vega`
 			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
 				#local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
 				nv_args=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
