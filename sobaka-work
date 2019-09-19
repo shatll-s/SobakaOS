@@ -148,13 +148,21 @@ case $1 in
 		fi
 	;;
 	change_amd_oc)
-		echo -e "CORE_CLOCK="$(echo $2 | jq ".core_clock") \
-				"\nCORE_STATE="$(echo $2 | jq ".core_state") \
-				"\nCORE_VOLTAGE="$(echo $2 | jq ".core_voltage") \
-				"\nMEMORY_CLOCK="$(echo $2 | jq ".memory_clock") \
-				"\nMEMORY_STATE="$(echo $2 | jq ".memory_state") \
-				"\nAMDMEMTWEAK="$(echo $2 | jq ".memory_tweak") \
-				"\nFAN="$(echo $2 | jq ".fan") > $AMD_CFG
+		[[ `echo $2 | jq ".core_clock"` != null ]]		&& core_clock=`echo $2 | jq -r ".core_clock"`
+		[[ `echo $2 | jq ".core_state"` != null ]]		&& core_state=`echo $2 | jq -r ".core_state"`
+		[[ `echo $2 | jq ".core_voltage"` != null ]]	&& core_voltage=`echo $2 | jq -r ".core_voltage"`
+		[[ `echo $2 | jq ".memory_clock"` != null ]]	&& memory_clock=`echo $2 | jq -r ".memory_clock"`
+		[[ `echo $2 | jq ".memory_state"` != null ]]	&& memory_state=`echo $2 | jq -r ".memory_state"`
+		[[ `echo $2 | jq ".memory_tweak"` != null ]]	&& memory_tweak=`echo $2 | jq -r ".memory_tweak"`
+		[[ `echo $2 | jq ".fan"` != null ]]				&& fan=`echo $2 | jq -r ".fan"`
+		
+		echo -e "CORE_CLOCK=$core_clock" \
+				"\nCORE_STATE=$core_state" \
+				"\nCORE_VOLTAGE=$core_voltage" \
+				"\nMEMORY_CLOCK=$memory_clock" \
+				"\nMEMORY_STATE=$memory_state" \
+				"\nAMDMEMTWEAK=$memory_tweak" \
+				"\nFAN=$fan"> $AMD_CFG
 		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
 		return=$(amd-oc)
 		exitcode=$?
@@ -165,13 +173,21 @@ case $1 in
 		fi
 	;;
 	change_nvidia_oc)
-		echo -e "CORE_CLOCK="$(echo $2 | jq ".core_clock") \
-				"\nMEMORY_CLOCK="$(echo $2 | jq ".memory_clock") \
-				"\nFAN="$(echo $2 | jq ".fan") \
-				"\nPLIMIT="$(echo $2 | jq ".power_limit") \
-				"\nPILL="$(echo $2 | jq ".pill") \
-				"\nPILL_ARGS="$(echo $2 | jq ".pill_args") \
-				"\nLIGHT_OFF="$(echo $2 | jq ".light")> $NVIDIA_CFG
+		[[ `echo $2 | jq ".core_clock"` != null ]]		&& core_clock=`echo $2 | jq -r ".core_clock"`
+		[[ `echo $2 | jq ".memory_clock"` != null ]]	&& memory_clock=`echo $2 | jq -r ".memory_clock"`
+		[[ `echo $2 | jq ".power_limit"` != null ]]		&& power_limit=`echo $2 | jq -r ".power_limit"`
+		[[ `echo $2 | jq ".pill"` != null ]]			&& pill=`echo $2 | jq -r ".pill"`
+		[[ `echo $2 | jq ".pill_args"` != null ]]		&& pill_args=`echo $2 | jq -r ".pill_args"`
+		[[ `echo $2 | jq ".light"` != null ]]			&& light=`echo $2 | jq -r ".light"`
+		[[ `echo $2 | jq ".fan"` != null ]]				&& fan=`echo $2 | jq -r ".fan"`
+
+		echo -e "CORE_CLOCK=$core_clock" \
+				"\nMEMORY_CLOCK=$memory_clock" \
+				"\nPLIMIT=$power_limit" \
+				"\nPILL=$pill" \
+				"\nPILL_ARGS=$pill_args" \
+				"\nLIGHT_OFF=$light" \
+				"\nFAN=$fan" > $NVIDIA_CFG
 		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg				
 		return=$(nvidia-oc)
 		exitcode=$?
