@@ -88,7 +88,7 @@ function set_fan_amd () {
 		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
 		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
 		#echo "Fan target: $fan_target"
-		echo "echo $fan_target > ${fan_addr[$i]}/fan1_target"
+		#echo "echo $fan_target > ${fan_addr[$i]}/fan1_target"
 		echo $fan_target > ${fan_addr[$i]}/fan1_target
 	fi
 }
