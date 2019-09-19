@@ -1,7 +1,6 @@
 #!/bin/bash
 #apt-get -q=2 install sed ssh openvpn nano mc jq curl screen libnet-rawip-perl #recomended packages
 RIG_CFG="/sobaka/cfg/rig.cfg"
-tmp_dir="/tmp"
 . $RIG_CFG
 [[ -z $HOST ]] && HOST="https://sobaka.group/message.php"
 [ -t 1 ] && . colors
@@ -43,15 +42,15 @@ fi
 
 [[ $1 == "-v" && ! -z $2 ]]&& VER=$2 || VER="latest"
 
-cd $tmp_dir
-[[ -f $tmp_dir/sobaka-$VER.deb ]] && rm $tmp_dir/sobaka-$VER.deb
+cd /sobaka/downloads
+[[ -f /sobaka/downloads/sobaka-$VER.deb ]] && rm /sobaka/downloads/sobaka-$VER.deb
 DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/sobaka-$VER.deb"
 wget -q $DOWNLOAD
 [[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)" && exit 1
 
 echo -e "${GREEN}>Upgrade files downloaded${WHITE}"
 dpkg -i --force-confold "sobaka-$VER.deb"
-rm $tmp_dir/sobaka-$VER.deb
+rm /sobaka/downloads/sobaka-$VER.deb
 
 echo -e "${CYAN}>Getting latest version of packages${WHITE}"
 versions_url="https://sobaka.group/downloads/deb_versions.txt"

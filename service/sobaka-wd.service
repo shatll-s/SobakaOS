@@ -1,7 +1,7 @@
 [Unit]
 Description=Sobaka Watchdog Service
 After=sobaka.service
-Requires=sobaka.service
+#Requires=sobaka.service
 
 [Service]
 Type=oneshot

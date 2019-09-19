@@ -5,11 +5,6 @@ Section "ServerFlags"
     Option "OffTime" "0"
 EndSection
 
-Section "ServerLayout"
-	Identifier	"Layout0"
-	Screen		"Default Screen"
-EndSection
-
 Section "Device"
     Identifier  "Configured Video Device"
     Driver      "amdgpu"
