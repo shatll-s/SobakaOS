@@ -98,6 +98,18 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		else
 			script="wolfamdctrl"
 		fi
+
+		#####################################################
+		#Core State section
+		#####################################################
+		if [[ ${CORE_STATE[$y]} == "A" || ! ${CORE_STATE[$y]} ]]; then
+			echo -e "${CYAN}Auto${WHITE} Core State selection."
+			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
+		else 
+			echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
+			echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
+			echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
+		fi
 		#echo "Card $card, ${core_addr[$i]}"
 		str="$script -i $card"
 		if [[ ! -z ${CORE_STATE[$y]} && ! ${CORE_STATE[$y]} == "A" ]]; then
@@ -127,17 +139,6 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		[[ $(echo $str | awk '{print length}') -gt 30 ]] && bash -c "$str"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
 		amdmemtweak --i $y $AMDMEMTWEAK
-		#####################################################
-		#Core State section
-		#####################################################
-		if [[ ${CORE_STATE[$y]} == "A" || ! ${CORE_STATE[$y]} ]]; then
-			echo -e "${CYAN}Auto${WHITE} Core State selection."
-			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
-		else 
-			echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
-			echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
-			echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
-		fi
 		#####################################################
 		#Fan section
 		#####################################################
