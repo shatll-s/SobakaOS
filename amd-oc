@@ -1,10 +1,18 @@
 #!/bin/bash
-
 [ -t 1 ] && . colors #source colors only if running in terminal
 AMD_CFG="/sobaka/cfg/amd.cfg"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 [[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
 LOCK_FILE="/tmp/.amd-oc.lock"
+
+function getdata () {
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_tweak fan; do
+		if [[ `echo $1 | jq ".$option"` != null ]]; then
+			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
+			eval "${option^^}=\"$option_value\""
+		fi
+	done
+}
 
 if  [[ -e $LOCK_FILE ]]; then
 	pid=`cat $LOCK_FILE`
@@ -17,8 +25,23 @@ echo $$ > $LOCK_FILE
 n=$(gpu-detect AMD)
 [[ $n == 0 ]]&& echo $(date --rfc-3339=seconds)" no AMD GPU(s) detected, exiting" && exit 1
 echo -e $(date --rfc-3339=seconds)" $n "$LIGHTRED"AMD"$WHITE" GPU detected"
-[[ ! -f $AMD_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $AMD_CFG does not exist, exiting" && exit 1
-. $AMD_CFG
+
+if [[ ! -z $1 ]]; then
+	echo "Overclocking config given in arguments"
+	getdata "$1"
+else
+	[[ ! -f $AMD_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $AMD_CFG does not exist, exiting" && exit 1
+	cfg=`cat $AMD_CFG`
+	echo $cfg | jq '.'  > /dev/null 2>&1
+	exitcode="$?"
+	if [[ $exitcode -eq 0 ]]; then
+		echo "Overclocking config in JSON format (or empty)"
+		getdata "$cfg"
+	else
+		echo "OverClocking config in BASH format"
+		. $AMD_CFG
+	fi
+fi
 
 #OC arrays
 CORE_CLOCK=($CORE_CLOCK)
@@ -26,7 +49,6 @@ CORE_STATE=($CORE_STATE)
 CORE_VOLTAGE=($CORE_VOLTAGE)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
-#AMDMEMTWEAK=$AMDMEMTWEAK #no need
 
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
@@ -37,23 +59,19 @@ for (( i=0; i < $n; ++i )); do
 	[[ ! ${CORE_VOLTAGE[$i]} && ! -z ${CORE_VOLTAGE[0]} ]]&& CORE_VOLTAGE[$i]=${CORE_VOLTAGE[-1]}
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${MEMORY_STATE[$i]} && ! -z ${MEMORY_STATE[0]} ]]&& MEMORY_STATE[$i]=${MEMORY_STATE[-1]}
-	#[[ ! ${AMDMEMTWEAK[$i]} && ! -z ${AMDMEMTWEAK[0]} ]]&& MEMORY_STATE[$i]=${AMDMEMTWEAK[-1]}
-	#AMDMemTweak is only one for all cards
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
 done
 
 echo "Trying to apply next settings:"
-echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
-echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
 echo -e ${CYAN}"Core State:${WHITE}\t${CORE_STATE[@]}"
+echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
+echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
-echo -e ${CYAN}"Memory Tweak:${WHITE}\t${AMDMEMTWEAK[@]}"
+echo -e ${CYAN}"Memory Tweak:${WHITE}\t${MEMORY_TWEAK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 [ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
 echo -e $BROWN"================================================================"$WHITE
-#core_addr=(`ls -d /sys/class/drm/card[0-9]*/device/hwmon/hwmon[0-9]* | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
-#core_addr=(`ls -d /sys/class/drm/card[[:digit:]]/device/hwmon/hwmon? | sed 's/\/hwmon\/hwmon[0-9]*//g'`)
 
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 
@@ -138,7 +156,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		fi
 		[[ $(echo $str | awk '{print length}') -gt 30 ]] && bash -c "$str"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
-		amdmemtweak --i $y $AMDMEMTWEAK
+		amdmemtweak --i $y $MEMORY_TWEAK
 		#####################################################
 		#Fan section
 		#####################################################

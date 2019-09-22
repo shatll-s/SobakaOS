@@ -1,15 +1,22 @@
 #!/bin/bash
 [ -t 1 ] && . colors #source colors only if running in terminal
 NVIDIA_CFG="/sobaka/cfg/nvidia.cfg"
-
 LOCK_FILE="/tmp/.nvidia-oc.lock"
+
+function getdata () {
+	for option in core_clock memory_clock power_limit pill pill_args light fan; do
+		if [[ `echo $1 | jq ".$option"` != null ]]; then
+			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
+			eval "${option^^}=\"$option_value\""
+		fi
+	done
+}
 
 if  [[ -e $LOCK_FILE ]]; then
 	pid=`cat $LOCK_FILE`
 	ps --pid $pid &>/dev/null
 	[[ $? == 0 ]] && echo -e "${RED}It seems another copy of NVIDIA Overclocking script is already running\nCooldown a bit :)${WHITE}" && exit 1	
 fi
-
 echo $$ > $LOCK_FILE
 
 export DISPLAY=:0
@@ -25,8 +32,23 @@ n=$(gpu-detect NVIDIA)
 [[ $n == 0 ]]&&	echo $(date --rfc-3339=seconds)" 0 NVIDIA GPU detected" && exit 1
 echo -e $(date --rfc-3339=seconds)" $n ${GREEN}NVIDIA${WHITE} GPU detected"
 
-[[ ! -f $NVIDIA_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $NVIDIA_CFG does not exist!" && exit 1
-. $NVIDIA_CFG
+if [[ ! -z $1 ]]; then
+	echo "Overclocking config given in arguments"
+	getdata "$1"
+else
+	[[ ! -f $NVIDIA_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $NVIDIA_CFG does not exist!" && exit 1
+	cfg=`cat $NVIDIA_CFG`
+	echo $cfg | jq '.'  > /dev/null 2>&1
+	exitcode="$?"
+	if [[ $exitcode -eq 0 ]]; then
+		echo "Overclocking config in JSON format (or empty)"
+		getdata "$cfg"
+	else
+		echo "OverClocking config in BASH format"
+		
+		. $NVIDIA_CFG
+	fi
+fi
 
 #Making arrays
 CORE_CLOCK=($CORE_CLOCK)
@@ -46,8 +68,12 @@ echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
 echo -e ${CYAN}"Memory:${WHITE}\t\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 echo -e ${CYAN}"Power limit:${WHITE}\t${PLIMIT[@]}"
-[[ $LIGHT_OFF == 1 ]] && echo -e ${CYAN}"Light:${WHITE}\t\tTurn off"
-
+echo -en ${CYAN}"Light:${WHITE}\t\t"
+[[ $LIGHT_OFF == 1 ]] && echo "off" || echo "on"
+echo -en ${CYAN}"Pill:${WHITE}\t\t"
+[[ $PILL == 0 ]] && echo "off" || echo "on"
+echo -e ${CYAN}"Pill args:${WHITE}\t$PILL_ARGS"
+exit 0
 #We need to do persistence-mode just once
 nvidia-persistenced --persistence-mode
 nvidia-smi -pm 1

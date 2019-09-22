@@ -76,7 +76,7 @@ fi
 /sobaka/sbin/watchdog-qinheng initial
 hello
 . $RIG_CFG
-if [[ ! -z $NOTIFY_ON_BOOT || $NOTIFY_ON_BOOT == 1 ]]; then
+if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
 fi
 

@@ -76,7 +76,9 @@ function set_fan_amd () {
 	done
 	local fan=$1
 	local fan_addr=$2
-	echo 1 > $fan_addr/pwm1_enable
+	echo 0 >  $fan_addr/pwm1_enable
+	sleep 0.2
+	echo 1 >  $fan_addr/pwm1_enable
 	if [[ $3 -ne 1 ]]; then
 		let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
 		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
