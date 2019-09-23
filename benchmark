@@ -1,0 +1,164 @@
+#!/bin/bash
+BENCHMARK_CFG="/tmp/benchmark"
+BATCH_CFG="/sobaka/cfg/batch.cfg"
+RIG_CFG="/sobaka/cfg/rig.cfg"
+LOCK_FILE="/tmp/.benchmark.lock"
+LOG="/sobaka/log/benchmark.log"
+VARIABLES_CFG="/sobaka/service/variables"
+. $VARIABLES_CFG
+[ -t 1 ] && . colors
+rm -f $LOG
+#exec &>>$LOG
+
+[ -t 1 ] && . colors
+
+if  [[ -e $LOCK_FILE ]]; then
+	pid=`cat $LOCK_FILE`
+	ps --pid $pid &>/dev/null
+	[[ $? == 0 ]] && echo -e "${RED}It seems another copy of Benchmark is already running\nCooldown a bit :)${WHITE}" && exit 1
+fi
+echo $$ > $LOCK_FILE
+
+if [[ ! -z $1 ]]; then
+	echo -e "${GREEN}> Benchmark config given in arguments${WHITE}"
+	cfg="$1"
+else
+	if [[ ! -f $BENCHMARK_CFG ]]; then
+		echo -e "${RED}$(date --rfc-3339=seconds) configuration file $BENCHMARK_CFG does not exist, exiting${WHITE}"
+		rm $LOCK_FILE
+		exit 1
+	fi
+	echo -e "${GREEN}> Read benchmark config from $BENCHMARK_CFG${WHITE}"
+	cfg=`cat $BENCHMARK_CFG`
+fi
+
+function screen_check () {
+	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
+}
+
+function check_con () {
+	while true; do
+  		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
+			killcx $con lo $?>/dev/null
+  		done
+		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &&
+			continue ||
+			break
+	done
+}
+
+function services_stop () {
+	echo -e "${GREEN}> Stopping services${WHITE}"
+	wd stop > /dev/null 2>&1
+	systemctl stop sobaka
+	if [[ $(screen_check asw) -gt 0 ]]; then
+		asw_trigger=1
+		screen_kill asw
+	fi	
+}
+
+function services_start () {
+	echo -e "${GREEN}> Starting services${WHITE}"
+	systemctl start sobaka
+	systemctl start sobaka-wd
+	[[ $asw_trigger -eq 1 ]] && asw restart
+}
+
+
+function benchmark () {
+	#echo $cfg | jq '.'
+	data='{}' #nullify json
+	for ((i=0; i < ${#algos[@]}; i++)); do
+		echo -e "----------------------------------------------------------------"
+		local algo=`echo $cfg | jq ".algo.${algos[$i]}"`
+		#echo $algo | jq '.'
+		echo $algo > /tmp/bm_current_algo
+		local miner=`echo $cfg | jq -r ".algo.${algos[$i]}.miner"`
+		local batch=`json2batch /tmp/bm_current_algo "return"`
+		echo -e "Algo: ${CYAN}${algos[$i]}${WHITE}\tminer: ${CYAN}$miner${WHITE}"
+		echo -e "Batch: $batch"
+		echo -e "miner1=\"$miner\"\nbatch1=\"$batch\"" > $BATCH_CFG
+		check_con $miner
+		screen -dmS benchmark.miner bash -c "miner-loop $miner \"$batch\""
+		sleep $warm_up
+		local now=`date +%s`
+		local stop_time=$((now + check_time))
+		local iterations=0
+		local hr_sum=0
+		while [[ `date +%s` -le $stop_time ]]; do
+			((iterations++))
+			now=`date +%s`
+			local left=$((stop_time - now))
+			local stats=`sobaka-stats $miner`
+			[[ `echo $stats | jq '.miner_total_hr'` != null ]] && local hr=`echo $stats | jq -r '.miner_total_hr'` ||
+				local hr=0
+			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
+				hr=`echo "scale=2; $hr / 1000" | bc -l`
+			fi
+			hr_sum=`echo "scale=2; $hr_sum + $hr" | bc -l`
+			echo -e "$iterations\tTime left: ${CYAN}$left${WHITE} sec\thr: ${CYAN}$hr${WHITE}"
+			sleep $sleep
+		done
+		local average_hr=`echo "scale=2; $hr_sum / $iterations" | bc -l`
+		data=$(jq -n --arg algos "$data" \
+			--arg key "${algos[$i]}" \
+			--arg value "$average_hr" \
+			'$algos | fromjson + { ($key) : ($value)}')
+		screen_kill benchmark.miner
+		echo -e "Average hashrate on ${CYAN}${algos[$i]}${WHITE}: ${GREEN}$average_hr${WHITE}"
+	done
+}
+
+function main () {
+	services_stop
+	check_time=180
+	warm_up=30  #miner need time to start && get hashes
+	sleep=5
+	reserve_batch=`cat $BATCH_CFG`
+	if [[ `echo $cfg | jq ".algo"` != null ]]; then
+		algos=(`echo $cfg | jq -r ".algo | keys_unsorted[]"`)
+	else
+		echo -e "${RED}No algos given, exiting${WHITE}"
+		rm $LOCK_FILE
+		exit 1
+	fi
+	echo -e "${GREEN}> Benchmark started${WHITE}"
+	echo -e "Check time: $check_time, warm-up-time: $warm_up, interval: $sleep"
+	benchmark
+	echo $data | jq '.'
+	echo "$reserve_batch" > $BATCH_CFG
+	
+	. $RIG_CFG
+	request=$(
+		jq -n \
+		--arg password "$PASSWD" \
+		--argjson benchmark "$data" \
+		'{	
+			"method": "benchmark",
+			"jsonrpc": "2.0",
+			"stats": {
+				$password,
+				$benchmark
+			}
+		}'
+
+	)
+
+	#echo $request | jq '.' -c
+	local response=$(echo $request | curl -s --data @- \
+		--connect-timeout 7 --max-time 15 \
+		"${HOST}?id=${RIG_ID}&method=benchmark" -H "Content-Type: application/json; charset=utf-8\r\n")
+	msg "Benchmark config" info "$(date --rfc-3339=seconds) New benchmark values sent:\n$data"
+	services_start
+}
+
+case $1 in
+	--help|-h)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname [--help]${WHITE}"
+	;;
+	*)
+		main	
+	;;
+esac
+rm $LOCK_FILE

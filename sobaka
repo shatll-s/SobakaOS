@@ -20,14 +20,15 @@ function screen_kill () {
 	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
 	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
 }
-
 function check_con () {
-	#if [[ $1 == 'ewbf' || $1 == 't_rex' || $1 == 'claymore' || $1 == 'xmrig_amd' || $1 == 'xmrig_nvidia' ]]; then
-		#grep -E "TIME_WAIT|FIN_WAIT2"
-		for con in `netstat -anp | grep -E "TIME_WAIT" | grep ${APIPORT[$1]} | awk '{print $5}'`; do
+	while true; do
+  		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
 			killcx $con lo $?>/dev/null
-		done
-	#fi
+  		done
+		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &&
+			continue ||
+			break
+	done
 }
 
 #check if config files exists

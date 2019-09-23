@@ -761,11 +761,15 @@ up_time=$(uptime -s)
 up=$(date --date "$up_time" +%s)
 msg_count=0
 
-while true; do
-	[[ -f $RIG_CFG ]] && . $RIG_CFG || echo "No config file. Can\`t connect to host"  >> $LOG
-	[[ -f $BATCH_CFG ]] && . $BATCH_CFG
-	sleep 5
-	stats
-	echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
-done
+if [[ -z $1 ]]; then
+	while true; do
+		[[ -f $RIG_CFG ]] && . $RIG_CFG || echo "No config file. Can\`t connect to host"  >> $LOG
+		[[ -f $BATCH_CFG ]] && . $BATCH_CFG
+		sleep 5
+		stats
+		echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
+	done
+else
+	echo `miner_stats $1`
+fi
 

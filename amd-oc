@@ -6,7 +6,7 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE="/tmp/.amd-oc.lock"
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_tweak fan; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_tweak fan enhanced; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -19,18 +19,17 @@ if  [[ -e $LOCK_FILE ]]; then
 	ps --pid $pid &>/dev/null
 	[[ $? == 0 ]] && echo -e "${RED}It seems another copy of AMD Overclocking script is already running\nCooldown a bit :)${WHITE}" && exit 1
 fi
-
 echo $$ > $LOCK_FILE
 
 n=$(gpu-detect AMD)
-[[ $n == 0 ]]&& echo $(date --rfc-3339=seconds)" no AMD GPU(s) detected, exiting" && exit 1
+[[ $n == 0 ]]&& echo $(date --rfc-3339=seconds)" no AMD GPU(s) detected, exiting" && rm $LOCK_FILE && exit 1
 echo -e $(date --rfc-3339=seconds)" $n "$LIGHTRED"AMD"$WHITE" GPU detected"
 
-if [[ ! -z $1 ]]; then
+if [[ ! -z $1 && $1 != "--firstrun" ]]; then
 	echo "Overclocking config given in arguments"
 	getdata "$1"
 else
-	[[ ! -f $AMD_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $AMD_CFG does not exist, exiting" && exit 1
+	[[ ! -f $AMD_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $AMD_CFG does not exist, exiting" && rm $LOCK_FILE && exit 1
 	cfg=`cat $AMD_CFG`
 	echo $cfg | jq '.'  > /dev/null 2>&1
 	exitcode="$?"
@@ -49,7 +48,6 @@ CORE_STATE=($CORE_STATE)
 CORE_VOLTAGE=($CORE_VOLTAGE)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
-
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
 
@@ -73,15 +71,13 @@ echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 [ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
 echo -e $BROWN"================================================================"$WHITE
 
+#making sorted array of core addresses
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
-
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
 done
-
 IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
 unset IFS
-
 for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
 	for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
 		[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
@@ -99,67 +95,57 @@ done
 #		echo "Copying pp_table to $dir"
 #	done
 #fi
-y=0 #not all $i are amdgpu cards
+y=0 #$y = OC values, because not all $i are amdgpu cards, 
 for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
-		#####################################################
-		#Core, mem, volt settings
-		#####################################################
 		#wolfamdctrl -i 0 --mem-state 2 --mem-clock 2000 --core-state 4 --core-clock 1100 --volt-state 4 --vddc-table-set 900
 		#wolfamdctrl -i /sys/class/drm/card5/device --core-state 3 --core-clock 1100 also works
 		card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9]*\)\/device/\1/')
 		gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 		echo -e "${LIGHTRED}GPU $y: ${gpu_name[$i]}${WHITE} (${core_addr[$i]})"
-		if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
-			#echo "This is Vega"
-			script="vegatool"
-		else
-			script="wolfamdctrl"
-		fi
+		[[ ${gpu_name[$i]} == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
 
-		#####################################################
-		#Core State section
-		#####################################################
-		if [[ ${CORE_STATE[$y]} == "A" || ! ${CORE_STATE[$y]} ]]; then
-			echo -e "${CYAN}Auto${WHITE} Core State selection."
-			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
-		else 
-			echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
-			echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
-			echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
-		fi
-		#echo "Card $card, ${core_addr[$i]}"
-		str="$script -i $card"
-		if [[ ! -z ${CORE_STATE[$y]} && ! ${CORE_STATE[$y]} == "A" ]]; then
-			str=$str" --core-state ${CORE_STATE[$y]}"
-			[[ ${CORE_CLOCK[$y]} ]]&& str=$str" --core-clock ${CORE_CLOCK[$y]}"
-			if [ ${CORE_VOLTAGE[$y]} ]; then
-				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$y]}" -A1) \
-				| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
-				str=$str" --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$y]}"
+		if [[ $ENHANCED -eq 1 ]]; then
+			echo -e "${LIGHTRED}Enhanced overclock (for all states)${WHITE}"
+			if [[ ! -z ${CORE_CLOCK[$y]} ]]; then
+				dpm_state=(`echo -e $($script -i $card --show-core | grep "DPM state" | sed -e 's/://g; s/DPM state \([0-9]*\)/\1/')`)
+				for ((z=0; z < ${#dpm_state[@]}; z++)); do
+					$script -i $card --core-state ${dpm_state[$z]} --core-clock ${CORE_CLOCK[$y]}
+				done
 			fi
+			if [[ ! -z ${CORE_VOLTAGE[$y]} ]]; then
+				volt_states=(`echo -e $($script -i $card --show-voltage | grep "Voltage state" | sed -e 's/://g; s/.*Voltage state \([0-9]*\)/\1/')`) 
+				for ((z=0; z < ${#volt_states[@]}; z++)); do
+					$script -i $card --volt-state ${volt_states[$z]} --vddc-table-set ${CORE_VOLTAGE[$y]}
+				done
+			fi
+			str="$script -i $card"	#for future
 		else
-			if [ ${CORE_VOLTAGE[$y]} ]; then
-				default_clock=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
-				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state $default_clock" -A1) \
-				| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
-				str=$str" --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$y]}"
+			str="$script -i $card"
+			if [[ -z ${CORE_STATE[$y]} || ${CORE_STATE[$y]} == "A" ]]; then
+				CORE_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
+				cs_trigger=1
+			fi
+			[[ ${CORE_CLOCK[$y]} ]] && str="$str --core-state ${CORE_STATE[$y]} --core-clock ${CORE_CLOCK[$y]}"
+			if [[ ${CORE_VOLTAGE[$y]} ]]; then
+				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$y]}" -A1) \
+					| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
+				str="$str --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$y]}"
 			fi
 		fi
-		if [ ${MEMORY_STATE[$y]} ]; then
-			str=$str" --mem-state ${MEMORY_STATE[$y]}"
-			[[ ${MEMORY_CLOCK[$y]} ]]&&	str=$str" --mem-clock ${MEMORY_CLOCK[$y]}"
-		elif [ ${MEMORY_CLOCK[$y]} ]; then #mem clock is set, stat isn`t
-			default_mem_state=`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed -e 's/*//; s/:.*//'`
-			echo "GPU$y Memory State isn\`t set, using current state ("$default_mem_state")"
-			str=$str" --mem-state $default_mem_state --mem-clock ${MEMORY_CLOCK[$y]}"
+		#str="$script -i $card"
+
+		if [[ -z ${MEMORY_STATE[$y]} || ${MEMORY_STATE[$y]} == "A" ]]; then
+			MEMORY_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed -e 's/*//; s/:.*//'`
+			ms_trigger=1
 		fi
-		[[ $(echo $str | awk '{print length}') -gt 30 ]] && bash -c "$str"
+		[[ ${MEMORY_CLOCK[$y]} ]]&&	str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
+
+		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
 		amdmemtweak --i $y $MEMORY_TWEAK
-		#####################################################
+
 		#Fan section
-		#####################################################
 		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		if (( ${FAN[$y]} == "A" )); then
 			echo -e "${CYAN}Auto${WHITE} fan."
@@ -173,15 +159,36 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 				fan_target=`echo "scale=0; ${FAN[$y]} * $rpm_max / 100" | bc -l`
 				[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
 				[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
-				#echo "Fan target: $fan_target"
 				echo $fan_target > ${fan_addr[$i]}/fan1_target
 			else
 				let fan_adapted[$i]=${FAN[$y]}*255/100 #fan power is beetween 0 and 255
 				echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
 			fi
 		fi
+				
+		if [[ $ENHANCED -eq 1 ]]; then
+			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
+			echo -e "${CYAN}Auto${WHITE} Core State selection (because of Enhanced OC)"
+		elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
+			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
+			echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
+		else
+			echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
+			#Core & Memory states selection
+			if [[ $cs_trigger -ne 1 ]]; then #if core state given
+				echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
+				echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
+			fi
+
+			if [[ $ms_trigger -ne 1 ]]; then
+				echo -e "${CYAN}Manual${WHITE} Memory State selection (${CYAN}P${MEMORY_STATE[$y]}${WHITE})."
+				echo ${MEMORY_STATE[$y]} > ${core_addr[$i]}/pp_dpm_mclk
+			fi
+		fi
+
 		echo -e $BROWN"================================================================"$WHITE
 		(( y++ ))
+		unset cs_trigger ms_trigger
 	fi
 done
 

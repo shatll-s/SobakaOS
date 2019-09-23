@@ -32,7 +32,7 @@ n=$(gpu-detect NVIDIA)
 [[ $n == 0 ]]&&	echo $(date --rfc-3339=seconds)" 0 NVIDIA GPU detected" && exit 1
 echo -e $(date --rfc-3339=seconds)" $n ${GREEN}NVIDIA${WHITE} GPU detected"
 
-if [[ ! -z $1 ]]; then
+if [[ ! -z $1 && $1 != "--pill-delay" ]]; then
 	echo "Overclocking config given in arguments"
 	getdata "$1"
 else
@@ -54,26 +54,26 @@ fi
 CORE_CLOCK=($CORE_CLOCK)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 FAN=($FAN)
-PLIMIT=($PLIMIT)
+POWER_LIMIT=($POWER_LIMIT)
 
 for (( i=0; i < $n; ++i )); do
 	[[ ! ${CORE_CLOCK[$i]} && ! -z ${CORE_CLOCK[0]} ]]&& CORE_CLOCK[$i]=${CORE_CLOCK[-1]}
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
-	[[ ! ${PLIMIT[$i]} && ! -z ${PLIMIT[0]} ]]&& PLIMIT[$i]=${PLIMIT[-1]}
+	[[ ! ${POWER_LIMIT[$i]} && ! -z ${POWER_LIMIT[0]} ]]&& POWER_LIMIT[$i]=${POWER_LIMIT[-1]}
 done
 
 echo "Trying to apply next settings:"
 echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
 echo -e ${CYAN}"Memory:${WHITE}\t\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
-echo -e ${CYAN}"Power limit:${WHITE}\t${PLIMIT[@]}"
+echo -e ${CYAN}"Power limit:${WHITE}\t${POWER_LIMIT[@]}"
 echo -en ${CYAN}"Light:${WHITE}\t\t"
 [[ $LIGHT_OFF == 1 ]] && echo "off" || echo "on"
 echo -en ${CYAN}"Pill:${WHITE}\t\t"
 [[ $PILL == 0 ]] && echo "off" || echo "on"
 echo -e ${CYAN}"Pill args:${WHITE}\t$PILL_ARGS"
-exit 0
+
 #We need to do persistence-mode just once
 nvidia-persistenced --persistence-mode
 nvidia-smi -pm 1
@@ -107,7 +107,7 @@ while read string; do
 	[[ ! -z $LIGHT_OFF ]] && args+=" -a [gpu:$i]/GPULogoBrightness=0"
 	#echo $args
 	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
-	[[ ! -z ${PLIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${PLIMIT[$i]}
+	[[ ! -z ${POWER_LIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${POWER_LIMIT[$i]}
 	[[ $(($i + 1)) < $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
 
 	((i++))

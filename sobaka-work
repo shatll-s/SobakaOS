@@ -368,6 +368,10 @@ case $1 in
 			;;
 		esac
 	;;
+	benchmark)
+		echo "$2" > /tmp/benchmark
+		screen -dmS benchmark.main benchmark
+	;;
 	settings)
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".notify_on_boot"` || NOTIFY=1

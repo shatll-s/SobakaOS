@@ -5,18 +5,6 @@ AUTOSWITCH_CFG="/sobaka/cfg/autoswitch.cfg"
 AUTOSWITCH_TMP="/tmp/autoswitch"
 . colors
 
-#later need to fill up more algo
-algo_dividers='
-{
-	"DAGGERHASHIMOTO": 1000,
-	"X16R": 1000,
-	"BEAM": 1000000000,
-	"BEAMV2": 1000000000,
-	"CRYPTONIGHTV7" : 1000,
-	"CRYPTONIGHTV8" : 100000000,
-	"CRYPTONIGHTHEAVY" : 1000
-}'
-
 ########## functions ##########
 function set_fixstr () {
 	[[ ! -z $2 ]] && need=$2 || need=21
@@ -49,16 +37,14 @@ function set_active () {
 function get_new_nicehash_stats () {
 	local api="https://api2.nicehash.com/main/api/v2/public/simplemultialgo/info/"
 	nh_stats=$(echo `curl -s $api` | jq '.miningAlgorithms[]')
-	echo -e "Algo                 Price       Hr    BTC/day     USD/day"
-	echo -e "----------------------------------------------------------"
-	#echo ${algo[@]}
-	#echo ${algo_dividers[@]}
+	echo -e "Algo                 Price       Hr      Units    BTC/day     USD/day"
+	echo -e "---------------------------------------------------------------------"
 	for (( i=0; i < ${#algo[@]}; i++ )); do
 		#echo "algo "${algo[$i]}
 		available=`echo $as_tmp | jq -r ".autoswitch[] | select (.algo == \"${algo[$i]}\")"`
-		#echo $algo_dividers | jq ".${algo[$i]}"
-		divider[$i]=`echo $algo_dividers | jq ".${algo[$i]}"`
-		divider[$i]=`echo "scale=0; ${divider[$i]} / 10" | bc -l` #new nicehash bug 
+		divider[$i]=`echo $algo_dividers | jq -r ".${algo[$i]}"`
+		divider[$i]=`echo "scale=0; ${divider[$i]} / 10" | bc -l` #new nicehash bug
+		unit[$i]=`echo $units | jq -r ".${algo[$i]}"`
 		[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
 		#echo "divider "${divider[$i]}
 		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]}\") | .paying"`
@@ -74,10 +60,10 @@ function get_new_nicehash_stats () {
 		else
 			string+="${RED}-${WHITE}"
 		fi
-		string+="${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
+		string+="${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 7`  `set_fixstr ${unit[$i]} 6`    `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
 		echo -e "$string"
 	done
-	echo -e "----------------------------------------------------------"
+	echo -e "---------------------------------------------------------------------"
 }
 
 function get_old_nicehash_stats () {
@@ -130,11 +116,12 @@ function get_old_nicehash_stats () {
 		"CUCKOOCYCLE" : 43
 	}'
 	nh_stats=$(echo `curl -s $api` | jq '.result.simplemultialgo[]')
-	echo -e "Algo                 Price       Hr    BTC/day     USD/day"
-	echo -e "----------------------------------------------------------"
+	echo -e "Algo                 Price       Hr          BTC/day     USD/day"
+	echo -e "----------------------------------------------------------------"
 	for (( i=0; i < ${#algo[@]}; i++ )); do
 		if [[ `echo $nh_algos | jq ".${algo[$i]}"` != null ]]; then
 			divider[$i]=`echo $algo_dividers | jq ".${algo[$i]}"`
+			unit[$i]=`echo $units | jq -r ".${algo[$i]}"`
 			[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
 			key[$i]=`echo $nh_algos | jq ".${algo[$i]}"`
 			price[$i]=`echo $nh_stats | jq -r ". | select (.algo == ${key[$i]}) | .paying"`
@@ -145,19 +132,21 @@ function get_old_nicehash_stats () {
 				#echo "Set max_profit ${profit_btc[$i]}, max_profit_i $max_profit_i"
 			fi
 			profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1 && x != 0) print 0; x" | bc -l`
-			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
+			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} `set_fixstr ${price[i]} 11`  `set_fixstr ${hr[i]} 6` `set_fixstr ${unit[$i]} 5` `set_fixstr ${profit_btc[i]} 11`  ${profit_usd[i]:0:5}${GREEN} ${WHITE}"
 		else
 			string="${CYAN}`set_fixstr ${algo[$i]}`${WHITE} not supported"
 		fi
 		echo -e "$string"
 	done
-	echo -e "----------------------------------------------------------"
+	echo -e "----------------------------------------------------------------"
 }
 
 ########## main ##########
 function main () {
 	as_cfg=`cat $AUTOSWITCH_CFG`
 	[[ `echo $as_cfg | jq ".algos"` != null ]]	&& benchmark=`echo $as_cfg | jq ".algos"`
+	[[ `echo $as_cfg | jq ".dividers"` != null ]]	&& algo_dividers=`echo $as_cfg | jq ".dividers"`
+	[[ `echo $as_cfg | jq ".units"` != null ]]	&& units=`echo $as_cfg | jq ".units"`
 	[[ `echo $as_cfg | jq ".hyst"` != null ]]	&& hyst=`echo $as_cfg | jq -r ".hyst"`
 	[[ `echo $as_cfg | jq ".provider"` != null ]]	&& provider=`echo $as_cfg | jq -r ".provider"`
 	[[ `echo $as_cfg | jq ".delay"` != null ]]	&& delay=`echo $as_cfg | jq -r ".delay"`
