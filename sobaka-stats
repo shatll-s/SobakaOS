@@ -215,7 +215,7 @@ case $1 in
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
 		if [[ $miner_algo == "phi2" ]]; then
 			local x=1000
-		elif [[ $miner_algo == "cnr" ]]; then
+		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
 			local x=1000000
 		else
 			local x=1

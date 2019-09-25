@@ -4,8 +4,6 @@ LOG="/sobaka/log/sobaka.log"
 exec &>>$LOG
 
 BATCH_CFG="/sobaka/cfg/batch.cfg"
-VARIABLES_CFG="/sobaka/service/variables"
-. $VARIABLES_CFG
 
 echo "================================================================"
 echo $(date --rfc-3339=seconds)" Started new session $0"
@@ -20,19 +18,9 @@ function screen_kill () {
 	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
 	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
 }
-function check_con () {
-	while true; do
-  		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
-			killcx $con lo $?>/dev/null
-  		done
-		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &&
-			continue ||
-			break
-	done
-}
 
 #check if config files exists
-[[ ! -f $VARIABLES_CFG || ! -f $BATCH_CFG ]] && echo "Configuration file(s) does not exist! Can\`t mine without configs..."
+[[ ! -f $BATCH_CFG ]] && echo "Configuration file $BATCH_CFG does not exist! Can\`t mine without configs..."
 
 export "PATH=$PATH:/sobaka:/sobaka/bin:/sobaka/sbin" #need to run sobaka scripts without prefix
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sobaka/lib
@@ -52,14 +40,12 @@ while true; do
 				echo $(date --rfc-3339=seconds)" Killed previous miner1 screen [code 3: miner is not selected/stopped]"
 			fi
 		elif [[ $(screen_check miner1) -eq 0 ]]; then #miner is set up, screens = 0
-			check_con $miner1
 			wd restart
 			screen -dmS miner1.$miner1 bash -c "miner-loop $miner1 \"$batch1\""
 			echo -n $(date --rfc-3339=seconds)" Started miner1 screen with $miner1 "
 			[[ $miner1 == $lastcheck ]] && echo "[code 2: miner is not changed, but closed]" || echo "[code 0: simple start]"
 		elif [[	$miner1 != $lastcheck ]]; then #miner is set up, screens > 0, just check if miner changed, if not, everething is ok
 			screen_kill miner1
-			check_con $miner1
 			wd restart
 			screen -dmS miner1.$miner1 bash -c "miner-loop $miner1 \"$batch1\""
 			echo $(date --rfc-3339=seconds)" Restarted miner1 screen with $miner1 [code 1: miner changed]"
@@ -73,7 +59,6 @@ while true; do
 		elif [[ $miner2 == $lastcheck2 ]]; then #ok, miner is set up and miner = last check
 			if [[ $(screen_check miner2) == 0 ]]; then
 				if [[ $miner2 != $miner1 ]]; then #if miner2 is set up, screen = 0, miner2 != miner1
-					check_con $miner2
 					wd restart
 					screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
 					echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 2: miner is not changed, but closed]"
@@ -86,7 +71,6 @@ while true; do
 			fi
 		elif [[ $(screen_check miner2) == 0 ]]; then 
 			if [[ ! $miner2 == $miner1 ]]; then #miner is set up, miner != last check (changed or first run) and screen = 0 and miner1 != miner2
-				check_con $miner2
 				wd restart
 				screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
 				echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 0: simple start]"
@@ -94,7 +78,6 @@ while true; do
 		else #miner is set up, miner != last check, screen > 0
 			if [[ ! $miner2 == $miner1 ]]; then  #miner is set up, miner != last check (changed or first run), screen > 0, miner1 != miner2
 				screen_kill miner2
-				check_con $miner2
 				wd restart
 				screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
 				echo $(date --rfc-3339=seconds)" Restarted miner2 screen with $miner2 [code 1: miner changed]"

@@ -79,7 +79,7 @@ function benchmark () {
 		echo -e "Batch: $batch"
 		echo -e "miner1=\"$miner\"\nbatch1=\"$batch\"" > $BATCH_CFG
 		check_con $miner
-		screen -dmS benchmark.miner bash -c "miner-loop $miner \"$batch\""
+		screen -dmS miner1.benchmark bash -c "miner-loop $miner \"$batch\""
 		sleep $warm_up
 		local now=`date +%s`
 		local stop_time=$((now + check_time))
@@ -94,6 +94,8 @@ function benchmark () {
 				local hr=0
 			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
+			elif [[ "x16r" == *${algos[$i]}* ]]; then
+				hr=`echo "scale=2; $hr / 1000000" | bc -l`
 			fi
 			hr_sum=`echo "scale=2; $hr_sum + $hr" | bc -l`
 			echo -e "$iterations\tTime left: ${CYAN}$left${WHITE} sec\thr: ${CYAN}$hr${WHITE}"
@@ -104,7 +106,7 @@ function benchmark () {
 			--arg key "${algos[$i]}" \
 			--arg value "$average_hr" \
 			'$algos | fromjson + { ($key) : ($value)}')
-		screen_kill benchmark.miner
+		screen_kill miner1.benchmark
 		echo -e "Average hashrate on ${CYAN}${algos[$i]}${WHITE}: ${GREEN}$average_hr${WHITE}"
 	done
 }
@@ -153,6 +155,41 @@ function main () {
 }
 
 case $1 in
+	test)
+        . $RIG_CFG
+        data='{"Beamv2": "0","DaggerHashimoto": "0"}'
+		data2='
+			{
+			 "CryptoNightv7": "5525.48",
+			 "CryptoNightv8": "2510.71",
+			 "CryptoNightHeavy": "5371.57",
+			 "Beamv2": "87.91",
+			 "DaggerHashimoto": "141.42",
+			 "Lyra2rev3": "241.26",
+			 "X16r": "58.47"
+			}
+		'
+        request=$(
+        jq -n \
+        --arg password "$PASSWD" \
+        --argjson benchmark "$data2" \
+        '{      
+                "method": "benchmark",
+                "jsonrpc": "2.0",
+                "stats": {
+                        $password,
+                        $benchmark
+                }
+        }'
+		)
+    echo $request | jq '.' -c
+
+    response=$(echo $request | curl -s --data @- \
+    --connect-timeout 7 --max-time 15 \
+    "${HOST}?id=${RIG_ID}&method=benchmark" -H "Content-Type: application/json; charset=utf-8\r\n")
+    echo $response
+
+    ;;
 	--help|-h)
 		bname=`basename $0`
 		echo -e "Usage: ${CYAN}$bname [--help]${WHITE}"

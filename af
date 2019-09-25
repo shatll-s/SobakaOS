@@ -76,10 +76,8 @@ function set_fan_amd () {
 	done
 	local fan=$1
 	local fan_addr=$2
-	echo 0 >  $fan_addr/pwm1_enable
-	sleep 0.2
-	echo 1 >  $fan_addr/pwm1_enable
-	if [[ $3 -ne 1 ]]; then
+	[[ `cat $fan_addr/pwm1_enable` -ne 1 ]] && echo 1 >  $fan_addr/pwm1_enable
+	if [[ $3 != "vega" ]]; then
 		let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
 		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
 		echo $fan_adapted > $fan_addr/pwm1
@@ -90,6 +88,13 @@ function set_fan_amd () {
 		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
 		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
 		#echo "Fan target: $fan_target"
+		#sometimes we can`t put new value, so need to refresh pwm1_enable:
+		if [[ ! -z $fan_target_last && $fan_target_last == $fan_target ]]; then
+			echo 0 > $fan_addr/pwm1_enable
+			sleep 0.2
+			echo 1 > $fan_addr/pwm1_enable
+			echo -e "${RED} freeze${WHITE}"
+		fi
 		#echo "echo $fan_target > ${fan_addr[$i]}/fan1_target"
 		echo $fan_target > ${fan_addr[$i]}/fan1_target
 	fi
@@ -199,7 +204,7 @@ function autofan () {
 		#Set fan if something changed
 		if [[ ! -z ${new_fan[$i]} ]]; then
 			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
-				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega=1
+				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega="vega"
 				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]} $vega`
 			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
 				#local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
