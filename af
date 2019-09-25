@@ -61,6 +61,7 @@ function displaytime () {
 	}
 
 function set_fan_amd () {
+	
 	local timer=0
 	while [[ $timer -le 20 ]]; do
 		if  [[ ! -f $LOCK_FILE_AMD ]]; then #no lock file
@@ -83,19 +84,11 @@ function set_fan_amd () {
 		echo $fan_adapted > $fan_addr/pwm1
 	else #this is VEGA
 		local rpm_min=`cat ${fan_addr[$i]}/fan1_min`
+		[[ rpm_min -lt 600 ]] && rpm_min=600 #mb it will fix freezes...
 		local rpm_max=`cat ${fan_addr[$i]}/fan1_max`
 		local fan_target=`echo "scale=0; $fan * $rpm_max / 100" | bc -l`
 		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
 		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
-		#echo "Fan target: $fan_target"
-		#sometimes we can`t put new value, so need to refresh pwm1_enable:
-		if [[ ! -z $fan_target_last && $fan_target_last == $fan_target ]]; then
-			echo 0 > $fan_addr/pwm1_enable
-			sleep 0.2
-			echo 1 > $fan_addr/pwm1_enable
-			echo -e "${RED} freeze${WHITE}"
-		fi
-		#echo "echo $fan_target > ${fan_addr[$i]}/fan1_target"
 		echo $fan_target > ${fan_addr[$i]}/fan1_target
 	fi
 }
@@ -161,8 +154,15 @@ function autofan () {
 				local fan_color=$RED
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -lt $fan_max ]]; then
-				local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
+				if [[ ${gpu_temp[$i]} -ge $crit_temp ]]; then
+					local new_fan[$i]=$fan_max
+				elif (( ${gpu_temp[$i]} - $crit_hyst > $target_temp )); then
+					local new_fan[i]=$((${gpu_fan[$i]} + $crit_fan_shift))
+				else
+					local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
+				fi
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
+				
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			else
 				local fan_color=$RED
@@ -175,7 +175,11 @@ function autofan () {
 				local fan_color=$BLUE
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -gt $fan_min ]];then
-				local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
+				if (( ${gpu_temp[$i]} + $crit_hyst < $target_temp )); then
+					local new_fan[i]=$((${gpu_fan[$i]} - $crit_fan_shift))
+				else
+					local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
+				fi
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			else
@@ -205,7 +209,17 @@ function autofan () {
 		if [[ ! -z ${new_fan[$i]} ]]; then
 			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
 				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega="vega"
+				
+				#sometimes we can`t put new value, so need to refresh pwm1_enable:
+				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} ]]; then
+					echo 0 > ${fan_addr[$i]}/pwm1_enable
+					sleep 0.2
+					echo 1 > ${fan_addr[$i]}/pwm1_enable
+					echo -e "${RED} freeze${WHITE}"
+				fi
+
 				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]} $vega`
+				last_fan[i]=${new_fan[i]}
 			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
 				#local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
 				nv_args=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
@@ -231,7 +245,10 @@ function start () {
 	fan_max=`echo $cfg | jq '.af_fanmax'`
 	fan_min=`echo $cfg | jq '.af_fanmin'`
 	delay=`echo $cfg | jq '.af_delay'`
-	
+	crit_temp=80
+	[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
+	crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
+
 	echo -e "${GREEN}Thank you for using ${CYAN}SobakaOS${GREEN} autofan v 0.2"
 	echo -e "${BROWN}$LOGO${GREEN}"
 	echo -e "Visit ${CYAN}www.sobaka.group${WHITE}"
