@@ -145,7 +145,7 @@ function get_old_nicehash_stats () {
 ########## main ##########
 function main () {
 	as_cfg=`cat $AUTOSWITCH_CFG`
-	[[ `echo $as_cfg | jq ".algos"` != null ]]	&& benchmark=`echo $as_cfg | jq ".algos"`
+	[[ `echo $as_cfg | jq ".algo"` != null ]]	&& benchmark=`echo $as_cfg | jq ".algo"`
 	[[ `echo $as_cfg | jq ".dividers"` != null ]]	&& algo_dividers=`echo $as_cfg | jq ".dividers"`
 	[[ `echo $as_cfg | jq ".units"` != null ]]	&& units=`echo $as_cfg | jq ".units"`
 	[[ `echo $as_cfg | jq ".hyst"` != null ]]	&& hyst=`echo $as_cfg | jq -r ".hyst"`
@@ -184,7 +184,7 @@ function main () {
 		#echo $as_cfg | jq '.'
 		if [[ -z $active_algo ]]; then
 			string+=" and there is no active algo, set it"
-			[[ ! -z $1 && $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
+			[[ $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
 			msg="$(date --rfc-3339=seconds) There is no active algo, set ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
 			if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
 				msg+="\nWe have AMD OC settings for this algo.\n"
@@ -209,7 +209,7 @@ function main () {
 			string+=" and $delta% better than $active_algo"
 			if [[ `echo "if ($delta > $hyst) print 1" | bc -l` -eq 1 ]]; then
 				string+=", switching to it"
-				[[ ! -z $1 && $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
+				[[ $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
 				msg="$(date --rfc-3339=seconds) Switch to ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
 				if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
 					msg+="\nWe have AMD OC settings for this algo.\n"
@@ -226,7 +226,7 @@ function main () {
 				string+=", but hysteresis is $hyst%, nothing to do"
 			fi
 		fi
-		[[ ! -z $1 && $1 != 'check' ]] && echo -e "$string" || echo -e "Best algo is ${CYAN}${best_algo}${WHITE} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
+		[[ $1 != 'check' ]] && echo -e "$string" || echo -e "Best algo is ${CYAN}${best_algo}${WHITE} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
 	else
 		echo "Error occured while getting max profit. Dev info: max_profit_i @${max_profit_i}@, max_profit @${max_profit}@"
 	fi

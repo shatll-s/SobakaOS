@@ -117,6 +117,8 @@ function benchmark () {
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
 			elif [[ "X16R" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000000" | bc -l`
+			elif [[ "LYRA2" == *${algos[$i]^^}* ]]; then
+				hr=`echo "scale=2; $hr / 1000" | bc -l`
 			fi
 			hr_sum=`echo "scale=2; $hr_sum + $hr" | bc -l`
 			echo -n '.'
