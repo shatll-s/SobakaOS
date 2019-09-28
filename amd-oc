@@ -105,7 +105,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		echo -e "${LIGHTRED}GPU $y: ${gpu_name[$i]}${WHITE} (${core_addr[$i]})"
 		[[ ${gpu_name[$i]} == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
 
-		if [[ $ENHANCED -eq 1 ]]; then
+		if [[ $ENHANCED -eq 1 && ${gpu_name[$i]} != *"Vega"* ]]; then
 			echo -e "${LIGHTRED}Enhanced overclock (for all states)${WHITE}"
 			if [[ ! -z ${CORE_CLOCK[$y]} ]]; then
 				dpm_state=(`echo -e $($script -i $card --show-core | grep "DPM state" | sed -e 's/://g; s/DPM state \([0-9]*\)/\1/')`)
@@ -126,7 +126,19 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 				CORE_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
 				cs_trigger=1
 			fi
-			[[ ${CORE_CLOCK[$y]} ]] && str="$str --core-state ${CORE_STATE[$y]} --core-clock ${CORE_CLOCK[$y]}"
+			
+			if [[ ${CORE_CLOCK[$y]} ]]; then
+				if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
+					$script -i $card --core-state 4 --core-clock $((${CORE_CLOCK[$y]}-30)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					$script -i $card --core-state 5 --core-clock $((${CORE_CLOCK[$y]}-20)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					$script -i $card --core-state 6 --core-clock $((${CORE_CLOCK[$y]}-10)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					$script -i $card --core-state 7 --core-clock ${CORE_CLOCK[$y]} | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+
+				else
+					str="$str --core-state ${CORE_STATE[$y]} --core-clock ${CORE_CLOCK[$y]}"
+				fi
+			fi
+
 			if [[ ${CORE_VOLTAGE[$y]} ]]; then
 				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$y]}" -A1) \
 					| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
@@ -141,7 +153,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		fi
 		[[ ${MEMORY_CLOCK[$y]} ]]&&	str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
 
-		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str"
+		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
 		amdmemtweak --i $y $MEMORY_TWEAK
 
@@ -165,27 +177,32 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 				echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
 			fi
 		fi
-				
-		if [[ $ENHANCED -eq 1 ]]; then
-			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
-			echo -e "${CYAN}Auto${WHITE} Core State selection (because of Enhanced OC)"
-		elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
-			echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
-			echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
+		if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
+			echo "echo manual > ${core_addr[$i]}/power_dpm_force_performance_level"
+			echo "echo 4 > ${core_addr[$i]}/pp_power_profile_mode"
+			echo "manual" > ${core_addr[$i]}/power_dpm_force_performance_level
+			echo 4 > ${core_addr[$i]}/pp_power_profile_mode		
 		else
-			echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
-			#Core & Memory states selection
-			if [[ $cs_trigger -ne 1 ]]; then #if core state given
-				echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
-				echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
-			fi
+			if [[ $ENHANCED -eq 1 && ${gpu_name[$i]} != *"Vega"* ]]; then
+				echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
+				echo -e "${CYAN}Auto${WHITE} Core State selection (because of Enhanced OC)"
+			elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
+				echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
+				echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
+			else
+				echo manual > ${core_addr[$i]}/power_dpm_force_performance_level
+				#Core & Memory states selection
+				if [[ $cs_trigger -ne 1 ]]; then #if core state given
+					echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$y]}${WHITE})."
+					echo ${CORE_STATE[$y]} > ${core_addr[$i]}/pp_dpm_sclk
+				fi
 
-			if [[ $ms_trigger -ne 1 ]]; then
-				echo -e "${CYAN}Manual${WHITE} Memory State selection (${CYAN}P${MEMORY_STATE[$y]}${WHITE})."
-				echo ${MEMORY_STATE[$y]} > ${core_addr[$i]}/pp_dpm_mclk
+				if [[ $ms_trigger -ne 1 ]]; then
+					echo -e "${CYAN}Manual${WHITE} Memory State selection (${CYAN}P${MEMORY_STATE[$y]}${WHITE})."
+					echo ${MEMORY_STATE[$y]} > ${core_addr[$i]}/pp_dpm_mclk
+				fi
 			fi
 		fi
-
 		echo -e $BROWN"================================================================"$WHITE
 		(( y++ ))
 		unset cs_trigger ms_trigger

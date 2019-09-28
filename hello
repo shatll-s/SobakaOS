@@ -214,7 +214,7 @@ local request=$(
 
 [[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
 
-#echo $request | jq '.' 
+echo $request | jq '.' 
 
 try=0
 

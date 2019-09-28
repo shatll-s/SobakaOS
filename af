@@ -58,7 +58,7 @@ function displaytime () {
 	[[ $M > 0 ]] && printf '%d min ' $M
 	#[[ $D > 0 || $H > 0 || $M > 0 ]] && printf 'and '
 	printf '%d sec\n' $S
-	}
+}
 
 function set_fan_amd () {
 	
@@ -83,13 +83,13 @@ function set_fan_amd () {
 		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
 		echo $fan_adapted > $fan_addr/pwm1
 	else #this is VEGA
-		local rpm_min=`cat ${fan_addr[$i]}/fan1_min`
+		local rpm_min=`cat $fan_addr/fan1_min`
 		[[ rpm_min -lt 600 ]] && rpm_min=600 #mb it will fix freezes...
-		local rpm_max=`cat ${fan_addr[$i]}/fan1_max`
+		local rpm_max=`cat $fan_addr/fan1_max`
 		local fan_target=`echo "scale=0; $fan * $rpm_max / 100" | bc -l`
 		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
 		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
-		echo $fan_target > ${fan_addr[$i]}/fan1_target
+		echo $fan_target > $fan_addr/fan1_target
 	fi
 }
 
@@ -211,7 +211,7 @@ function autofan () {
 				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega="vega"
 				
 				#sometimes we can`t put new value, so need to refresh pwm1_enable:
-				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} ]]; then
+				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} && ${last_fan[i]} != $fan_min ]]; then
 					echo 0 > ${fan_addr[$i]}/pwm1_enable
 					sleep 0.2
 					echo 1 > ${fan_addr[$i]}/pwm1_enable
