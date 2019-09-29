@@ -361,7 +361,7 @@ case $1 in
 			;;
 			check)
 				echo "$data" > /sobaka/cfg/autoswitch.cfg
-				return=$(asw check)
+				return="$(asw check)"
 				msg "Profit check" info "$return"
 			;;
 			*)

@@ -1,5 +1,6 @@
 #!/bin/bash
 BENCHMARK_CFG="/tmp/benchmark"
+AUTOSWITCH_CFG="/sobaka/cfg/autoswitch.cfg"
 BATCH_CFG="/sobaka/cfg/batch.cfg"
 RIG_CFG="/sobaka/cfg/rig.cfg"
 LOCK_FILE="/tmp/.benchmark.lock"
@@ -7,10 +8,34 @@ LOG="/sobaka/log/benchmark.log"
 VARIABLES_CFG="/sobaka/service/variables"
 . $VARIABLES_CFG
 [ -t 1 ] && . colors
+algodata='{
+"dividers": {
+    "CRYPTONIGHTV7": "1000000000",
+    "CRYPTONIGHTV8": "1000000000",
+    "CRYPTONIGHTHEAVY": "1000000000",
+    "BEAMV2": "1000000000",
+    "DAGGERHASHIMOTO": "1000",
+    "GRINCUCKAROO29": "1000000000",
+    "GRINCUCKAROOD29": "1000000000",
+    "GRINCUCKATOO31": "1000000000",
+    "LYRA2REV3": "1000",
+    "X16R": "1000",
+    "ZHASH": "1000000000"
+},
+"units": {
+    "CRYPTONIGHTV7": "kh/s",
+    "CRYPTONIGHTV8": "kh/s",
+    "CRYPTONIGHTHEAVY": "kh/s",
+    "BEAMV2": "sol/s",
+    "DAGGERHASHIMOTO": "mh/s",
+    "GRINCUCKAROO29": "g/s",
+    "GRINCUCKAROOD29": "g/s",
+    "GRINCUCKATOO31": "g/s",
+    "LYRA2REV3": "mh/s",
+    "X16R": "mh/s",
+    "ZHASH": "sol/s"
+}}'
 
-#exec &>>$LOG
-
-[ -t 1 ] && . colors
 
 function echo2 () {
 	echo -e "$1"
@@ -134,6 +159,22 @@ function benchmark () {
 		#echo $data
 		local response=`send_data "$data"`
 		echo2 "\nAverage hashrate on ${CYAN}${algos[$i]}${WHITE}:${GREEN} $average_hr${WHITE}"
+		if [[ $rewrite -eq 1 ]]; then
+			jq '.' $AUTOSWITCH_CFG > /dev/null 2>&1
+			exitcode="$?"
+			if [[ $exitcode -ne 0 ]]; then
+				echo2 "${RED}Not correct data in $AUTOSWITCH_CFG${WHITE}"
+			else
+				echo `jq ".algo.${algos[$i]^^} = \"$average_hr\"" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+				if [[ `jq ".dividers.S${algos[$i]^^}" $AUTOSWITCH_CFG` == null ]]; then
+					echo2 "Rewriting data in $AUTOSWITCH_CFG"
+					divider=`echo $algodata | jq ".dividers.${algos[$i]^^}"`
+					unit=`echo $algodata | jq ".units.${algos[$i]^^}"`
+					echo `jq ".dividers.${algos[$i]^^} = $divider" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+					echo `jq ".units.${algos[$i]^^} = $unit" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+				fi
+			fi
+		fi
 		if [[ $notifications -eq 1 && `echo "$i+1" | bc -l` -lt ${#algos[@]} ]]; then
 			time_stop=`date +%s`
 			let "time=time_stop - time_start"
@@ -161,9 +202,10 @@ function main () {
 	[[ `echo $cfg | jq ".time"` != null ]]	&& time_array=`echo $cfg | jq ".time"`
 	[[ `echo $cfg | jq ".warmup"` != null ]]	&& warmup_array=`echo $cfg | jq ".warmup"`
 	[[ `echo $cfg | jq ".notifications"` != null ]]	&& notifications=1 || notifications=0
+	[[ `echo $cfg | jq ".rewrite"` != null ]]	&& rewrite=1 || rewrite=0
 	[[ $notifications -eq 1 ]] && msg "Benchmark started" info "$(date --rfc-3339=seconds) Benchmark started"
 	echo2 "${GREEN}> Benchmark started at $(date --rfc-3339=seconds)${WHITE}"
-	echo2 "Interval: ${CYAN}$sleep${WHITE}\t notifications:${CYAN} $notifications${WHITE}"
+	echo2 "Interval: ${CYAN}$sleep${WHITE}\t notifications:${CYAN} $notifications${WHITE}\trewrite:${CYAN} $rewrite${WHITE}"
 	
 	benchmark
 	cp /tmp/benchmark_batch $BATCH_CFG
@@ -191,6 +233,32 @@ function main () {
 }
 
 case $1 in
+	test2)
+		#jq '.' $AUTOSWsITCH_CFG # > /dev/null 2>&1
+		jq '.' /sobaka/cfg/autoweas.cfg
+		exitcode="$?"
+		echo $exitcode
+		if [[ $exitcode -ne 0 ]]; then
+			echo2 "${RED}Not correct data in $AUTOSWITCH_CFG${WHITE}"
+		else
+			algos[$i]='Cryptonightv7'
+			average_hr=1000
+			echo `jq ".algo.${algos[$i]^^} = \"$average_hr\"" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+			if [[ `jq ".dividers.S${algos[$i]^^}" $AUTOSWITCH_CFG` == null ]]; then
+				echo2 "Rewriting data in $AUTOSWITCH_CFG"
+				divider=`echo $data | jq ".dividers.${algos[$i]^^}"`
+				unit=`echo $data | jq ".units.${algos[$i]^^}"`
+				echo `jq ".dividers.${algos[$i]^^} = $divider" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+				echo `jq ".units.${algos[$i]^^} = $unit" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
+			fi
+		fi
+
+
+
+	 # echo `jq ".dividers.${algos[$i]^^}" $AUTOSWITCH_CFG`
+		#echo $data | jq '.'
+		cat $AUTOSWITCH_CFG | jq '.'
+	;;
 	test)
         . $RIG_CFG
         data='{"Beamv2": "0","DaggerHashimoto": "0"}'

@@ -20,14 +20,29 @@ function convert_algo () { #for nicehash
 		CRYPTONIGHT/0)
 			local output_algo="CRYPTONIGHT"
 		;;
-		CNR|CRYPTONIGHT/2)
+		CRYPTONIGHT/1)
+			local output_algo="CRYPTONIGHTV7"
+		;;
+		CNR|MONERO|CRYPTONIGHT/2)
 			local output_algo="CRYPTONIGHTV8"
 		;;
-		CRYPTONIGHT-HEAVY)
+		CN_HEAVY|CRYPTONIGHT-HEAVY)
 			local output_algo="CRYPTONIGHTHEAVY"
 		;;
 		CUCKAROO29)
 			local output_algo="GRINCUCKAROO29"
+		;;
+		EQUIHASH144_5)
+			local output_algo="ZHASH"
+		;;
+		CUCKAROOD29)
+			local output_algo="GRINCUCKAROOD29"
+		;;
+		CUCKATOO31)
+			local output_algo="GRINCUCKATOO31"
+		;;
+		LYRA2V3)
+			local output_algo="LYRA2REV3"
 		;;
 		*)
 			local output_algo=$input_algo

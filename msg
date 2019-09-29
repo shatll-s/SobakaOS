@@ -13,9 +13,6 @@ title=$1
 if [[ $# -ge 3 ]]; then
 	data="$3"
 
-	#data=`echo "$3" | sed "s/\'/\\'/g"`
-	#data=`echo "$3" | sed "s/'/\\\\\'/g" | sed 's/"/\\\\\"/g'`
-	
 	request=$(
 			jq -n \
 			--arg password "$PASSWD" \
@@ -57,16 +54,10 @@ if [[ $# -ge 2 ]]; then
 	request=`echo "$request $type_json" | jq -sc '.[0] * .[1]'`
 fi
 
-#if [[ ! -z $3 ]]; then
-#	data=$3
-#	data_json=`echo $data | jq -R -s '{"stats": {"data": {"data": .}}}'`
-#	request=`echo "$request $data_json" | jq -sc '.[0] * .[1]'`
-#fi
-
-#echo $request | jq '.' #no need, just visualisation
+#echo "$request" | jq '.' #no need, just visualisation
 
 #get server answer
-response=$(echo $request | curl -s --data @- \
+response=$(echo "$request" | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
 	"${HOST}?id=$RIG_ID&method=message"  -H "Content-Type: application/json")
 
