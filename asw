@@ -197,7 +197,7 @@ function main () {
 				msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
 			fi
 
-			[[ $notifications -eq 1 ]] && msg "Algo setup: ${best_algo}" info "$msg"
+			[[ $notifications -eq 1 && $1 != 'check' ]] && msg "Algo setup: ${best_algo}" info "$msg"
 		elif [[ $active_algo == ${algo[$max_profit_i]} ]]; then
 			string+=" and it is already set. Nothing to do"
 		else	
@@ -221,7 +221,7 @@ function main () {
 					string="\nApplying NVIDIA OC settings"
 					msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
 				fi
-				[[ $notifications -eq 1 ]] && msg "Algo switch: ${best_algo}" info "$msg"
+				[[ $notifications -eq 1 && $1 != 'check' ]] && msg "Algo switch: ${best_algo}" info "$msg"
 			else
 				string+=", but hysteresis is $hyst%, nothing to do"
 			fi
