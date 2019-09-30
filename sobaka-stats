@@ -240,6 +240,14 @@ case $1 in
 		miner_temp=(`echo $stats_template | jq '.gpus[].temperature'`)
 		miner_fan=(`echo $stats_template | jq '.gpus[].fan_speed'`)
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
+		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	nanominer)
 		#miner_ver=`echo $stats_template | jq -r '.[0]'` #no miner version in API

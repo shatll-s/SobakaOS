@@ -20,6 +20,7 @@ algodata='{
     "GRINCUCKATOO31": "1000000000",
     "LYRA2REV3": "1000",
     "X16R": "1000",
+	"X16RV2": "1000",
     "ZHASH": "1000000000"
 },
 "units": {
@@ -33,6 +34,7 @@ algodata='{
     "GRINCUCKATOO31": "g/s",
     "LYRA2REV3": "mh/s",
     "X16R": "mh/s",
+    "X16RV2": "mh/s",
     "ZHASH": "sol/s"
 }}'
 
@@ -85,6 +87,7 @@ function services_start () {
 	echo -e "${GREEN}> Starting services${WHITE}"
 	systemctl start sobaka
 	systemctl start sobaka-wd
+	af restart
 	[[ -f /tmp/asw_trigger && `cat /tmp/asw_trigger` -eq 1 ]] && asw restart
 }
 
@@ -140,7 +143,7 @@ function benchmark () {
 				local hr=0
 			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
-			elif [[ "X16R" == *${algos[$i]^^}* ]]; then
+			elif [[ "X16RV2" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000000" | bc -l`
 			elif [[ "LYRA2REV3" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
