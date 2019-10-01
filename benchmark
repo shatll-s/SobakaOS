@@ -63,14 +63,17 @@ function screen_check () {
 }
 
 function check_con () {
+	echo -n "Killing old connections ..."
 	while true; do
   		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
 			killcx $con lo $?>/dev/null
+			echo -n "."
   		done
 		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &>/dev/null &&
 			continue ||
 			break
 	done
+	echo " DONE"
 }
 
 function services_stop () {
@@ -128,7 +131,7 @@ function benchmark () {
 		[[ -z $warm_up ]] && warm_up=60
 		echo2 "Algo: ${CYAN}${algos[$i]}${WHITE}\tminer: ${CYAN}$miner${WHITE}\tcheck${CYAN} $check_time${WHITE}\twarm-up${CYAN} $warm_up${WHITE}"
 		echo -e "miner1=\"$miner\"\nbatch1=\"$batch\"" > $BATCH_CFG
-		#check_con $miner
+		check_con $miner
 		screen -dmS miner1.benchmark bash -c "miner-loop $miner \"$batch\""
 		sleep $warm_up
 		echo2 "$warm_up seconds warm-up passed, start checking hashrate"
@@ -143,14 +146,19 @@ function benchmark () {
 				local hr=0
 			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
-			elif [[ "X16RV2" == *${algos[$i]^^}* ]]; then
+			elif [[ "X16R" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000000" | bc -l`
 			elif [[ "LYRA2REV3" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
 			fi
 			hr_sum=`echo "scale=2; $hr_sum + $hr" | bc -l`
-			echo -n '.'
-			echo -n '.' >> $LOG
+			if [[ $VERBOSE -ne 1 ]]; then
+				echo -n '.'
+				echo -n '.' >> $LOG
+			else
+				echo2 "$iterations: $hr"
+			fi
+			
 			sleep $sleep
 		done
 		local average_hr=`echo "scale=2; x=$hr_sum / $iterations; if(x<1 && x != 0) print 0; x" | bc -l`
@@ -234,6 +242,10 @@ function main () {
 	#if we doesn`t send
 	msg "Benchmark completed" warning "$(date --rfc-3339=seconds) Benchmark is ended, but something goes wrong while sending stats to server.\nTry to edit values manually:$data\n$hr_time passed."
 }
+
+for arg in $@; do
+	[[ $arg == "-v" ]] && VERBOSE=1
+done
 
 case $1 in
 	test2)
@@ -321,8 +333,8 @@ case $1 in
 		fi
 		echo $$ > $LOCK_FILE
 		
-		if [[ ! -z $2 ]]; then
-			echo -e "${GREEN}> Benchmark config given in arguments${WHITE}"
+		if [[ ! -z $2 && $2 != "-v" ]]; then
+			echo -e "${GREEN}> Benchmark config given in arguments: ${WHITE}"
 			cfg="$2"
 		else
 			if [[ ! -f $BENCHMARK_CFG ]]; then

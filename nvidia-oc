@@ -69,7 +69,7 @@ echo -e ${CYAN}"Memory:${WHITE}\t\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 echo -e ${CYAN}"Power limit:${WHITE}\t${POWER_LIMIT[@]}"
 echo -en ${CYAN}"Light:${WHITE}\t\t"
-[[ $LIGHT_OFF == 1 ]] && echo "off" || echo "on"
+[[ $LIGHT == 1 ]] && echo "off" || echo "on"
 echo -en ${CYAN}"Pill:${WHITE}\t\t"
 [[ $PILL == 0 ]] && echo "off" || echo "on"
 echo -e ${CYAN}"Pill args:${WHITE}\t$PILL_ARGS"
@@ -104,7 +104,7 @@ while read string; do
 	else
 		args+=" -a [gpu:$i]/GPUFanControlState=0"
 	fi
-	[[ ! -z $LIGHT_OFF ]] && args+=" -a [gpu:$i]/GPULogoBrightness=0"
+	[[ ! -z $LIGHT ]] && args+=" -a [gpu:$i]/GPULogoBrightness=0"
 	#echo $args
 	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
 	[[ ! -z ${POWER_LIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${POWER_LIMIT[$i]}

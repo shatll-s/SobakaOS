@@ -173,8 +173,7 @@ function make_batch () {
 			#make config file
 			#[[ ! -z $fork ]] && miner_dir="/sobaka/miners/t_rex/$fork" || miner_dir="/sobaka/miners/t_rex"
 			#if fork is not set, may be there are some global configs?
-			
-			sobaka_json=`cat "$miner_dir/config_global.json"` #it will be json based on global, but with user changes
+			sobaka_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
 
 			[[ ! -z $template ]]&& sobaka_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $sobaka_json`
 			[[ ! -z $pool ]]&& sobaka_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $sobaka_json`
@@ -193,7 +192,7 @@ function make_batch () {
 					sobaka_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$sobaka_json"`
 				done
 			fi	
-				echo -e "$sobaka_json" | jq '.' > "$miner_dir/config"
+				echo -e "$sobaka_json" | jq '.' > "${miner_dir}config"
 		;;
 		nanominer)
 			minerexec+=" /sobaka/miners/nanominer/config.ini "
