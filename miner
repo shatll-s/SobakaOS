@@ -1,10 +1,5 @@
 #!/bin/bash
 
-function screen_kill () {
-	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
-	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
-}
-
 n=1
 command=$1
 [[ ! -z $1 && $1 == "2" ]] && n=2 && command=$2
@@ -15,7 +10,7 @@ case $command in
 		screen -r miner$n
 	;;
 	restart)
-		screen_kill miner$n
+		screen-kill miner$n
 		echo "Miner screen killed, waiting to restart"
 	;;
 	list)

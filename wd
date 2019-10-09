@@ -21,11 +21,6 @@ LOGO="
 "
 LOGO=${BROWN}$LOGO${WHITE}
 
-function screen_kill () {
-	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
-	[[ ! -z $MINER_PID ]] && kill $MINER_PID
-}
-
 function loop() {
 
 	local miner=$2
@@ -81,7 +76,7 @@ function loop() {
 				msg "Watchdog: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) restart"
 				echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $WD_RESTART minutes${WHITE}"
 				miner_restart_count=1
-				screen_kill $miner
+				screen-kill $miner
 			fi
 		fi
 		ok_count=0
@@ -143,16 +138,16 @@ case $1 in
 		start
 	;;
 	stop)
-		screen_kill wd
+		screen-kill wd
 		echo "Watchdog stopped"
 	;;
 	restart)
-		screen_kill wd
+		screen-kill wd
 		screen -dmS wd bash -c "/dog/wd start"
 		echo "Watchdog restarted"
 	;;
 	screen)
-		screen_kill wd
+		screen-kill wd
 		screen -dmS wd bash -c "/dog/wd start"
 		#while true; do
 		#	sleep 30

@@ -119,7 +119,7 @@ case $1 in
 	;;
 	restart_miner)
 		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
-		screen_kill $2
+		screen-kill $2
 		miner_now=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
 		if [[ $miner ]]; then
 			if [[ ! $miner_now ]]; then
@@ -189,8 +189,8 @@ case $1 in
 			echo $2 | jq '.' > /tmp/wallet_raw.cfg
 			jsonwallet2cfg /tmp/wallet_raw.cfg $WALLET_CFG
 			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg, don`t kill miners
-			screen_kill miner1
-			screen_kill miner2
+			screen-kill miner1
+			screen-kill miner2
 			msg "Wallet change" ok "$(date --rfc-3339=seconds)\n Wallet changed, miners restarted."
 		else
 			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
@@ -202,7 +202,7 @@ case $1 in
 		#if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
 		if [[ $(echo $2 | jq '.') != 'null' ]]; then
 			[[ $2 != "--reconfigure" ]] && echo $2 | jq '.' > /tmp/$1 #I forgot, what is --reconfigure???
-			[[ $3 != "--hello" ]] && screen_kill miner$i #don`t kill miner if there is --hello argument
+			[[ $3 != "--hello" ]] && screen-kill miner$i #don`t kill miner if there is --hello argument
 			json2batch /tmp/$1
 
 			if [[ $3 != "--hello" && $3 != "--quiet" ]]; then #don`t send msg if there is --hello argument

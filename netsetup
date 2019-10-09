@@ -256,7 +256,7 @@ function setup()
 
 	string+="    version: 2"
 	#echo -e "$string"
-	rm /etc/netplan/*
+	rm -f /etc/netplan/*
 	echo -e "$string" > $interfaces
 
 	netplan apply

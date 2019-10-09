@@ -42,11 +42,6 @@ LOGO="
 "
 #colors section end
 
-function screen_kill () {
-	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
-	[[ ! -z $MINER_PID ]]&& kill $MINER_PID
-}
-
 function displaytime () {
 	local T=$1
 	local D=$((T/60/60/24))
@@ -282,14 +277,14 @@ case $1 in
 		screen -r af
 	;;
 	stop)
-		screen_kill af
+		screen-kill af
 		echo "$(date --rfc-3339=seconds) Autofan stopped"
 	;;
 	loop)
 		start
 	;;
 	start|restart)
-		screen_kill af
+		screen-kill af
 		screen -dmS af bash -c "/dog/af loop"
 		echo "$(date --rfc-3339=seconds) Autofan (re)started"
 	;;

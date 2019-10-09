@@ -13,12 +13,6 @@ function screen_check () {
 	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
 }
 
-#kill screen session with name of first argument
-function screen_kill () {
-	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
-	[[ ! -z "$MINER_PID" ]] && kill $MINER_PID
-}
-
 #check if config files exists
 [[ ! -f $BATCH_CFG ]] && echo "Configuration file $BATCH_CFG does not exist! Can\`t mine without configs..."
 
@@ -36,7 +30,7 @@ while true; do
 		. $BATCH_CFG
 		if [[ ! $batch1 ]]; then
 			if [[ $(screen_check miner1) -gt 0 ]]; then
-				screen_kill miner1
+				screen-kill miner1
 				echo $(date --rfc-3339=seconds)" Killed previous miner1 screen [code 3: miner is not selected/stopped]"
 			fi
 		elif [[ $(screen_check miner1) -eq 0 ]]; then #miner is set up, screens = 0
@@ -45,7 +39,7 @@ while true; do
 			echo -n $(date --rfc-3339=seconds)" Started miner1 screen with $miner1 "
 			[[ $batch1 == $lastcheck ]] && echo "[code 2: miner is not changed, but closed]" || echo "[code 0: simple start]"
 		elif [[	$batch1 != $lastcheck ]]; then #miner is set up, screens > 0, just check if miner changed, if not, everething is ok
-			screen_kill miner1
+			screen-kill miner1
 			wd restart
 			screen -dmS miner1.$miner1 bash -c "miner-loop $miner1 \"$batch1\""
 			echo $(date --rfc-3339=seconds)" Restarted miner1 screen with $miner1 [code 1: miner changed]"
@@ -53,7 +47,7 @@ while true; do
 		
 		if [[ ! $batch2 ]]; then #check if miner2 is set up
 			if [[ $(screen_check miner2) -gt 0 ]]; then
-				screen_kill miner2
+				screen-kill miner2
 				echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 3: miner is not selected/stopped]"
 			fi
 		elif [[ $batch2 == $lastcheck2 ]]; then #ok, miner is set up and miner = last check
@@ -65,7 +59,7 @@ while true; do
 				fi
 			else #ok, miner is set up and miner = last check and miner2 = miner1
 				if [[ $batch2 == $batch1 ]]; then
-					screen_kill miner2
+					screen-kill miner2
 					echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 5: you can\`t start two same miners]"
 				fi
 			fi
@@ -77,12 +71,12 @@ while true; do
 			fi
 		else #miner is set up, miner != last check, screen > 0
 			if [[ ! $batch2 == $batch1 ]]; then  #miner is set up, miner != last check (changed or first run), screen > 0, miner1 != miner2
-				screen_kill miner2
+				screen-kill miner2
 				wd restart
 				screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
 				echo $(date --rfc-3339=seconds)" Restarted miner2 screen with $miner2 [code 1: miner changed]"
 			else #miner is set up, miner != last check (changed or first run), screen > 0, miner1 = miner2 => miner2 changed to the same to miner 
-				screen_kill miner2
+				screen-kill miner2
 				echo $(date --rfc-3339=seconds)" Killed previous miner2 screen [code 5: you can\`t start two same miners]"
 			fi
 		fi

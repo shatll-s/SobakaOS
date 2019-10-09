@@ -11,8 +11,6 @@ if [[ ! -e /usr/local/bin/teleconsole ]]; then
 	curl https://www.teleconsole.com/get.sh | sh
 fi
 
-
-
 start () {
 	screen -ls teleconsole | grep -q teleconsole && running=1 || running=0
 
