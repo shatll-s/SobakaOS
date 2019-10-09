@@ -1,9 +1,9 @@
 #!/bin/bash
 #at first make Nvidia & AMD OC, then every 10 sec checks if the miners are closed, return them to live. Logic: second miner closes if it has same name with first
-LOG="/sobaka/log/sobaka.log"
+LOG="/dog/log/mining.log"
 exec &>>$LOG
 
-BATCH_CFG="/sobaka/cfg/batch.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
 
 echo "================================================================"
 echo $(date --rfc-3339=seconds)" Started new session $0"
@@ -22,8 +22,8 @@ function screen_kill () {
 #check if config files exists
 [[ ! -f $BATCH_CFG ]] && echo "Configuration file $BATCH_CFG does not exist! Can\`t mine without configs..."
 
-export "PATH=$PATH:/sobaka:/sobaka/bin:/sobaka/sbin" #need to run sobaka scripts without prefix
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sobaka/lib
+export "PATH=$PATH:/dog:/dog/bin:/dog/sbin" #need to run OSdog scripts without prefix
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/dog/lib
 export CUDA_DEVICE_ORDER
 
 #OC

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. /dog/colors
+sleep 5
+sudo -i bash -c "/dog/motd; bash"

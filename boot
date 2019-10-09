@@ -1,15 +1,15 @@
 #!/bin/bash
-LOG="/sobaka/log/sobaka-boot.log"
+LOG="/dog/log/boot.log"
 AMD="amdgpu-pro-18.50-708488-ubuntu-18.04"
 NVIDIA="NVIDIA-Linux-x86_64-415.27"
-RIG_CFG="/sobaka/cfg/rig.cfg"
-FLASH_CFG="/sobaka-flash/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
+FLASH_CFG="/dog-flash/rig.cfg"
 NVIDIASMI_FILE=/tmp/nvidiagpudetect
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 
 exec &>>$LOG
 
-cp /sobaka/service/environment /etc/environment
+cp /dog/service/environment /etc/environment
 . /etc/environment
 export PATH=$PATH
 export LC_ALL="en_US.UTF-8"
@@ -66,14 +66,14 @@ fi
 
 [[ `gpu-detect AMD` -gt 0 ]] && sleep 2 && amdmeminfo -q -s > $AMDMEMINFO_FILE
 
-if [[ ! -f /sobaka/log/firstrun.txt ]]; then
-	tech_info > /sobaka/log/firstrun.txt
+if [[ ! -f /dog/log/firstrun.log ]]; then
+	tech_info > /dog/log/firstrun.log
 	netsetup -f
 else
 	netsetup -f
 fi
-/sobaka/sbin/watchdog-opendev initial
-/sobaka/sbin/watchdog-qinheng initial
+/dog/sbin/wd-opendev initial
+/dog/sbin/wd-qinheng initial
 hello
 . $RIG_CFG
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
@@ -81,7 +81,14 @@ if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 fi
 
 if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
-	[[ `gpu-detect AMD` -lt 8 ]] && sudo systemctl start sobakax
+	if [[ `gpu-detect AMD` -lt 8 ]]; then
+		echo "> Starting OSdog Xserver"
+		sudo systemctl start dogx
+	else
+		echo "> Don\`t start OSdog Xserver (there are 8+ AMD GPUs)"
+	fi
+else
+	echo "> Don\`t start OSdog Xserver (due to settings)"		
 fi
 
 time_stop=`date +%s`

@@ -1,14 +1,14 @@
 [Unit]
-Description=Sobaka mining daemon
+Description=OSdog mining daemon
 #After=display-manager.service
 #Requires=display-manager.service
-After=sobaka-boot.service
+After=boot.service
 #networking.service is not working in 18.04
 
 [Service]
 Type=simple
-ExecStart=/sobaka/sobaka
-WorkingDirectory=/sobaka
+ExecStart=/dog/mining
+WorkingDirectory=/dog
 
 [Install]
 WantedBy=multi-user.target

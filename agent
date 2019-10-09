@@ -14,7 +14,7 @@ function screen_kill () {
 case $1 in
 	run)
 		while true; do
-			[[ $(screen_check agent) -eq 0 ]] && echo "Starting agent screen" && screen -dmS agent bash -c "/sobaka/sobaka-stats"
+			[[ $(screen_check agent) -eq 0 ]] && echo "Starting agent screen" && screen -dmS agent bash -c "/dog/stats"
 			sleep 10
 		done
 	;;

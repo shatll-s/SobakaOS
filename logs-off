@@ -1,7 +1,7 @@
 #!/bin/bash
 . colors
-[[ ! -f /sobaka/service/fstab_ram ]] && echo "Error, no fstab file" && exit 1
-cp /sobaka/service/fstab_ram /etc/fstab
+[[ ! -f /dog/service/fstab_ram ]] && echo "Error, no fstab file" && exit 1
+cp /dog/service/fstab_ram /etc/fstab
 sed -E 's/^[#]?Storage=.*$/Storage=volatile/g' -i /etc/systemd/journald.conf
 systemctl restart systemd-journald
 rm -r /var/log/*

@@ -63,8 +63,8 @@ DISK_NAME=`echo ${DISK_PART} | sed 's/\([[:digit:]]\)//'`
 DISK_SIZE=`cat /proc/partitions | grep -w "${DISK_NAME}" | awk '{ printf("%.f",$3/1024)}'`
 PART_SIZE=`cat /proc/partitions | grep -w "${DISK_PART}" | awk '{ printf("%.f",$3/1024)}'`
 
-echo -e "Sobaka booted from ${GREEN}$DISK_NAME${WHITE} and whole drive size is ${WHITE}$DISK_SIZE${WHITE} MB"
-echo -e "Sobaka partition is ${YELLOW}$DISK_PART${WHITE} and it's size is ${WHITE}$PART_SIZE${WHITE} MB"
+echo -e "OSdog booted from ${GREEN}$DISK_NAME${WHITE} and whole drive size is ${WHITE}$DISK_SIZE${WHITE} MB"
+echo -e "OSdog partition is ${YELLOW}$DISK_PART${WHITE} and it's size is ${WHITE}$PART_SIZE${WHITE} MB"
 
 
 EXPAND_SIZE=$((DISK_SIZE-PART_SIZE-28))
@@ -72,7 +72,7 @@ if [ $EXPAND_SIZE -le ${FREE_SPACE_LIMIT} ]; then
 	echo -e "${RED}Free disk space less then ${FREE_SPACE_LIMIT} MB. Stopped${WHITE}"
 	exit 1
 else
-	echo -e "Try to auto-expand Sobaka partition by ${WHITE}${EXPAND_SIZE}${WHITE} MB up to ${WHITE}$((PART_SIZE+EXPAND_SIZE))${WHITE} MB in total"
+	echo -e "Try to auto-expand OSdog partition by ${WHITE}${EXPAND_SIZE}${WHITE} MB up to ${WHITE}$((PART_SIZE+EXPAND_SIZE))${WHITE} MB in total"
 
 	[ -t 1 ] && echo -e "Press Ctrl+C to stop or wait 5 seconds to continue" && read -t 5
 
@@ -80,7 +80,7 @@ else
 
 	if [ $? = 0 ]; then
 		NEW_PART_SIZE=`cat /proc/partitions | grep -w "${DISK_PART}" | awk '{ printf("%.f",$3/1024)}'`
-		echo -e "New Sobaka partition size is ${GREEN}$NEW_PART_SIZE${WHITE} MB"
+		echo -e "New OSdog partition size is ${GREEN}$NEW_PART_SIZE${WHITE} MB"
 	fi
 fi
 

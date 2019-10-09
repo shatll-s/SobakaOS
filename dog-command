@@ -1,11 +1,11 @@
 #!/bin/bash
 [ -t 1 ] && . colors #source colors only if running in terminal
-AMD_CFG="/sobaka/cfg/amd.cfg"
-NVIDIA_CFG="/sobaka/cfg/nvidia.cfg"
-RIG_CFG="/sobaka/cfg/rig.cfg"
-WALLET_CFG="/sobaka/cfg/wallet.cfg"
-BATCH_CFG="/sobaka/cfg/batch.cfg"
-LOCK_DIR="/tmp/sobaka-work"
+AMD_CFG="/dog/cfg/amd.cfg"
+NVIDIA_CFG="/dog/cfg/nvidia.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
+WALLET_CFG="/dog/cfg/wallet.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
+LOCK_DIR="/tmp/dog-command"
 
 
 ########################################################
@@ -22,7 +22,7 @@ PID=$$
 PID_file="$LOCK_DIR/$PID"
 touch $PID_file
 
-echo $(date --rfc-3339=seconds)" Start doing \"$1\" \"$2\""
+echo $(date --rfc-3339=seconds)" Start doing \"$1\"" #\"$2\""
 
 case $1 in
 	exec)
@@ -55,7 +55,7 @@ case $1 in
 	flash_bios)
 		. $RIG_CFG		
 		cd /tmp
-		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$2 #https://sobaka.group/files/1/upload/0000001_bios_amd_bus02.rom.gz
+		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$2 #https://os.dog/files/1/upload/0000001_bios_amd_bus02.rom.gz
 		wget -q $link 
 		exitcode=$?
 		if [[ ! $exitcode -eq 0 ]]; then
@@ -170,12 +170,12 @@ case $1 in
 			while [[ $try -lt 20 ]]; do
 				if [ `ls -a $LOCK_DIR | wc -l` -eq 3 ]; then
 					rm $PID_file
-					systemctl restart sobaka-agent
+					systemctl restart agent
 				fi
 				sleep 1
 				((try++))
 			done
-			msg "Upgrade" warning "Upgrade was successfull, but I can not restart sobaka services, because some commands are still running.<br>Sometimes we need to reboot or restart Sobaka services (if you need it, try to reboot or send <b>systemctl restart sobaka-agent</b> command to rig."
+			msg "Upgrade" warning "Upgrade was successfull, but I can not restart OSdog services, because some commands are still running.<br>Sometimes we need to reboot or restart OSdog services (if you need it, try to reboot or send <b>systemctl restart agent</b> command to rig."
 		else
 			msg "Upgrade" warning "<b>Something goes wrong</b>\n$return"
 		fi
@@ -226,8 +226,8 @@ case $1 in
 				hostnamectl set-hostname $2 #for 18.04
 			fi
 			if [[ $3 != '--hello' ]]; then
-				sobaka-work batch1 --reconfigure --quiet
-				sobaka-work batch2 --reconfigure --quiet
+				dog-command batch1 --reconfigure --quiet
+				dog-command batch2 --reconfigure --quiet
 			fi
 			[[ $3 != '--hello' && $3 != '--quiet' ]] && msg "Name change" ok "$(date --rfc-3339=seconds)\n Name successfully changed to $2, may be you need reboot to get effect."
 		else
@@ -264,7 +264,7 @@ case $1 in
 				exit 1
 			fi
 			file=$(echo $file_gz | sed 's/.gz//')
-			mv /tmp/$file /sobaka/cfg/openvpn.conf
+			mv /tmp/$file /dog/cfg/openvpn.conf
 		fi
 		#echo "next step"
 	
@@ -275,7 +275,7 @@ case $1 in
 		#echo $use
 		if [[ ! -z $use && $use -eq 1 ]]; then
 			echo "Trying to activate openvpn"
-			cp /sobaka/cfg/openvpn.conf /etc/openvpn/client.conf
+			cp /dog/cfg/openvpn.conf /etc/openvpn/client.conf
 			systemctl restart openvpn@client
 			sleep 15
 		fi
@@ -329,7 +329,7 @@ case $1 in
 			;;
 			*)
 			af="$2"
-			echo "$af" > /sobaka/cfg/af.cfg
+			echo "$af" > /dog/cfg/af.cfg
 			if [[ `echo $af | jq '.af_enabled'` -eq 1 ]]; then
 				af restart
 				text="Autofan (re)started"
@@ -360,12 +360,12 @@ case $1 in
 				rm /tmp/asw_hardcopy
 			;;
 			check)
-				echo "$data" > /sobaka/cfg/autoswitch.cfg
+				echo "$data" > /dog/cfg/autoswitch.cfg
 				return="$(asw check)"
 				msg "Profit check" info "$return"
 			;;
 			*)
-				echo "$data" > /sobaka/cfg/autoswitch.cfg
+				echo "$data" > /dog/cfg/autoswitch.cfg
 				msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
 			;;
 		esac
@@ -399,7 +399,7 @@ case $1 in
 		msg "Unknown command ($1)" warning
 	;;
 esac
-echo $(date --rfc-3339=seconds)" End doing \"$1\" \"$2\""
+echo $(date --rfc-3339=seconds)" End doing \"$1\"" #\"$2\""
 rm $PID_file
 
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 #apt-get -q=2 install sed ssh openvpn nano mc jq curl screen libnet-rawip-perl #recomended packages
-RIG_CFG="/sobaka/cfg/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 tmp_dir="/tmp"
 . $RIG_CFG
-[[ -z $HOST ]] && HOST="https://sobaka.group/message.php"
+[[ -z $HOST ]] && HOST="https://os.dog/message.php"
 [ -t 1 ] && . colors
 
 function upgrade_deb () {
@@ -19,7 +19,7 @@ function upgrade_deb () {
 		local download_link=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/$debname-latest.deb"
 		wget -q $download_link
 		local exitcode=$?
-		[[ $exitcode -ne 0 ]] && echo -e "${RED}>Error occured while downloading sobaka-libs package${WHITE}" && return
+		[[ $exitcode -ne 0 ]] && echo -e "${RED}>Error occured while downloading dog-libs package${WHITE}" && return
 
 		echo -e "${GREEN}>Package $debname downloaded${WHITE}"
 		dpkg -i "$debname-latest.deb"
@@ -32,7 +32,7 @@ function upgrade_deb () {
 
 #help section
 if [[ $1 == "--help" || $1 == "-h" ]]; then
-	echo "$0 upgrades Sobaka OS to the latest available version."&&
+	echo "$0 upgrades OSdog to the latest available version."&&
 	echo "At first, it\`s trying to download package, so if you have weak speed, it may take much time." &&
 	echo "You can install specified version by typing upgrade -v [version here]" &&
 	echo "F.e. upgrade -v 0.9 will upgrade to version 0.9, even current version is higher;" &&
@@ -44,32 +44,32 @@ fi
 [[ $1 == "-v" && ! -z $2 ]]&& VER=$2 || VER="latest"
 
 cd $tmp_dir
-[[ -f $tmp_dir/sobaka-$VER.deb ]] && rm $tmp_dir/sobaka-$VER.deb
-DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/sobaka-$VER.deb"
+[[ -f $tmp_dir/dog-$VER.deb ]] && rm $tmp_dir/dog-$VER.deb
+DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/dog-$VER.deb"
 wget -q $DOWNLOAD
 [[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)" && exit 1
 
 echo -e "${GREEN}>Upgrade files downloaded${WHITE}"
-dpkg -i --force-confold "sobaka-$VER.deb"
-rm $tmp_dir/sobaka-$VER.deb
+dpkg -i --force-confold "dog-$VER.deb"
+rm $tmp_dir/dog-$VER.deb
 
 echo -e "${CYAN}>Getting latest version of packages${WHITE}"
-versions_url="https://sobaka.group/downloads/deb_versions.txt"
+versions_url="https://os.dog/downloads/deb_versions.txt"
 versions=`curl -sLk $versions_url`
 [[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}"
 eval "$versions"
 
-upgrade_deb sobaka-libs $sobaka_libs
-upgrade_deb sobaka-sbin $sobaka_sbin
+upgrade_deb dog-libs $dog_libs
+upgrade_deb dog-sbin $dog_sbin
 
 apt-get -q=2 install lm-sensors
 
 crontab="/var/spool/cron/crontabs/root"
-crontab_remove="/sobaka/service/crontab.root.remove"
+crontab_remove="/dog/service/crontab.root.remove"
 
 while read string; do
 	[[ `fgrep -c "$string" "$crontab"` -eq 0 ]] && echo "$string" >> "$crontab"
-done < /sobaka/service/crontab.root
+done < /dog/service/crontab.root
 
 if [[ -f $crontab_remove ]]; then
 	while read string; do

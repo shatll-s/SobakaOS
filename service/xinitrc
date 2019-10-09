@@ -1,10 +1,10 @@
-tint2 -c /sobaka/service/tint2rc &
-(sleep 2 && feh --bg-scale --no-fehbg /sobaka/service/dog.jpg) &
+tint2 -c /dog/service/tint2rc &
+(sleep 2 && feh --bg-scale --no-fehbg /dog/service/dog.jpg) &
 setxkbmap -option "terminate:ctrl_alt_bksp" &
 setxkbmap -layout "us,ru" &
 setxkbmap -option "grp:ctrl_shift_toggle,grp_led:scroll" &
-xrdb -merge /sobaka/service/Xresources
-xterm -geometry +0+0 -e bash -c "/sobaka/sobaka-info; sudo su" &
+xrdb -merge /dog/service/Xresources
+xterm -geometry +0+0 -e bash -c "/dog/motd; sudo su" &
 xterm -geometry +0+360 -e bash -c "date;
-echo 'Miner will be displayed here soon'; sleep 20; sudo /sobaka/miner; sudo su" &
+echo 'Miner will be displayed here soon'; sleep 20; sudo /dog/miner; sudo su" &
 openbox-session

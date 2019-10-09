@@ -1,7 +1,7 @@
 #!/bin/bash
-#SobakaOS Autofan v 0.3. Visit www.sobaka.group
+#OSdog Autofan v 0.3. Visit os.dog
 #Dependencies: NVIDIA, AMD drivers; jq
-AF_CFG="/sobaka/cfg/af.cfg"
+AF_CFG="/dog/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE_AMD="/tmp/.amd-oc.lock"
@@ -19,7 +19,7 @@ LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
 #  "af_delay": 12
 #}
 
-#colors section (somebody can use it without SobakaOS)
+#colors section (somebody can use it without OSdog)
 RED="\e[31m"
 WHITE="\e[0m"
 GREEN="\e[32m"
@@ -249,9 +249,9 @@ function start () {
 	[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
 	crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
 
-	echo -e "${GREEN}Thank you for using ${CYAN}SobakaOS${GREEN} autofan v 0.2"
+	echo -e "${GREEN}Thank you for using ${CYAN}OSdog${GREEN} Autofan v 0.3"
 	echo -e "${BROWN}$LOGO${GREEN}"
-	echo -e "Visit ${CYAN}www.sobaka.group${WHITE}"
+	echo -e "Visit ${CYAN}www.os.dog${WHITE}"
 	$LINE
 	
 	export DISPLAY=:0
@@ -290,7 +290,7 @@ case $1 in
 	;;
 	start|restart)
 		screen_kill af
-		screen -dmS af bash -c "/sobaka/af loop"
+		screen -dmS af bash -c "/dog/af loop"
 		echo "$(date --rfc-3339=seconds) Autofan (re)started"
 	;;
 	*)

@@ -10,8 +10,8 @@ function nvidia_stop () {
 	for (( i=0; i < $try_count; i++ ))
 	do
 		wd stop > /dev/null 2>&1
-		systemctl stop sobaka 
-		systemctl stop sobakax #> /dev/null 2>&1
+		systemctl stop mining 
+		systemctl stop dogx #> /dev/null 2>&1
 		killall -9 xinit > /dev/null 2>&1
 		rmmod -f nvidia_uvm > /dev/null 2>&1
 		rmmod -f nvidia_drm > /dev/null 2>&1
@@ -31,10 +31,10 @@ function nvidia_stop () {
 function nvidia_start () {
 	#rm /tmp/nvidia_stop > /dev/null 2>&1
 	echo -e "${CYAN}> Turning all services on${WHITE}"
-	systemctl start sobakax #> /dev/null 2>&1
+	systemctl start dogx #> /dev/null 2>&1
 	sleep 10
-	systemctl start sobaka
-	systemctl start sobaka-wd
+	systemctl start mining
+	systemctl start wd
 }
 
 function nvidia_install () {
@@ -42,28 +42,28 @@ function nvidia_install () {
 
 	if [[ -z $url ]]; then
 		echo -e "${CYAN}> Getting the latest version${WHITE}"
-		versions_url="https://sobaka.group/downloads/drivers/driver_versions.txt"
+		versions_url="https://os.dog/downloads/drivers/driver_versions.txt"
 		versions=`curl -sLk $versions_url`
 		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && return 1
 		eval "$versions"
 		echo -e "The latest stable Nvidia driver version: ${GREEN}${LATEST_NVIDIA}${WHITE}"
-		url="https://sobaka.group/downloads/drivers/${LATEST_NVIDIA}"
+		url="https://os.dog/downloads/drivers/${LATEST_NVIDIA}"
 	fi
 
-	cd "/sobaka/downloads"
+	cd "/dog/downloads"
 	driver_name=`basename $url`
 
 	if [[ -e ./$driver_name ]]; then
 		echo -e "${CYAN}> Driver $driver_name is already downloaded${WHITE}"
 	else
 		echo -e "${CYAN}> Downloading $url${WHITE}"
-		wget -c $url -O "/sobaka/downloads/$driver_name" #`[ -t 0 ] && echo '--no-verbose'`
+		rm -f "/tmp/$driver_name"
+		wget -c $url -O "/tmp/$driver_name" #`[ -t 0 ] && echo '--no-verbose'`
+		mv "/tmp/$driver_name" "/dog/downloads/$driver_name"
 		[[ $? -ne 0 ]] && echo -e "${RED}Error downloading driver${WHITE}" && exit 1
 	fi
 
 
-	#driver_name="/sobaka/downloads/NVIDIA-Linux-x86_64-418.56.run"
-	#chmod 700 "$driver_name"
 	echo -e "${CYAN}> Installing${WHITE}"
 	apt update
 	#apt-get install -y dkms

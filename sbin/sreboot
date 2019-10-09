@@ -4,7 +4,7 @@
 
 sync
 
-mount -o remount,ro /sobaka-flash
+mount -o remount,ro /dog-flash
 
 echo 1 > /proc/sys/kernel/sysrq
 echo s > /proc/sysrq-trigger

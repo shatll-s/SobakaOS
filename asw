@@ -1,7 +1,7 @@
 #!/bin/bash
 ########## variables ##########
-BATCH_CFG="/sobaka/cfg/batch.cfg"
-AUTOSWITCH_CFG="/sobaka/cfg/autoswitch.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
+AUTOSWITCH_CFG="/dog/cfg/autoswitch.cfg"
 AUTOSWITCH_TMP="/tmp/autoswitch"
 [ -t 1 ] && . colors
 
@@ -262,7 +262,7 @@ case $1 in
 	;;
 	start|restart)
 		screen_kill asw
-		screen -dmS asw bash -c "/sobaka/asw loop"
+		screen -dmS asw bash -c "/dog/asw loop"
 		echo "$(date --rfc-3339=seconds) AutoSwitch (re)started"
 	;;
 	*)

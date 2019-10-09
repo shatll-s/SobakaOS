@@ -1,5 +1,5 @@
 #!/bin/bash
-RIG_CFG="/sobaka/cfg/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 
 if [[ -f $RIG_CFG ]]; then
 	#echo "File exists"
@@ -11,6 +11,6 @@ fi
 
 #echo "Password = $PASSWD"
 
-x11vnc -storepasswd $PASSWD /sobaka/cfg/.vncpasswd
+x11vnc -storepasswd $PASSWD /dog/cfg/.vncpasswd
 
-/usr/bin/x11vnc -rfbauth /sobaka/cfg/.vncpasswd -noxdamage -shared -dontdisconnect -many -noxfixes -display :0
+/usr/bin/x11vnc -rfbauth /dog/cfg/.vncpasswd -noxdamage -shared -dontdisconnect -many -noxfixes -display :0

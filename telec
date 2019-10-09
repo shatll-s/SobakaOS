@@ -1,10 +1,10 @@
 #!/bin/bash
 # Teleconsole control script
-#kill 29022; . /sobaka/cfg/batch.cfg; screen -dmS miner1.gminer -c /sobaka/service/screen.settings bash -c "$batch1"
+#kill 29022; . /dog/cfg/batch.cfg; screen -dmS miner1.gminer -c /dog/service/screen.settings bash -c "$batch1"
 
 MAX_TELEC_IDLE=3600
-logfile=/sobaka/log/teleconsole.log
-. /sobaka/colors
+logfile=/dog/log/teleconsole.log
+. /dog/colors
 
 if [[ ! -e /usr/local/bin/teleconsole ]]; then
 	echo -e "${CYAN}> Installing Teleconsole${WHITE}"
@@ -22,7 +22,7 @@ start () {
 
 	[[ -e $logfile ]] && rm $logfile
 
-	screen -dm -c /sobaka/service/screenrc.teleconsole
+	screen -dm -c /dog/service/screenrc.teleconsole
 	sleep 0.2
 
 	for i in {1..60}; do # wait console init

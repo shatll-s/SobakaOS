@@ -1,5 +1,5 @@
 #!/bin/bash
-VARIABLES_CFG="/sobaka/service/variables"
+VARIABLES_CFG="/dog/service/variables"
 . $VARIABLES_CFG
 . colors
 
@@ -28,9 +28,9 @@ while true; do
 	exitcode=$?
 	echo "Error on miner start: exitcode $exitcode"
 	if [[ $exitcode -eq 127 ]]; then
-		fork=`echo $batch | sed "s#cd /.* /sobaka/miners/$miner/\([.a-zA-Z0-9]*\)/miner.*#\1#"`
+		fork=`echo $batch | sed "s#cd /.* /dog/miners/$miner/\([.a-zA-Z0-9]*\)/miner.*#\1#"`
 		echo ">Trying to download miner by command getminer $miner $fork"
-		/sobaka/getminer $miner $fork
+		/dog/getminer $miner $fork
 	else
 		echo -e "\n${RED}>Miner exited, waiting 3 seconds to restart${WHITE}\n"
 	fi

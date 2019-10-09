@@ -1,9 +1,9 @@
 [Unit]
-Description=Sobaka X server
+Description=OSdog X server
 
 [Service]
 Type=simple
-ExecStart=/sobaka/sobakax
+ExecStart=/dog/dogx
 EnvironmentFile=/etc/environment
 
 [Install]

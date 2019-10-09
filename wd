@@ -3,9 +3,8 @@
 . /etc/environment
 export PATH
 export CUDA_DEVICE_ORDER
-RIG_CFG="/sobaka/cfg/rig.cfg"
-BATCH_CFG="/sobaka/cfg/batch.cfg"
-#LOG="/sobaka/log/sobaka-wd.log"
+RIG_CFG="/dog/cfg/rig.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
 #exec &>>$LOG
 
 
@@ -149,12 +148,12 @@ case $1 in
 	;;
 	restart)
 		screen_kill wd
-		screen -dmS wd bash -c "/sobaka/wd start"
+		screen -dmS wd bash -c "/dog/wd start"
 		echo "Watchdog restarted"
 	;;
 	screen)
 		screen_kill wd
-		screen -dmS wd bash -c "/sobaka/wd start"
+		screen -dmS wd bash -c "/dog/wd start"
 		#while true; do
 		#	sleep 30
 		#done

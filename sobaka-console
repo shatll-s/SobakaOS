@@ -1,5 +1,0 @@
-#!/bin/bash
-
-. /sobaka/colors
-sleep 5
-sudo -i bash -c "/sobaka/sobaka-info; bash"

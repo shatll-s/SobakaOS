@@ -1,12 +1,11 @@
 #!/bin/bash
-RIG_CFG="/sobaka/cfg/rig.cfg"
-FLASH_CFG="/sobaka-flash/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
+FLASH_CFG="/dog-flash/rig.cfg"
 TMP_FILE="/tmp/conv.cfg"
 . colors
 
 if [[ ! -z $RIG_CFG ]]; then #what is it???
-	mkdir -p /sobaka/cfg
-	#echo "RIG_ID=\nPASSWD=" > $RIG_CFG
+	mkdir -p /dog/cfg
 fi
 
 if [[ ! -f $RIG_CFG && -f $FLASH_CFG ]]; then
@@ -31,9 +30,9 @@ if [[ $flashdata != 1 ]]; then
 	read rig_id
 	echo -e "Enter ${CYAN}RIG_PASSWORD${WHITE}:"
 	read rig_password
-	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}"https://sobaka.group/message.php${WHITE}"\nType another host or hit Enter to use default:"
+	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}"https://os.dog/message.php${WHITE}"\nType another host or hit Enter to use default:"
 	read rig_host
-	[[ -z $rig_host ]]&& rig_host="https://sobaka.group/message.php"
+	[[ -z $rig_host ]]&& rig_host="https://os.dog/message.php"
 	echo -e "Thank you, trying to apply changes.\nIf something goes wrong, you can change rig ID & password manually, just type \"nano /sobaka/cfg/rig.cfg\""
 fi
 
@@ -43,9 +42,9 @@ cfg+="HOST=\"$rig_host\"\n"
 cfg+="RIG_ID=\"$rig_id\"\n"
 cfg+="PASSWD=\"$rig_password\"\n"
 echo -e $cfg > $RIG_CFG
-echo "user:$PASSWD" | chpasswd #Change password
+echo "user:$rig_password" | chpasswd #Change password
 $LINE
-#hello
-systemctl restart sobaka
-systemctl restart sobaka-agent
+
+systemctl restart mining
+systemctl restart agent
 hello

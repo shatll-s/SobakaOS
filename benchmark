@@ -1,11 +1,11 @@
 #!/bin/bash
 BENCHMARK_CFG="/tmp/benchmark"
-AUTOSWITCH_CFG="/sobaka/cfg/autoswitch.cfg"
-BATCH_CFG="/sobaka/cfg/batch.cfg"
-RIG_CFG="/sobaka/cfg/rig.cfg"
+AUTOSWITCH_CFG="/dog/cfg/autoswitch.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 LOCK_FILE="/tmp/.benchmark.lock"
-LOG="/sobaka/log/benchmark.log"
-VARIABLES_CFG="/sobaka/service/variables"
+LOG="/dog/log/benchmark.log"
+VARIABLES_CFG="/dog/service/variables"
 . $VARIABLES_CFG
 [ -t 1 ] && . colors
 algodata='{
@@ -79,7 +79,7 @@ function check_con () {
 function services_stop () {
 	echo -e "${GREEN}> Stopping services${WHITE}"
 	wd stop > /dev/null 2>&1
-	systemctl stop sobaka
+	systemctl stop mining
 	if [[ $(screen_check asw) -gt 0 ]]; then
 		echo 1 > /tmp/asw_trigger
 		screen_kill asw
@@ -88,8 +88,8 @@ function services_stop () {
 
 function services_start () {
 	echo -e "${GREEN}> Starting services${WHITE}"
-	systemctl start sobaka
-	systemctl start sobaka-wd
+	systemctl start mining
+	systemctl start wd
 	af restart
 	[[ -f /tmp/asw_trigger && `cat /tmp/asw_trigger` -eq 1 ]] && asw restart
 }
@@ -141,7 +141,7 @@ function benchmark () {
 		local hr_sum=0
 		while [[ `date +%s` -le $stop_time ]]; do
 			((iterations++))
-			local stats=`sobaka-stats $miner`
+			local stats=`stats $miner`
 			[[ `echo $stats | jq '.miner_total_hr'` != null ]] && local hr=`echo $stats | jq -r '.miner_total_hr'` ||
 				local hr=0
 			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
@@ -248,66 +248,6 @@ for arg in $@; do
 done
 
 case $1 in
-	test2)
-		#jq '.' $AUTOSWsITCH_CFG # > /dev/null 2>&1
-		jq '.' /sobaka/cfg/autoweas.cfg
-		exitcode="$?"
-		echo $exitcode
-		if [[ $exitcode -ne 0 ]]; then
-			echo2 "${RED}Not correct data in $AUTOSWITCH_CFG${WHITE}"
-		else
-			algos[$i]='Cryptonightv7'
-			average_hr=1000
-			echo `jq ".algo.${algos[$i]^^} = \"$average_hr\"" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
-			if [[ `jq ".dividers.S${algos[$i]^^}" $AUTOSWITCH_CFG` == null ]]; then
-				echo2 "Rewriting data in $AUTOSWITCH_CFG"
-				divider=`echo $data | jq ".dividers.${algos[$i]^^}"`
-				unit=`echo $data | jq ".units.${algos[$i]^^}"`
-				echo `jq ".dividers.${algos[$i]^^} = $divider" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
-				echo `jq ".units.${algos[$i]^^} = $unit" $AUTOSWITCH_CFG` > $AUTOSWITCH_CFG
-			fi
-		fi
-
-
-
-	 # echo `jq ".dividers.${algos[$i]^^}" $AUTOSWITCH_CFG`
-		#echo $data | jq '.'
-		cat $AUTOSWITCH_CFG | jq '.'
-	;;
-	test)
-        . $RIG_CFG
-        data='{"Beamv2": "0","DaggerHashimoto": "0"}'
-		data2='
-			{
-			 "CryptoNightv7": "5525.48",
-			 "CryptoNightv8": "2510.71",
-			 "CryptoNightHeavy": "5371.57",
-			 "Beamv2": "87.91",
-			 "DaggerHashimoto": "141.42",
-			 "Lyra2rev3": "241.26",
-			 "X16r": "58.47"
-			}
-		'
-        request=$(
-        jq -n \
-        --arg password "$PASSWD" \
-        --argjson benchmark "$data2" \
-        '{      
-                "method": "benchmark",
-                "jsonrpc": "2.0",
-                "stats": {
-                        $password,
-                        $benchmark
-                }
-        }'
-		)
-    echo $request | jq '.' -c
-
-    response=$(echo $request | curl -s --data @- \
-    --connect-timeout 7 --max-time 15 \
-    "${HOST}?id=${RIG_ID}&method=benchmark" -H "Content-Type: application/json; charset=utf-8\r\n")
-    echo $response
-	;;
 	show|"")
 		screen -d benchmark
 		screen -r benchmark

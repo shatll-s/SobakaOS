@@ -1,6 +1,6 @@
 #!/bin/bash
 API_TIMEOUT=10
-RIG_CFG="/sobaka/cfg/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 NVIDIASMI_FILE=/tmp/nvidiasmi #need to get some info from nvidia-smi
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 [ -t 1 ] && . colors
@@ -236,26 +236,26 @@ while [[ $try -lt 3 ]]; do
 			#name
 			name=$(echo $response | jq ".name" -r)
 			if [[ ! -z $name && $name != 'null' ]]; then
-				sobaka-work change_name "$name" --hello
+				dog-command change_name "$name" --hello
 			fi
 
 			#nvidia
 			command_argument=$(echo $response | jq ".nvidia" --raw-output)
-			sobaka-work change_nvidia_oc "$command_argument" --hello
+			dog-command change_nvidia_oc "$command_argument" --hello
 
 			#amd
 			command_argument=$(echo $response | jq ".amd" --raw-output)
-			sobaka-work change_amd_oc "$command_argument" --hello
+			dog-command change_amd_oc "$command_argument" --hello
 
 			#manifests
 			command_argument=$(echo $response | jq ".batch1" --raw-output)
-			sobaka-work batch1 "$command_argument" --hello
+			dog-command batch1 "$command_argument" --hello
 			command_argument=$(echo $response | jq ".batch2" --raw-output)
-			sobaka-work batch2 "$command_argument" --hello
+			dog-command batch2 "$command_argument" --hello
 			
 			#autofan
 			command_argument=$(echo $response | jq ".af" --raw-output)
-			sobaka-work af "$command_argument" --hello
+			dog-command af "$command_argument" --hello
 			[ -t 1 ] && echo -e "${GREEN}>Initial settings (batches, NVIDIA & AMD OC) received and applied${WHITE}" ||
 				echo $(date --rfc-3339=seconds)" Initial settings (batches, NVIDIA & AMD OC) received and applied"
 

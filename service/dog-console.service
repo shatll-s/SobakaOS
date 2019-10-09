@@ -1,9 +1,9 @@
 [Unit]
-Description=Sobaka Console on TTY1
+Description=OSdog Console on TTY1
 
 [Service]
 Type=simple
-ExecStart=/sobaka/sobaka-console
+ExecStart=/dog/dog-console
 
 StandardOutput=tty
 StandardInput=tty

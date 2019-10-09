@@ -1,6 +1,6 @@
 #!/bin/bash
 [ -t 1 ] && . colors #source colors only if running in terminal
-AMD_CFG="/sobaka/cfg/amd.cfg"
+AMD_CFG="/dog/cfg/amd.cfg"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 [[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
 LOCK_FILE="/tmp/.amd-oc.lock"

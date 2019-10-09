@@ -1,10 +1,10 @@
 [Unit]
-Description=Sobaka start & driver check
+Description=OSdog start & driver check
 
 [Service]
 Type=oneshot
-ExecStart=/sobaka/sobaka-boot
-WorkingDirectory=/sobaka
+ExecStart=/dog/boot
+WorkingDirectory=/dog
 RemainAfterExit=1
 TimeoutSec=300
 

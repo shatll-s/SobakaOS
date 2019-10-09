@@ -1,9 +1,9 @@
 #!/bin/bash
 
-RIG_CFG="/sobaka/cfg/rig.cfg"
-VARIABLES_CFG="/sobaka/service/variables"
+RIG_CFG="/dog/cfg/rig.cfg"
+VARIABLES_CFG="/dog/service/variables"
 AUTOSWITCH_TMP="/tmp/autoswitch"
-[[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/sobaka/cfg/batch.cfg"
+[[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/dog/cfg/batch.cfg"
 . $VARIABLES_CFG
 name=$(cat /etc/hostname)
 manifest=`cat $1`
@@ -80,7 +80,7 @@ function get_variables () {
 }
 
 function make_batch () {
-	[[ ! -z $fork ]] && miner_dir="/sobaka/miners/$miner/$fork/" || miner_dir="/sobaka/miners/$miner/"
+	[[ ! -z $fork ]] && miner_dir="/dog/miners/$miner/$fork/" || miner_dir="/dog/miners/$miner/"
 	local minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
 	if [[ $miner == "ccminer" && $fork == "tpruvot-2.3.1" ]]; then
 		:
@@ -106,7 +106,7 @@ function make_batch () {
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dcoin \$"${MINER}"_DUALCOIN"
 				#[[ ! -z $pass `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" -dpsw \$APASS"
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
 		;;
 		ewbf)
 			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
@@ -115,7 +115,7 @@ function make_batch () {
 			minerexec+=" --server $raw_pool --port $port"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
-			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /sobaka/log/"$miner".log"
+			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /dog/log/"$miner".log"
 		;;
 		bminer)
 			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
@@ -125,7 +125,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=$template
 			[[ ! -z $pass ]]	&& minerexec+=":"$pass
 			minerexec+="@$pool"
-			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/sobaka/log/"$miner".log -watchdog=false"
+			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/dog/log/"$miner".log -watchdog=false"
 		;;
 		ccminer)
 			#minerexec+="$fork -o $pool"
@@ -153,12 +153,12 @@ function make_batch () {
 		claymore_c)
 			minerexec+=" -xpool $pool -xwal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
 		;;
 		claymore_z)
 			minerexec+=" -zpool $pool -zwal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /sobaka/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
 		;;
 		cpuminer)
 			minerexec+=" -o "
@@ -171,32 +171,30 @@ function make_batch () {
 		t_rex)
 			minerexec+=" -c config"
 			#make config file
-			#[[ ! -z $fork ]] && miner_dir="/sobaka/miners/t_rex/$fork" || miner_dir="/sobaka/miners/t_rex"
-			#if fork is not set, may be there are some global configs?
-			sobaka_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
+			dog_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
 
-			[[ ! -z $template ]]&& sobaka_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $sobaka_json`
-			[[ ! -z $pool ]]&& sobaka_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $sobaka_json`
-			[[ ! -z $pass ]]&& sobaka_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $sobaka_json`
-			[[ ! -z $algo ]]&& sobaka_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $sobaka_json`
+			[[ ! -z $template ]]&& dog_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $dog_json`
+			[[ ! -z $pool ]]&& dog_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $dog_json`
+			[[ ! -z $pass ]]&& dog_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $dog_json`
+			[[ ! -z $algo ]]&& dog_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $dog_json`
 
 			#looking for keys in json
 			if [[ $config != "{null}" ]]; then
 				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
 				for ((y=0; y < ${#keys[@]}; y++)); do
 					#echo "Check ${keys[$y]}"
-					[[ `echo $sobaka_json | jq ".\"${keys[$y]}\""` != null ]] &&
-						sobaka_json=`jq "del(.\"${keys[$y]}\")" <<< "$sobaka_json"` #if key exist, delete it
+					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
+						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
 
 					value=`echo $config | jq ".\"${keys[$y]}\""`
-					sobaka_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$sobaka_json"`
+					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
 				done
 			fi	
-				echo -e "$sobaka_json" | jq '.' > "${miner_dir}config"
+				echo -e "$dog_json" | jq '.' > "${miner_dir}config"
 		;;
 		nanominer)
-			minerexec+=" /sobaka/miners/nanominer/config.ini "
-			config="logPath=/sobaka/log/nanominer.txt\n"
+			minerexec+=" /dog/miners/nanominer/config.ini "
+			config="logPath=/dog/log/nanominer.log\n"
 			config+="port=9090\n"
 			config+="mport=0\n"
 			config+="rigName = $name\n"
@@ -207,7 +205,7 @@ function make_batch () {
 			[[ ! -z $pass ]]&& config+="rigPassword = $pass\n"
 			[[ ! -z $addition ]]&& config+="$addition"
 			
-			echo -e "$config" > /sobaka/miners/nanominer/config.ini
+			echo -e "$config" > /dog/miners/nanominer/config.ini
 		;;
 		lolminer)
 			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
@@ -239,7 +237,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind=${APIPORT[$miner]} --log=/sobaka/log/z_enemy.txt"
+			minerexec+=" --api-bind=${APIPORT[$miner]} --log=/dog/log/z_enemy.log"
 		;;
 		xmr_stak)
 			minerexec+=" -c ${miner_dir}config.txt -C ${miner_dir}pools.txt"
@@ -308,14 +306,14 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/sobaka/log/wildrig.txt"
+			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/dog/log/wildrig.log"
 		;;
 		phoenix)
 			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
 			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
 			[[ ! -z $template ]]&& minerexec+=" -wal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
-			minerexec+=" -cdmport ${APIPORT[$miner]} -log 1 -logfile /sobaka/log/phoenix.txt"
+			minerexec+=" -cdmport ${APIPORT[$miner]} -log 1 -logfile /dog/log/phoenix.log"
 		;;
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
@@ -323,7 +321,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/sobaka/log/teamredminer.txt"
+			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/dog/log/teamredminer.log"
 		;;
 		cryptodredge)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
@@ -331,7 +329,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind ${APIPORT[$miner]} --log /sobaka/log/cryptodredge.txt"
+			minerexec+=" --api-bind ${APIPORT[$miner]} --log /dog/log/cryptodredge.log"
 		;;
 		nbminer)
 			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
@@ -415,7 +413,7 @@ case $2 in
 			if [[ -z $autoswitch_arr ]]; then
 				echo "No autoswitch detected"
 				if [[ ! -z $miner ]]; then
-					/sobaka/getminer $miner $fork
+					/dog/getminer $miner $fork
 					
 				fi
 				[[ $miner_i -eq 1 ]] && asw stop
@@ -438,7 +436,7 @@ case $2 in
 					unset miner batch coin pass pool addition algo fork brand config config_pools config_nvidia config_amd config_cpu pool_without_port port batch #don`t delete template && wallet (it`s same in NiceHash)
 					autoswitch=`echo $autoswitch_arr | jq ".[$i]"`
 					get_variables "$autoswitch"
-					/sobaka/getminer $miner $fork #not optimal - need to download all miners at start
+					/dog/getminer $miner $fork #not optimal - need to download all miners at start
 					batch=`make_batch`
 					algo=`convert_algo $algo`
 					json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"batch\": \"$batch\"}]"`

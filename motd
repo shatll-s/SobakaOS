@@ -1,0 +1,49 @@
+#!/bin/bash
+#show some info on startup
+. /etc/environment
+export PATH
+. colors
+. /dog/cfg/rig.cfg
+
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+LOGO=${BROWN}$LOGO${WHITE}
+uname -a | sed 's/Ubuntu /Ubuntu\n/'
+$LINE
+echo -en "${GREEN}OSdog version "
+[[ ! -z $OS ]] && echo -e "${CYAN}$OS" || echo -e "${RED}undefined"
+echo -e "$LOGO"
+echo -en ${CYAN}
+#ifconfig | grep -v "127.0.0.1" | grep "inet" | sed 's/.*inet \([0-9.]*\)\s.*/IP: \1/g'
+ifconfig | grep -v "127.0.0.1" | grep "inet " | sed 's/.*inet \([0-9.]*\)\s.*$/\1/g' #18.04
+echo -en ${WHITE}
+
+df -h /
+uptime | sed 's/^\s//'
+$LINE
+
+gpu-detect list
+$LINE
+echo "Some commands:"
+echo -e ${CYAN}"miner [2]"${WHITE}"\tshow first [second] miner screen"
+echo -e ${CYAN}"af"${WHITE}"\t\tshow Autofan screen"
+echo -e ${CYAN}"asw"${WHITE}"\t\tshow AutoSwitch screen"
+echo -e ${CYAN}"wd"${WHITE}"\t\tshow watchdog screen"
+echo -e ${CYAN}"agent"${WHITE}"\t\tshow screen with stats"
+echo -e ${CYAN}"Ctrl+A,D"${WHITE}"\tdetach from current screen"
+echo -e ${CYAN}"netsetup"${WHITE}"\tsetup LAN/WiFi"
+echo -e ${CYAN}"newdog"${WHITE}"\t\tset new rig ID, password, host"
+echo -e ${CYAN}"logs-off"${WHITE}"\tput logs in RAM (don\`t forget to reboot)"
+echo -e ${CYAN}"logs-on"${WHITE}"\t\tput logs on disk (don\`t forget to reboot)"
+echo -e ${CYAN}"sreboot"${WHITE}"\t\treboot system"
+
+echo -e ""
+echo -e ${RED}"amd-info"${WHITE}"\tshow AMD core, memory & voltage states"
+echo -e ${GREEN}"nvidia-smi"${WHITE}"\tshow some info about installed NVIDIA GPU"
+echo -e ""
+echo -e ${CYAN}"upgrade --help"${WHITE}"\tshow how to use upgrade/downgrade"

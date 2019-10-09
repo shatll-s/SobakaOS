@@ -1,13 +1,12 @@
 #!/bin/bash
 API_TIMEOUT=10
-RIG_CFG="/sobaka/cfg/rig.cfg"
-BATCH_CFG="/sobaka/cfg/batch.cfg"
-#WALLET_CFG="/sobaka/cfg/wallet.cfg"
-VARIABLES_CFG="/sobaka/service/variables"
+RIG_CFG="/dog/cfg/rig.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
+VARIABLES_CFG="/dog/service/variables"
 NVIDIASMI_FILE=/tmp/nvidiasmi #need to get some info from nvidia-smi
-RESPONSE_FILE=/sobaka/log/response.log
-COMMANDS_FILE=/sobaka/log/commands.log
-LOG="/sobaka/log/sobaka-agent.log"
+RESPONSE_FILE=/dog/log/response.log
+COMMANDS_FILE=/dog/log/commands.log
+LOG="/dog/log/agent.log"
 . colors
 #exec &>>$LOG
 
@@ -110,6 +109,13 @@ case $1 in
 			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
 				for ((i=0; i < ${#miner_hr[@]}; i++)); do
 					miner_hr[$i]=`echo "${miner_hr[$i]} * 1000" | bc`
+				done
+			fi
+		elif [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000" | bc`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc`
 				done
 			fi
 		fi
@@ -749,7 +755,7 @@ if [[ $response ]] ; then #if we get answer (pass is ok, etc)
 			local command_type=$(echo $response | jq ".[$i].command_type" --raw-output)
 			local command_argument=$(echo $response | jq ".[$i].command_argument" --raw-output)
 			local title=$(echo $response | jq ".[$i].title" --raw-output)
-			sobaka-work "$command_type" "$command_argument" >> $LOG &
+			dog-command "$command_type" "$command_argument" >> $LOG &
 		done
 	#else #if $count < 1, no commands received
 	#	echo "($count commands)" >> $LOG
@@ -762,7 +768,7 @@ echo -e $BROWN"================================================================"
 }
 
 export DISPLAY=":0"
-export "PATH=$PATH:/sobaka:/sobaka/bin:/sobaka/sbin"
+export "PATH=$PATH:/dog:/dog/bin:/sobdogaka/sbin"
 export CUDA_DEVICE_ORDER
 . $RIG_CFG
 . $BATCH_CFG

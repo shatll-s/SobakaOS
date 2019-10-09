@@ -1,6 +1,6 @@
 #!/bin/bash
 [ -t 1 ] && . colors #source colors only if running in terminal
-NVIDIA_CFG="/sobaka/cfg/nvidia.cfg"
+NVIDIA_CFG="/dog/cfg/nvidia.cfg"
 LOCK_FILE="/tmp/.nvidia-oc.lock"
 
 function getdata () {
@@ -111,7 +111,7 @@ while read string; do
 	[[ $(($i + 1)) < $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
 
 	((i++))
-done < <(/sobaka/gpu-detect NVIDIA list)
+done < <(/dog/gpu-detect NVIDIA list)
 
 if [[ $PILL == 1 ]]; then
 	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
@@ -121,7 +121,7 @@ if [[ $PILL == 1 ]]; then
 		sleep=0
  		echo "Pill is served"
 	fi
- 	screen -dmS pill bash -c "sleep $sleep; /sobaka/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
+ 	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
 fi
 echo -e $BROWN"================================================================"$WHITE
 

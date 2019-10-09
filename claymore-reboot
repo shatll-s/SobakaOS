@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CLAYMORE_LOG="/sobaka/log"
+CLAYMORE_LOG="/dog/log"
 
 #save last messages about hanging cards
 if [[ -e $CLAYMORE_LOG/claymore_noappend.log ]]; then

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+sleep 2
+/dog/xorgmake
+xinit /dog/service/xinitrc
+
+exitcode=$?
+echo ""
+echo "xinit exited (exitcode=$exitcode), starting dog-console"
+sudo systemctl start dog-console

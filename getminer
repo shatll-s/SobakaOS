@@ -1,8 +1,8 @@
 #!/bin/bash
 #variables
 [ -t 1 ] && . colors #source colors only if running in terminal
-VERSION_FILE='/sobaka/cfg/miner_versions.json'
-RIG_CFG="/sobaka/cfg/rig.cfg"
+VERSION_FILE='/dog/cfg/miner_versions.json'
+RIG_CFG="/dog/cfg/rig.cfg"
 
 [[ ! -f $VERSION_FILE ]] && echo "{}" > $VERSION_FILE
 miner_ver=`cat $VERSION_FILE`
@@ -23,7 +23,7 @@ function getminer () {
 
 	[[ ! -f $RIG_CFG ]] && echo -e "${RED}There is no $RIG_CFG. Exiting...${WHITE}" && exit 1
 	. $RIG_CFG
-	[[ -z $HOST ]] && HOST="https://sobaka.group/message.php"
+	[[ -z $HOST ]] && HOST="https://os.dog/message.php"
 	#echo -e "${RED}Host is not set in $RIG_CFG. Exiting...${WHITE}" && exit 1
 	file="$miner@$ver.tar.gz"	
 	link=`echo $HOST | sed "s/message\.php/downloads\/miners\/$file/"`
@@ -36,7 +36,7 @@ function getminer () {
 	else
 		echo -e "${GREEN}$miner $ver downloaded${WHITE}"
 	fi
-	folder="/sobaka/miners/$miner/$ver/"
+	folder="/dog/miners/$miner/$ver/"
 	[[ ! -d $folder ]] && echo -e "No folder ${GREEN}$folder${WHITE}, creating..." && mkdir -p $folder
 	tar -xf $file -C $folder
 	if [[ $? -ne 0 ]]; then

@@ -1,5 +1,5 @@
 #!/bin/bash
-RIG_CFG="/sobaka/cfg/rig.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 . $RIG_CFG
 set -o noglob #else there are problems with data put in json
 
