@@ -82,7 +82,7 @@ function services_stop () {
 	systemctl stop mining
 	if [[ $(screen_check asw) -gt 0 ]]; then
 		echo 1 > /tmp/asw_trigger
-		screen_kill asw
+		screen-kill asw
 	fi	
 }
 
@@ -166,7 +166,7 @@ function benchmark () {
 			--arg key "${algos[$i]}" \
 			--arg value "$average_hr" \
 			'$algos | fromjson + { ($key) : ($value)}')
-		screen_kill miner1.benchmark
+		screen-kill miner1.benchmark
 		#echo $data
 		local response=`send_data "$data"`
 		echo2 "\nAverage hashrate on ${CYAN}${algos[$i]}${WHITE}:${GREEN} $average_hr${WHITE}"
@@ -253,9 +253,9 @@ case $1 in
 		screen -r benchmark
     ;;
 	stop)
-		screen_kill benchmark
-		screen_kill miner1.benchmark
-		screen_kill miner2.benchmark
+		screen-kill benchmark
+		screen-kill miner1.benchmark
+		screen-kill miner2.benchmark
 		services_start
 		[[ -f $BATCH_CFG ]] && cp /tmp/benchmark_batch $BATCH_CFG
 		[[ -f $LOCK_FILE ]] && rm $LOCK_FILE
