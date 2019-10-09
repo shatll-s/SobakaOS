@@ -248,7 +248,7 @@ case $1 in
 		screen -r asw
 	;;
 	stop)
-		screen_kill asw
+		screen-kill asw
 		echo "$(date --rfc-3339=seconds) AutoSwitch stopped"
 	;;
 	check)
@@ -261,7 +261,7 @@ case $1 in
 		loop
 	;;
 	start|restart)
-		screen_kill asw
+		screen-kill asw
 		screen -dmS asw bash -c "/dog/asw loop"
 		echo "$(date --rfc-3339=seconds) AutoSwitch (re)started"
 	;;
