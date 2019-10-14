@@ -24,12 +24,16 @@ function set_active () {
 		if [[ `echo $json | jq -r ".autoswitch[$i].algo"` == $best_algo ]]; then
 			local miner=`echo $json | jq -r ".autoswitch[$i].miner"`
 			local batch=`echo $json | jq -r ".autoswitch[$i].batch"`
-			#strange bug - if use sed directly on file, I can`t cat this file later, so use ebanie kostyli
-			local batch_cfg=`cat $BATCH_CFG | sed -e "s%batch1=.*%batch1=\"$batch\"%; s%miner1=.*%miner1=\"$miner\"%" `
-			echo -e "$batch_cfg" > $BATCH_CFG
+			#	#strange bug - if use sed directly on file, I can`t cat this file later, so use ebanie kostyli
+			#	local batch_cfg=`cat $BATCH_CFG | sed -e "s%batch1=.*%batch1=\"$batch\"%; s%miner1=.*%miner1=\"$miner\"%" `
+			#	echo -e "$batch_cfg" > $BATCH_CFG
+			[[ -f $BATCH_CFG ]] && sed -i "/.*batch1=.*/d" $BATCH_CFG
+			[[ -f $BATCH_CFG ]] && sed -i "/.*miner1=.*/d" $BATCH_CFG
+			echo "batch1=\"$batch\"" >> $BATCH_CFG
+			echo "miner1=\"$miner\"" >> $BATCH_CFG			
 			json=`jq ".autoswitch[$i] += {\"active\": 1}" <<< "$json"`
 			echo "$json" > $AUTOSWITCH_TMP
-		break
+			break
 		fi
 	done
 	echo "> Switching to $best_algo"
