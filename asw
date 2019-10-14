@@ -42,6 +42,7 @@ function set_active () {
 function get_new_nicehash_stats () {
 	local api="https://api2.nicehash.com/main/api/v2/public/simplemultialgo/info/"
 	nh_stats=$(echo `curl -s $api` | jq '.miningAlgorithms[]')
+	#echo $nh_stats | jq '.'
 	echo -e "Algo                 Price       Hr      Units    BTC/day     USD/day"
 	echo -e "---------------------------------------------------------------------"
 	for (( i=0; i < ${#algo[@]}; i++ )); do
@@ -53,7 +54,15 @@ function get_new_nicehash_stats () {
 		[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
 		#echo "divider "${divider[$i]}
 		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]}\") | .paying"`
+		if [[ `echo ${price[$i]} | grep e-` ]]; then
+			price[$i]=`echo ${price[$i]} | sed "s/e-.*//"`
+			float=`echo ${price[$i]} | sed "s/.*e-\([0-9]*\)/\1/"`
+			price[$i]=`echo "x=${price[$i]} / 10^5; if(x<1 && x != 0) print 0; x" | bc -l`
+			unset float
+		fi
+		#echo "price "${price[$i]}
 		profit_btc[$i]=`echo "scale=10; x=${price[$i]} * ${hr[$i]} / ${divider[$i]}; if(x<1 && x != 0) print 0; x" | bc -l`
+		#echo "profit "${profit_btc[$i]}
 		profit_usd[$i]=`echo "scale=2; x=${profit_btc[$i]} * $btcusd / 1; if(x<1 && x != 0) print 0; x" | bc -l`
 		string="${CYAN}`set_fixstr ${algo[$i]} 20`"
 		if [[ ! -z $available ]]; then

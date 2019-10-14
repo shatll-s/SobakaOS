@@ -451,7 +451,7 @@ case $2 in
 			
 		[[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
 		[[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
-		echo -e "batch$miner_i=\"$batch\"" >> $BATCH_CFG
+		echo "batch$miner_i=\"$batch\"" >> $BATCH_CFG
 		echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
 
 		echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"
