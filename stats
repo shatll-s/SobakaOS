@@ -768,7 +768,7 @@ echo -e $BROWN"================================================================"
 }
 
 export DISPLAY=":0"
-export "PATH=$PATH:/dog:/dog/bin:/sobdogaka/sbin"
+export "PATH=$PATH:/dog:/dog/bin:/dog/sbin"
 export CUDA_DEVICE_ORDER
 . $RIG_CFG
 . $BATCH_CFG

@@ -182,7 +182,7 @@ function setup()
 			else
 				string+="            dhcp4: yes\n"
 			fi
-			string+="            dhcp6: yes\n"
+			string+="            dhcp6: no\n"
 			string+="            optional: true\n"
 			((wired_count++))
 		else
@@ -242,7 +242,7 @@ function setup()
 				else
 					string+="            dhcp4: yes\n"
 				fi
-				string+="            dhcp6: yes\n"
+				string+="            dhcp6: no\n"
 				string+="            optional: true\n"
 				string+="            access-points:\n"
 				((wifi_count++))

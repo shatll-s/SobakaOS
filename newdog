@@ -33,7 +33,7 @@ if [[ $flashdata != 1 ]]; then
 	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}"https://os.dog/message.php${WHITE}"\nType another host or hit Enter to use default:"
 	read rig_host
 	[[ -z $rig_host ]]&& rig_host="https://os.dog/message.php"
-	echo -e "Thank you, trying to apply changes.\nIf something goes wrong, you can change rig ID & password manually, just type \"nano /sobaka/cfg/rig.cfg\""
+	echo -e "Thank you, trying to apply changes.\nIf something goes wrong, you can change rig ID & password manually, just type \"nano /dog/cfg/rig.cfg\""
 fi
 
 cfg="#This is rig configuration file\n"
