@@ -260,6 +260,7 @@ function setup()
 	echo -e "$string" > $interfaces
 
 	netplan apply
+	[[ `sudo systemctl status openvpn | grep active` ]] && sudo systemctl restart openvpn
 
 	echo -en "${GREEN}$wired_count wired "
 	[[ $wifi_count -gt 0 ]] && echo -en "and $wifi_count wireless "
