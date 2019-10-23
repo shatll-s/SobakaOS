@@ -136,24 +136,23 @@ case $1 in
 		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
 	;;
 	cpuminer)
-		port='4048'
-		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port`
-		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([a-zA-Z0-9.]*\)\n.*/\1/'`
+		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
+		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s)
 		#miner_total_hr=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*\nKHS=\([0-9.]*\)\n.*/\1/; s/\.[0-9]*//'`
 		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_total_share=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ACC=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_total_badshare=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*REJ=\([a-zA-Z0-9.]*\)\n.*/\1/'`
-		threads=`echo "threads" | nc -w 5 localhost $port`
+		threads=`echo "threads" | nc -w 5 localhost $port | tr -d '\0'`
 		cpuarr=`echo "$threads" | sed -e 's/|/\n/g; s/;/\n/g'`
-		miner_hr=(`echo "$cpuarr" | grep 'KHS=' | sed 's/KHS=\([0-9]*\).*/\1/'`)
+		miner_hr=(`echo "$cpuarr" | grep 'H/s=' | sed 's#H/s=\([0-9]*\).*#\1#'`)
 		#if [[ $miner_total_hr == "0" && ! -z $miner_hr ]]; then #strange bug: sometimes cpuminer shows 0 total hr
 		miner_total_hr=0	
 		for ((i=0; i < ${#miner_hr[@]}; i++)); do
 			#let miner_hr[$i]=miner_hr[$i]/1000
 			#[[ ${miner_hr[$i]} -lt 1000 ]] && 
-			miner_hr[$i]=$(echo "scale=2; ${miner_hr[$i]}/1000" | bc -l)
+			#miner_hr[$i]=$(echo "scale=2; ${miner_hr[$i]}/1000" | bc -l)
 			#echo ${miner_hr[$i]}
 			#miner_total_hr=$(($miner_total_hr+${miner_hr[$i]}))
 			miner_total_hr=$(echo "scale=2;$miner_total_hr+${miner_hr[$i]}" | bc -l)
@@ -188,7 +187,7 @@ case $1 in
 		miner_algo=`echo $batch | sed 's/.*-k \([0-9a-zA-Z]*\).*/\1/'`
 		#ok, we got it
 
-		stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
+		stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
 		miner_ver=`echo $stats_template | jq -r '.summary[0].STATUS[0].Description'`
 		miner_online_raw=`echo $stats_template | jq -r '.summary[0].SUMMARY[0].Elapsed'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time

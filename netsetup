@@ -276,19 +276,19 @@ case $1 in
 		setup
 	;;
 	-s)
-	shift
-	while [ -n "$1" ]; do
-		option=`echo $1 | sed 's/=.*//'`
-		value=`echo $1 | sed "s/$option=//"`
-		if [[ ! "SSID WIFI_PASSWORD STATIC_IP_WIFI GATEWAY4_WIFI STATIC_IP_LAN GATEWAY4_LAN " == *$option* ]]; then
-			echo -e "Uncorrect parameter ${RED}$option${WHITE}"
-		else 
-			eval "`echo $option`=$value"
-		fi
 		shift
-	done
-	write_config
-	setup
+		while [ -n "$1" ]; do
+			option=`echo $1 | sed 's/=.*//'`
+			value=`echo $1 | sed "s/$option=//"`
+			if [[ ! "SSID WIFI_PASSWORD STATIC_IP_WIFI GATEWAY4_WIFI STATIC_IP_LAN GATEWAY4_LAN " == *$option* ]]; then
+				echo -e "Uncorrect parameter ${RED}$option${WHITE}"
+			else 
+				eval "`echo $option`=$value"
+			fi
+			shift
+		done
+		write_config
+		setup
 	;;
 	--help|-h)
 		bname=`basename $0`
