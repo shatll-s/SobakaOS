@@ -5,6 +5,6 @@ setxkbmap -layout "us,ru" &
 setxkbmap -option "grp:ctrl_shift_toggle,grp_led:scroll" &
 xrdb -merge /dog/service/Xresources
 xterm -geometry +0+0 -e bash -c "/dog/motd; sudo su" &
-xterm -geometry +0+360 -e bash -c "date;
+xterm -geometry +0+390 -e bash -c "date;
 echo 'Miner will be displayed here soon'; sleep 20; sudo /dog/miner; sudo su" &
 openbox-session

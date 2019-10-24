@@ -2,7 +2,7 @@
 #apt-get -q=2 install sed ssh openvpn nano mc jq curl screen libnet-rawip-perl #recomended packages
 RIG_CFG="/dog/cfg/rig.cfg"
 tmp_dir="/tmp"
-. $RIG_CFG
+[[ -f $RIG_CFG ]] && . $RIG_CFG
 [[ -z $HOST ]] && HOST="https://os.dog/message.php"
 [ -t 1 ] && . colors
 
@@ -81,5 +81,5 @@ fi
 
 systemctl restart cron
 
-hello
+[[ -f $RIG_CFG ]] && hello
 echo -e "${CYAN}>Reboot is recommended after upgrade${WHITE}"

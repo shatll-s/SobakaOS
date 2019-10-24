@@ -20,7 +20,6 @@ miner=$1
 ver=$2
 
 function getminer () {
-
 	[[ ! -f $RIG_CFG ]] && echo -e "${RED}There is no $RIG_CFG. Exiting...${WHITE}" && exit 1
 	. $RIG_CFG
 	[[ -z $HOST ]] && HOST="https://os.dog/message.php"
@@ -44,7 +43,7 @@ function getminer () {
 		msg "Miner download" warning "$(date --rfc-3339=seconds)\nError occured while trying to install <b>$miner $ver</b>.<br>Something wrong with install packet."
 		exit 1
 	fi
-	
+	[[ $miner == "claymore" ]] && ln -s "/dog/claymore-reboot" "${folder}reboot.sh"
 	[[ `echo $miner_ver | jq -r ".\"$miner\""` == null ]] && miner_ver=`jq ". + { \"$miner\": {} }" <<< "$miner_ver"`
 	miner_ver=`jq ".\"$miner\" += {\"$ver\" : \"\"}" <<< "$miner_ver"`
 	echo -e $miner_ver | jq '.' > $VERSION_FILE

@@ -22,7 +22,7 @@ PID=$$
 PID_file="$LOCK_DIR/$PID"
 touch $PID_file
 
-echo $(date --rfc-3339=seconds)" Start doing \"$1\"" #\"$2\""
+echo $(date --rfc-3339=seconds)" Start doing \"$1\"" # \"$2\""
 
 case $1 in
 	exec)
@@ -386,12 +386,12 @@ case $1 in
 	;;
 	settings)
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
-		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".notify_on_boot"` || NOTIFY=1
+		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
 		
 		[[ ! -z $(grep "NOTIFY_ON_BOOT=" $RIG_CFG) ]]&& sed -i "s/.*NOTIFY_ON_BOOT=.*/NOTIFY_ON_BOOT=$NOTIFY/g" $RIG_CFG || echo "NOTIFY_ON_BOOT=$NOTIFY" >> $RIG_CFG
 		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
 		
-		msg "Rig settings" ok \
+		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)\nRig settings applied:\n$2"
 	;;
 	*)

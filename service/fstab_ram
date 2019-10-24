@@ -1,5 +1,5 @@
-/dev/sda3 / ext4 defaults 0 0
-/dev/sda2 /dog-flash vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
+LABEL=DOG_BOOT / ext4 defaults 0 0
+LABEL=DOG /dog-flash vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
 tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0 #,size=500M
 tmpfs /var/tmp tmpfs defaults,noatime,mode=1777 0 0
 tmpfs /var/log tmpfs defaults,noatime,mode=0755 0 0

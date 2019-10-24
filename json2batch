@@ -54,9 +54,16 @@ function convert_algo () { #for nicehash
 function get_variables () {	
 	#[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
 	local manifest="$1"
-	for option in miner coin wallet pass pool addition algo fork brand; do
+	for option in miner coin wallet pass pool algo fork brand; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\"`" #double slash, because eval open it
+			eval "$option=\"$option_value\""
+		fi
+	done
+
+	for option in template addition; do
+		if [[ `echo $manifest | jq ".$option"` != null ]]; then
+			option_value="`echo $manifest | jq -r \".$option\" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`" #double slash, because eval open it
 			eval "$option=\"$option_value\""
 		fi
 	done
@@ -414,9 +421,9 @@ case $2 in
 				echo "No autoswitch detected"
 				if [[ ! -z $miner ]]; then
 					/dog/getminer $miner $fork
-					
 				fi
 				[[ $miner_i -eq 1 ]] && asw stop
+
 			else
 				echo "Autoswitch detected"
 				algo=`convert_algo $algo`
@@ -436,7 +443,7 @@ case $2 in
 					unset miner batch coin pass pool addition algo fork brand config config_pools config_nvidia config_amd config_cpu pool_without_port port batch #don`t delete template && wallet (it`s same in NiceHash)
 					autoswitch=`echo $autoswitch_arr | jq ".[$i]"`
 					get_variables "$autoswitch"
-					/dog/getminer $miner $fork #not optimal - need to download all miners at start
+					#/dog/getminer $miner $fork #not optimal - need to download all miners at start
 					batch=`make_batch`
 					algo=`convert_algo $algo`
 					json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"batch\": \"$batch\"}]"`
@@ -449,11 +456,14 @@ case $2 in
 
 		fi
 			
-		[[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
-		[[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
-		echo "batch$miner_i=\"$batch\"" >> $BATCH_CFG
-		echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
-
-		echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"
+		if [[ -z $autoswitch_arr ]]; then
+			[[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
+			[[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
+			echo "batch$miner_i=\"$batch\"" >> $BATCH_CFG
+			echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
+			echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"
+		else
+			echo "$(date --rfc-3339=seconds) No changes wrote in $BATCH_CFG (AutoSwitch will do it)"
+		fi
 	;;
 esac

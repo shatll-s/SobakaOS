@@ -86,9 +86,11 @@ if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
 		sudo systemctl start dogx
 	else
 		echo "> Don\`t start OSdog Xserver (there are 8+ AMD GPUs)"
+		sudo systemctl start dog-console
 	fi
 else
-	echo "> Don\`t start OSdog Xserver (due to settings)"		
+	echo "> Don\`t start OSdog Xserver (due to settings)"
+	sudo systemctl start dog-console
 fi
 
 time_stop=`date +%s`

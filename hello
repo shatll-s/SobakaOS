@@ -239,6 +239,10 @@ while [[ $try -lt 3 ]]; do
 				dog-command change_name "$name" --hello
 			fi
 
+			#settings
+			command_argument=$(echo $response | jq ".settings" --raw-output)
+			dog-command settings "$command_argument" --hello
+
 			#nvidia
 			command_argument=$(echo $response | jq ".nvidia" --raw-output)
 			dog-command change_nvidia_oc "$command_argument" --hello

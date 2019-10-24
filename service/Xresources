@@ -26,7 +26,8 @@
 *color15: #ffffff
 
 XTerm*utf8Title: true
-XTerm*font: -*-terminus-medium-r-*-*-14-*-*-*-*-*-iso10646-*
+!XTerm*font: -*-terminus-medium-r-*-*-14-*-*-*-*-*-iso10646-*
+XTerm.vt100.faceName: DejaVu Sans Mono:size=11
 xterm*VT100.geometry:     80x23
 xterm*utf8:               1
 XTerm*locale: 1
