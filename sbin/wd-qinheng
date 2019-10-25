@@ -1,0 +1,84 @@
+#!/bin/bash
+#QinHeng Electronics HL-340
+RIG_CFG="/dog/cfg/rig.cfg"
+[ -t 1 ] && . colors #source colors only if running in terminal
+
+if [[ `lsusb | grep -E '1a86:7523|5131:2007|0471:2379' | wc -l` -gt 0 ]]; then
+	for sysdevpath in $(find /sys/bus/usb/devices/usb*/ -name dev); do
+		syspath=`echo $sysdevpath | sed 's/\/dev$//'`
+		[[ -f $syspath/uevent ]] && . $syspath/uevent #DEVNAME=bus/usb/001/001
+		[[ "$DEVNAME" == "bus/"* || "$DEVNAME" == "sg1"* ]] && continue
+		#echo $DEVNAME
+		eval "$(udevadm info -q property --export -p $syspath | grep -E 'ID_VENDOR_ID|DEVNAME|ID_MODEL_ID|ID_SERIAL')" 
+		[[ ! ($ID_MODEL_ID == "7523") || $ID_VENDOR_ID != "1a86" ]] && continue
+		#echo -e "ID_MODEL_ID $ID_MODEL_ID\t ID_VENDOR_ID $ID_VENDOR_ID"
+		echo -e "${GREEN}>Detected QinHeng HL-340 watchdog ($WD_QINHENG) ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
+		PORT=$DEVNAME
+		echo "PORT = $DEVNAME"
+	done
+fi
+
+
+[[ -z $PORT ]] && echo -e "${RED}>There is no qinheng watchdog in system, exiting${WHITE}" && exit 1
+
+. $RIG_CFG
+if [[ -z $WD_QINHENG ]]; then
+	echo "WD_QINHENG=\"china\"" >> $RIG_CFG
+	WD_QINHENG="china"
+fi
+
+if [[ $WD_QINHENG == "fixorgua" ]]; then
+	#https://fix.org.ua/index.php/fix-forum/tekhpodderzhka/67-po-dlya-watchdog?start=6#135
+	ping="\x31\x41"
+	reset="\x33\x33"
+else
+	# Default China dog
+	ping="\x1E\x00"
+	reset="\xFF\x55" #blue line?
+fi
+
+case $1 in
+	initial)
+		MINER_PID=$(screen -ls | grep "wd-qinheng" | sed 's/\s\([0-9]*\)..*/\1/')
+		[[ ! -z "$MINER_PID" ]] && echo ">Killing old screens" && kill $MINER_PID
+		echo -e "${GREEN}>Opening screen ${CYAN}wd-qinheng${GREEN} with endless ping${WHITE}"
+		screen -dmS "wd-qinheng" bash -c "wd-qinheng ping"
+	;;
+	--set)
+		if [[ $2 == "china" || $2 == "fixorgua" ]]; then
+			. $RIG_CFG
+			if [[ -z $WD_QINHENG ]]; then
+				echo "WD_QINHENG=\"china\"" >> $RIG_CFG
+				exitcode=$?
+			else
+				sed -i "s/WD_QINHENG=.*$/WD_QINHENG=\"$2\"/" $RIG_CFG
+				exitcode=$?
+			fi
+			[[ $exitcode -eq 0 ]] && echo "Watchdog type set to: $2" || echo "Error while changing type"
+		else
+			echo -e "${RED}Available options: ${CYAN}china${RED} and ${CYAN}fixorgua${RED}, but you try to use unknown: $2"
+		fi
+	;;
+	show)
+		screen -d wd-qinheng
+		screen -r wd-qinheng
+	;;
+	ping)
+		while true; do
+			echo "$(date --rfc-3339=seconds) Pinging watchdog with $ping to $PORT"
+			#echo "echo -ne $ping > $PORT"
+			[[ `nc -w 2 -zv localhost 22 2>&1 | grep -c succeeded` -gt 0 ]] && echo -ne $ping > $PORT
+			sleep 5
+		done
+	;;
+	reset)
+		echo -e "${GREEN}>Pushing Reset with ${reset} to $PORT${WHITE}"
+		echo -ne $reset > $PORT
+	;;
+	*|-h|--help)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|ping|reset|--set${WHITE}"
+		echo -e "F.e. $bname --set china or $bname --set fixorgua"
+	;;
+esac
+
