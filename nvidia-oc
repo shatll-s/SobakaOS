@@ -20,7 +20,7 @@ fi
 echo $$ > $LOCK_FILE
 
 #Check OSdog X server
-echo -en "> Checking OSdog X server "
+echo -en ">Checking OSdog X server "
 try=0
 while [[ $try -lt 30 ]]; do
 	[[ ! -z `sudo systemctl status dogx | grep "active (running)"` ]] && break
@@ -29,8 +29,8 @@ while [[ $try -lt 30 ]]; do
 	((try++))	
 done
 echo ""
-[[ $try -ge 30 ]] && echo -e $(date --rfc-3339=seconds)" ${RED}OSdog X server is not active!${WHITE}" && rm $LOCK_FILE && exit 1
-echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
+[[ $try -ge 30 ]] && echo -e $(date --rfc-3339=seconds)" ${RED}OSdog X server is not active, exiting${WHITE}" && rm $LOCK_FILE && exit 1
+echo -e ">${GREEN}OSdog X server is active (running)${WHITE}"
 #Check end
 
 export DISPLAY=:0
