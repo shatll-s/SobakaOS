@@ -19,13 +19,23 @@ if  [[ -e $LOCK_FILE ]]; then
 fi
 echo $$ > $LOCK_FILE
 
-export DISPLAY=:0
-function screen_kill () {
-	local MINER_PID=$(screen -ls | grep "$1" | sed 's/\s\([0-9]*\)..*/\1/')
-	[[ ! -z $MINER_PID ]]&& kill $MINER_PID
-}
+#Check OSdog X server
+echo -en "> Checking OSdog X server "
+try=0
+while [[ $try -lt 30 ]]; do
+	[[ ! -z `sudo systemctl status dogx | grep "active (running)"` ]] && break
+	echo -n '.'
+	sleep 1
+	((try++))	
+done
+echo ""
+[[ $try -ge 30 ]] && echo -e $(date --rfc-3339=seconds)" ${RED}OSdog X server is not active!${WHITE}" && rm $LOCK_FILE && exit 1
+echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
+#Check end
 
-screen_kill pill
+export DISPLAY=:0
+
+screen-kill pill
 
 echo -e $BROWN"================================================================"$WHITE
 n=$(gpu-detect NVIDIA)
@@ -36,7 +46,7 @@ if [[ ! -z $1 && $1 != "--pill-delay" ]]; then
 	echo "Overclocking config given in arguments"
 	getdata "$1"
 else
-	[[ ! -f $NVIDIA_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $NVIDIA_CFG does not exist!" && exit 1
+	[[ ! -f $NVIDIA_CFG ]]&& echo $(date --rfc-3339=seconds)" configuration file $NVIDIA_CFG does not exist!" && rm $LOCK_FILE && exit 1
 	cfg=`cat $NVIDIA_CFG`
 	echo $cfg | jq '.'  > /dev/null 2>&1
 	exitcode="$?"
