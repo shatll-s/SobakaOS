@@ -260,6 +260,11 @@ while [[ $try -lt 3 ]]; do
 			#autofan
 			command_argument=$(echo $response | jq ".af" --raw-output)
 			dog-command af "$command_argument" --hello
+
+			#autoswitch
+			command_argument=$(echo $response | jq ".as" --raw-output)
+			dog-command autoswitch "$command_argument" --hello
+
 			[ -t 1 ] && echo -e "${GREEN}>Initial settings (batches, NVIDIA & AMD OC) received and applied${WHITE}" ||
 				echo $(date --rfc-3339=seconds)" Initial settings (batches, NVIDIA & AMD OC) received and applied"
 

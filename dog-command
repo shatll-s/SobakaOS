@@ -366,7 +366,7 @@ case $1 in
 			;;
 			*)
 				echo "$data" > /dog/cfg/autoswitch.cfg
-				msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
+				[[ $3 != '--hello' ]] && msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
 			;;
 		esac
 	;;
