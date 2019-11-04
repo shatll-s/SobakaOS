@@ -211,7 +211,8 @@ function make_batch () {
 			config+="pool1 = $pool\n"
 			[[ ! -z $pass ]]&& config+="rigPassword = $pass\n"
 			[[ ! -z $addition ]]&& config+="$addition"
-			
+
+			mkdir -p /dog/miners/nanominer
 			echo -e "$config" > /dog/miners/nanominer/config.ini
 		;;
 		lolminer)
