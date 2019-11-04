@@ -412,6 +412,36 @@ case $1 in
 		miner_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares'`)
 		miner_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares'`)
 	;;
+	ttminer)
+		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}' | nc -w $API_TIMEOUT localhost $port | jq '.result'`
+		[[ $miner1 == "ttminer" ]] && batch=$batch1 || batch=$batch2
+		miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
+	miner_ver=`echo $stats_template | jq -r '.[0]' | sed "s#TT-Miner/##"`
+		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
+		if (($miner_online_raw)); then
+			miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
+		fi
+		miner_algo="ethash"
+		local miner_hr=(`echo $stats_template | jq -r '.[3]' | sed 's/;/\n/g'`)
+		#miner_share=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		#miner_badshare=(`echo $stats_template | jq -r '.[10]' | sed 's/;/\n/g'`)
+		#miner_invshare=(`echo $stats_template | jq -r '.[11]' | sed 's/;/\n/g'`)
+		miner_busid=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		miner_total_hr=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $1}'`
+		miner_total_share=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $2}'`
+		miner_total_badshare=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $3}'`
+		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
+		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
+		if [[ $miner_algo == "ethash" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc -l`
+				done
+			fi
+		fi
+
+	;;
 esac
 
 ##################################################################

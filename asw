@@ -46,7 +46,6 @@ function get_new_nicehash_stats () {
 	echo -e "Algo                 Price       Hr      Units    BTC/day     USD/day"
 	echo -e "---------------------------------------------------------------------"
 	for (( i=0; i < ${#algo[@]}; i++ )); do
-		#echo "algo "${algo[$i]}
 		available=`echo $as_tmp | jq -r ".autoswitch[] | select (.algo == \"${algo[$i]}\")"`
 		divider[$i]=`echo $algo_dividers | jq -r ".${algo[$i]}"`
 		divider[$i]=`echo "scale=0; ${divider[$i]} / 10" | bc -l` #new nicehash bug
@@ -199,17 +198,22 @@ function main () {
 			string+=" and there is no active algo, set it"
 			[[ $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
 			msg="$(date --rfc-3339=seconds) There is no active algo, set ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
-			if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
-				msg+="\nWe have AMD OC settings for this algo.\n"
-				string+="\nApplying AMD OC settings"
-				msg+=$(amd-oc "`echo $as_cfg | jq \".amd_oc.$best_algo\"`")
+			echo $as_cfg | jq ".amd_oc.$best_algo"
+			echo "koLO"
+			if [[ `echo $as_cfg | jq ".amd_oc"` != null ]]; then
+				if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
+					msg+="\nWe have AMD OC settings for this algo.\n"
+					string+="\nApplying AMD OC settings"
+					msg+=$(amd-oc "`echo $as_cfg | jq \".amd_oc.$best_algo\"`")
+				fi
 			fi
-			if [[ ! -z `echo $as_cfg | jq ".nvidia_oc.$best_algo"` && `echo $as_cfg | jq ".nvidia_oc.$best_algo"` != null ]]; then
-				msg+="\nWe have NVIDIA OC settings for this algo.\n"
-				string="\nApplying NVIDIA OC settings"
-				msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
+			if [[ `echo $as_cfg | jq ".nvidia_oc"` != null ]]; then
+				if [[ ! -z `echo $as_cfg | jq ".nvidia_oc.$best_algo"` && `echo $as_cfg | jq ".nvidia_oc.$best_algo"` != null ]]; then
+					msg+="\nWe have NVIDIA OC settings for this algo.\n"
+					string="\nApplying NVIDIA OC settings"
+					msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
+				fi
 			fi
-
 			[[ $notifications -eq 1 && $1 != 'check' ]] && msg "Algo setup: ${best_algo}" info "$msg"
 		elif [[ $active_algo == ${algo[$max_profit_i]} ]]; then
 			string+=" and it is already set. Nothing to do"
@@ -224,15 +228,20 @@ function main () {
 				string+=", switching to it"
 				[[ $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
 				msg="$(date --rfc-3339=seconds) Switch to ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
-				if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
-					msg+="\nWe have AMD OC settings for this algo.\n"
-					string+="\nApplying AMD OC settings"
-					msg+=$(amd-oc "`echo $as_cfg | jq \".amd_oc.$best_algo\"`")
+				echo $as_cfg | jq '.'
+				if [[ `echo $as_cfg | jq ".amd_oc"` != null ]]; then
+					if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
+						msg+="\nWe have AMD OC settings for this algo.\n"
+						string+="\nApplying AMD OC settings"
+						msg+=$(amd-oc "`echo $as_cfg | jq \".amd_oc.$best_algo\"`")
+					fi
 				fi
-				if [[ ! -z `echo $as_cfg | jq ".nvidia_oc.$best_algo"` && `echo $as_cfg | jq ".nvidia_oc.$best_algo"` != null ]]; then
-					msg+="\nWe have NVIDIA OC settings for this algo.\n"
-					string="\nApplying NVIDIA OC settings"
-					msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
+				if [[ `echo $as_cfg | jq ".nvidia_oc"` != null ]]; then
+					if [[ ! -z `echo $as_cfg | jq ".nvidia_oc.$best_algo"` && `echo $as_cfg | jq ".nvidia_oc.$best_algo"` != null ]]; then
+						msg+="\nWe have NVIDIA OC settings for this algo.\n"
+						string="\nApplying NVIDIA OC settings"
+						msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
+					fi
 				fi
 				[[ $notifications -eq 1 && $1 != 'check' ]] && msg "Algo switch: ${best_algo}" info "$msg"
 			else

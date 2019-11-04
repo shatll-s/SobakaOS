@@ -344,8 +344,6 @@ case $1 in
 	autoswitch)
 		command=`echo $2 | jq -r '.command'`
 		data=`echo $2 | jq '.|del(.command)'`
-		echo "$2" > /tmp/asw
-		echo $command > /tmp/asw_command
 		case $command in
 			log)
 				screen -S asw -X hardcopy /tmp/asw_hardcopy

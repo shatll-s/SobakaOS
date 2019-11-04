@@ -346,6 +346,15 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=":$pass"
 			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --log" #log in miner folder :(
 		;;
+		ttminer)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $coin ]]&& minerexec+=" -coin $coin"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $wallet ]]&& minerexec+=" -u $wallet"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			[[ ! -z $name ]]&& minerexec+=" -w $name"
+			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]} --log /dog/log/cryptodredge.log"
+		;;		
 		*)
 			: #do nothing
 		;;
@@ -443,8 +452,8 @@ case $2 in
 					unset miner batch coin pass pool addition algo fork brand config config_pools config_nvidia config_amd config_cpu pool_without_port port batch #don`t delete template && wallet (it`s same in NiceHash)
 					autoswitch=`echo $autoswitch_arr | jq ".[$i]"`
 					get_variables "$autoswitch"
-					[[ $miner == "t_rex" ]] && echo "*** We need to download T-Rex miner for AutoSwitch right now because we need to edit included config file ***" && /dog/getminer $miner $fork 
-					#/dog/getminer $miner $fork #not optimal - need to download all miners at start
+					#[[ $miner == "t_rex" ]] && echo "*** We need to download T-Rex miner for AutoSwitch right now because we need to edit included config file ***" && /dog/getminer $miner $fork 
+					/dog/getminer $miner $fork #not optimal - need to download all miners at start
 					batch=`make_batch`
 					algo=`convert_algo $algo`
 					json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"batch\": \"$batch\"}]"`

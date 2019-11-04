@@ -1,5 +1,5 @@
 [Unit]
-Description=OSdog start & driver check
+Description=OSdog boot
 
 [Service]
 Type=oneshot

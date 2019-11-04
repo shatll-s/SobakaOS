@@ -28,7 +28,7 @@ while true; do
 	exitcode=$?
 	echo "Error on miner start: exitcode $exitcode"
 	if [[ $exitcode -eq 127 ]]; then
-		fork=`echo $batch | sed "s#cd /.* /dog/miners/$miner/\([.a-zA-Z0-9]*\)/miner.*#\1#"`
+		fork=`echo $batch | sed "s#cd /.* /dog/miners/$miner/\([-.a-zA-Z0-9]*\)/miner.*#\1#"`
 		echo ">Trying to download miner by command getminer $miner $fork"
 		/dog/getminer $miner $fork
 	else

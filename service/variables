@@ -23,6 +23,7 @@ APIPORT[bminer]=1880
 APIPORT[ewbf]=42000
 APIPORT[ethminer]=3000
 APIPORT[ccminer]=4068
+APIPORT[ttminer]=4069
 APIPORT[sgminer]=5598
 APIPORT[claymore_z]=3337
 APIPORT[claymore_c]=3335
