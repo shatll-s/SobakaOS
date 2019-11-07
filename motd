@@ -15,8 +15,9 @@ LOGO="
 LOGO=${BROWN}$LOGO${WHITE}
 uname -a | sed 's/Ubuntu /Ubuntu\n/'
 $LINE
+ver=`apt-cache policy osdog | grep Installed | sed 's/Installed://; s/\s*//'`
 echo -en "${GREEN}OSdog version "
-[[ ! -z $OS ]] && echo -e "${CYAN}$OS" || echo -e "${RED}undefined"
+[[ ! -z $ver ]] && echo -e "${CYAN}$ver" || echo -e "${RED}undefined"
 echo -e "$LOGO"
 echo -en ${CYAN}
 #ifconfig | grep -v "127.0.0.1" | grep "inet" | sed 's/.*inet \([0-9.]*\)\s.*/IP: \1/g'

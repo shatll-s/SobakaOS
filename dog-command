@@ -382,6 +382,24 @@ case $1 in
 			;;
 		esac
 	;;
+	remotessh)
+		command=`echo $2 | jq -r '.command'`
+		data=`echo $2 | jq '.|del(.command)'`
+		echo "$2" > /tmp/remotessh
+		case $command in
+			setup)
+				remotessh setup --config "$2"
+		#case "$2" in
+		#	stop|log)
+		#		return=$(benchmark $2)
+		#		msg "Benchmark $2" primary "$(date --rfc-3339=seconds)\n$return"
+		#	;;
+		#	*)
+		#		echo "$2" > /tmp/benchmark
+		#		screen -dmS benchmark bash -c "benchmark start"
+		#	;;
+		esac
+	;;
 	settings)
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1

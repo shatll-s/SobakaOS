@@ -1,0 +1,11 @@
+[Unit]
+Description=OSdog RemoteSSH
+#After=boot.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/dog/remotessh daemon
+
+[Install]
+WantedBy=multi-user.target

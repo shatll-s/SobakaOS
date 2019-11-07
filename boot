@@ -27,7 +27,6 @@ function tech_info()
 	echo -e "$info"
 }
 
-
 time_start=`date +%s`
 
 if [[ ! -f $RIG_CFG ]]; then
@@ -68,16 +67,19 @@ fi
 
 if [[ ! -f /dog/log/firstrun.log ]]; then
 	tech_info > /dog/log/firstrun.log
-	netsetup -f
-else
-	netsetup -f
 fi
+netsetup -f
+
 /dog/sbin/wd-opendev initial
 /dog/sbin/wd-qinheng initial
 hello
 . $RIG_CFG
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
+fi
+
+if [[ $REMOTESSH_USE == 1 ]]; then
+	sudo systemctl start remotessh
 fi
 
 if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then

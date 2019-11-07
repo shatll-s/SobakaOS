@@ -1,0 +1,96 @@
+#!/bin/bash
+########## variables ##########
+RIG_CFG="/dog/cfg/rig.cfg"
+KEY="/dog/cfg/.ssh/remotessh.key"
+[ -t 1 ] && . colors
+
+function getdata () {
+	for option in private_key server port use login; do
+		if [[ `echo $1 | jq ".$option"` != null ]]; then
+			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
+			eval "${option^^}=\"$option_value\""
+		fi
+	done
+}
+
+function setup () {
+	getdata "$cfg"
+	sed -i "/.*REMOTESSH.*/d" $RIG_CFG
+	local config="#REMOTESSH\nREMOTESSH_USE=\"${USE}\"\n"
+	config+="REMOTESSH_SERVER=\"${SERVER}\"\n"
+	config+="REMOTESSH_PORT=\"${PORT}\"\n"
+	config+="REMOTESSH_LOGIN=\"${LOGIN}\""
+	echo -e "$config" >> $RIG_CFG
+	mkdir -p "/dog/cfg/.ssh/"
+	chmod 0700 "/dog/cfg/.ssh/"
+	echo "$PRIVATE_KEY" > $KEY
+	chmod 0400 $KEY
+	
+	echo "Settings are written to $RIG_CFG"
+	echo "Private key is written to $KEY"
+
+	apt-get -q=2 install autossh
+	[[ $USE -eq 1 ]] && systemctl start remotessh || systemctl stop remotessh
+}
+
+#Checking arguments
+while [ -n "$1" ]; do
+	case "$1" in
+		--config)
+			echo -n "Found --config option"
+			shift
+			cfg=$1
+			
+			if [[ ! -z $cfg ]]; then
+				echo $cfg | jq '.'  > /dev/null 2>&1
+				exitcode="$?"
+				if [[ $exitcode -eq 0 ]]; then
+					echo " and config is given in JSON format (or empty)"
+				else
+					echo ", but config is in wrong format"
+					echo "> Trying to read config from $1"
+					[[ ! -f $1 ]] && echo -e "${RED}> Error! No such file, exiting${WHITE}" && exit 1
+					cfg=`cat $1`
+					echo $cfg | jq '.'  > /dev/null 2>&1
+					exitcode="$?"
+					if [[ $exitcode -eq 0 ]]; then
+						echo "... OK"
+					else
+						echo -e ". ${RED}Error! Config is broken${WHITE}"
+						exit 1
+					fi
+				fi
+			else
+				echo -e ", but ${RED}config is empty, exiting${WHITE}"
+				exit 1
+			fi
+		;;
+		show|setup|restart|start|stop|test|daemon)
+			command=$1
+		;;
+		*)
+			echo -e "${RED}$1${WHITE} is not valid command or argument"
+		;;
+	esac
+	shift
+done
+
+case "$command" in
+	show|"")
+		screen -r remotessh
+	;;
+	setup)
+		[[ ! -z $cfg ]] && setup || echo -e "${RED}> You need to give config to setup, exiting${WHITE}"
+	;;
+	test)
+		. $RIG_CFG
+		echo "autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}"
+	;;
+	daemon)
+		. $RIG_CFG
+		screen -dmS remotessh bash -c "autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}"
+	;;
+	start|restart|stop)
+		sudo systemctl $command	remotessh
+	;;
+esac

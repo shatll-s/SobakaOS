@@ -158,7 +158,7 @@ driver_nvidia=$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \(
 sysinfo=$(
 	jq -n \
 	--arg system "`lsb_release -d --short` `uname -m`" \
-	--arg osver "$OS" \
+	--arg osver "`apt-cache policy osdog | grep Installed | sed 's/Installed://; s/\s*//'`" \
 	--arg kernel "`uname -r`" \
 	--arg driver_amd "$driver_amd" \
 	--arg driver_nvidia "$driver_nvidia" \
@@ -224,7 +224,7 @@ while [[ $try -lt 5 ]]; do
 		"${HOST}?id=${RIG_ID}&method=hello2" -H "Content-Type: application/json; charset=utf-8\r\n")
 	#echo $response
 	if [[ $? -eq 0 ]]; then
-		#echo $response | jq '.'
+		echo $response | jq '.'
 		answer=$(echo $response | jq -r '.hello_answer')
 		#answer=$(echo $response) #just for debug
 		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
@@ -258,6 +258,10 @@ while [[ $try -lt 5 ]]; do
 			#autoswitch
 			command_argument=$(echo $response | jq ".as" --raw-output)
 			dog-command autoswitch "$command_argument" --hello
+
+			#remotessh
+			command_argument=$(echo $response | jq ".remotessh" --raw-output)
+			dog-command remotessh "$command_argument"
 
 			#manifests
 			command_argument=$(echo $response | jq ".batch1" --raw-output)

@@ -44,6 +44,7 @@ function getminer () {
 		exit 1
 	fi
 	[[ $miner == "claymore" ]] && ln -s "/dog/claymore-reboot" "${folder}reboot.sh"
+	[[ $miner == "ttminer" ]] && mkdir -p "/dog/log/TT-Miner" && ln -fs "/dog/log/TT-Miner" "${folder}/Logs"
 	[[ `echo $miner_ver | jq -r ".\"$miner\""` == null ]] && miner_ver=`jq ". + { \"$miner\": {} }" <<< "$miner_ver"`
 	miner_ver=`jq ".\"$miner\" += {\"$ver\" : \"\"}" <<< "$miner_ver"`
 	echo -e $miner_ver | jq '.' > $VERSION_FILE

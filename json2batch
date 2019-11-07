@@ -348,13 +348,13 @@ function make_batch () {
 			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --log" #log in miner folder :(
 		;;
 		ttminer)
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+	  		[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $coin ]]&& minerexec+=" -coin $coin"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $wallet ]]&& minerexec+=" -u $wallet"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			[[ ! -z $name ]]&& minerexec+=" -w $name"
-			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]} --log /dog/log/cryptodredge.log"
+			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]} --log"
 		;;		
 		*)
 			: #do nothing
