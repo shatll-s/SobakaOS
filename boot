@@ -78,10 +78,6 @@ if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
 fi
 
-if [[ $REMOTESSH_USE == 1 ]]; then
-	sudo systemctl start remotessh
-fi
-
 if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
 	if [[ `gpu-detect AMD` -lt 8 ]]; then
 		echo "> Starting OSdog Xserver"
@@ -93,6 +89,18 @@ if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
 else
 	echo "> Don\`t start OSdog Xserver (due to settings)"
 	sudo systemctl start dog-console
+fi
+
+if [[ $REMOTESSH_USE == 1 ]]; then
+	time=0
+	while [[ time -lt 15 ]]; do
+		[[ ! -z `systemctl status vnc | grep active` ]] && break
+		(( time++ ))
+		sleep 1
+	done
+	echo "> Waited $time seconds to get VNC active"
+	echo "> Starting RemoteSSH"
+	sudo systemctl start remotessh
 fi
 
 time_stop=`date +%s`

@@ -5,7 +5,7 @@ KEY="/dog/cfg/.ssh/remotessh.key"
 [ -t 1 ] && . colors
 
 function getdata () {
-	for option in private_key server port use login; do
+	for option in private_key server port use login port_vnc use_vnc; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -14,12 +14,15 @@ function getdata () {
 }
 
 function setup () {
+	#echo $cfg | jq '.'
 	getdata "$cfg"
 	sed -i "/.*REMOTESSH.*/d" $RIG_CFG
 	local config="#REMOTESSH\nREMOTESSH_USE=\"${USE}\"\n"
 	config+="REMOTESSH_SERVER=\"${SERVER}\"\n"
 	config+="REMOTESSH_PORT=\"${PORT}\"\n"
-	config+="REMOTESSH_LOGIN=\"${LOGIN}\""
+	config+="REMOTESSH_LOGIN=\"${LOGIN}\"\n"
+	config+="REMOTESSH_USE_VNC=\"${USE_VNC}\"\n"
+	config+="REMOTESSH_PORT_VNC=\"${PORT_VNC}\""
 	echo -e "$config" >> $RIG_CFG
 	mkdir -p "/dog/cfg/.ssh/"
 	chmod 0700 "/dog/cfg/.ssh/"
@@ -30,7 +33,17 @@ function setup () {
 	echo "Private key is written to $KEY"
 
 	apt-get -q=2 install autossh
-	[[ $USE -eq 1 ]] && systemctl start remotessh || systemctl stop remotessh
+	#[[ $USE -eq 1 ]] && systemctl start remotessh || systemctl stop remotessh
+}
+
+function make_command () {
+	. $RIG_CFG
+	[[ ! -z $REMOTESSH_USE_VNC && ! -z $REMOTESSH_PORT_VNC ]] && VNC=" -X -R${REMOTESSH_PORT_VNC}:localhost:5900"
+	local string="while true; do "
+	string+="autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}${VNC}; "
+	string+="sleep 3; echo \"Something goes wrong\"; done"
+	echo $string
+	#echo "while true; do autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}; sleep 3; echo \"Something goes wrong\"; done"
 }
 
 #Checking arguments
@@ -65,7 +78,7 @@ while [ -n "$1" ]; do
 				exit 1
 			fi
 		;;
-		show|setup|restart|start|stop|test|daemon)
+		show|setup|restart|start|stop|cli|daemon|status)
 			command=$1
 		;;
 		*)
@@ -82,15 +95,16 @@ case "$command" in
 	setup)
 		[[ ! -z $cfg ]] && setup || echo -e "${RED}> You need to give config to setup, exiting${WHITE}"
 	;;
-	test)
-		. $RIG_CFG
-		echo "autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}"
+	cli)
+		#. $RIG_CFG
+		#[[ ! -z $REMOTESSH_USE_VNC && ! -z $REMOTESSH_PORT_VNC ]] && VNC=" -X -R${REMOTESSH_PORT_VNC}:localhost:5900" #&& sleep 15
+		#echo "while true; do autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}; sleep 3; echo \"Something goes wrong\"; done"
+		echo `make_command`
 	;;
 	daemon)
-		. $RIG_CFG
-		screen -dmS remotessh bash -c "autossh -o \"StrictHostKeyChecking=no\" -R${REMOTESSH_PORT}:localhost:22 ${REMOTESSH_LOGIN}@${REMOTESSH_SERVER} -i ${KEY}"
+		screen -dmS remotessh bash -c "`make_command`"
 	;;
-	start|restart|stop)
+	start|restart|stop|status)
 		sudo systemctl $command	remotessh
 	;;
 esac

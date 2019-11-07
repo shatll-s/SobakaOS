@@ -389,6 +389,11 @@ case $1 in
 		case $command in
 			setup)
 				remotessh setup --config "$2"
+				[[ `echo $2 | jq -r '.use'` -eq 1 ]] && remotessh restart || remotessh stop
+			;;
+			hello)
+				remotessh setup --config "$2"
+			;;
 		#case "$2" in
 		#	stop|log)
 		#		return=$(benchmark $2)
