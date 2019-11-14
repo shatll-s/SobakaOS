@@ -385,7 +385,7 @@ case $1 in
 	remotessh)
 		command=`echo $2 | jq -r '.command'`
 		data=`echo $2 | jq '.|del(.command)'`
-		echo "$2" > /tmp/remotessh
+		#echo "$2" > /tmp/remotessh
 		case $command in
 			setup)
 				remotessh setup --config "$2"

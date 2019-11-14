@@ -34,6 +34,7 @@ APIPORT[lolminer]=8080
 APIPORT[gminer]=10050
 APIPORT[xmrig_amd]=10051
 APIPORT[xmrig_nvidia]=10052
+APIPORT[xmrig_cpu]=10053
 APIPORT[z_enemy]=4070
 APIPORT[xmr_stak]=10060
 APIPORT[wildrig_multi]=10062
