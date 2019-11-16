@@ -90,4 +90,3 @@ case $1 in
 		echo -e "Usage: ${CYAN}$bname initial|ping|reset|power|firmware|settings|setup-time${WHITE}"
 	;;
 esac
-

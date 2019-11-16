@@ -95,51 +95,6 @@ case $1 in
 			"$(date --rfc-3339=seconds)\nHost is not changed (connection will be lose if you will set empty host)."
 		fi
 	;;
-	change_miner*)
-		i=$(echo $1 | sed 's/change_miner//')
-		sed -i "/.*miner$i=.*/d" $BATCH_CFG
-		echo -e "miner$i=$2" >> $BATCH_CFG
-		if [[ $2 ]]; then
-			msg "Miner $i change" ok \
-			"$(date --rfc-3339=seconds)\nMiner succesfully changed to <b>$2</b>.\nIf you selected the same miner, no action will be done."
-		else
-			msg "Miner $i stop" ok \
-			"$(date --rfc-3339=seconds)\nMiner succesfully disabled."
-		fi
-	;;
-	miner_log)
-		screen -S $2 -X hardcopy /tmp/hardcopy
-		if [[ $? -eq 0 ]]; then
-			return=$(cat /tmp/hardcopy | sed 's/"//g')
-			msg "Log: $2" success "$return"
-		else
-			return="$(screen -ls)"
-			msg "Log: $2" error "$return"
-		fi
-	;;
-	restart_miner)
-		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
-		screen-kill $2
-		miner_now=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
-		if [[ $miner ]]; then
-			if [[ ! $miner_now ]]; then
-				msg "Restart $2" success \
-				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) succesfully restarted."
-			else
-				msg "Restart $2" error\
-				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) cannot be closed. Propably reboot will help."
-			fi
-		else
-			. $RIG_CFG
-			if [[ $2 -eq "miner1" ]]; then
-				miner=$MINER
-			elseif [[ $2 -eq "miner2" ]]
-				miner=$MINER2
-			fi
-			msg "Restart $2" warning \
-			"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) is not working.\nMay be this miner isn\`t suitable for your GPU."
-		fi
-	;;
 	change_amd_oc)
 		echo "$2" > $AMD_CFG
 		[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
@@ -184,19 +139,6 @@ case $1 in
 		msg "Rebooting" ok "$(date --rfc-3339=seconds)\nRebooting."
 		nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1
 	;;
-	change_wallet)
-		if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
-			echo $2 | jq '.' > /tmp/wallet_raw.cfg
-			jsonwallet2cfg /tmp/wallet_raw.cfg $WALLET_CFG
-			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg, don`t kill miners
-			screen-kill miner1
-			screen-kill miner2
-			msg "Wallet change" ok "$(date --rfc-3339=seconds)\n Wallet changed, miners restarted."
-		else
-			[[ $3 == "--hello" ]] && rm $PID_file && exit 0 #don`t send msg	
-			msg "Wallet change" warning "$(date --rfc-3339=seconds)\n Error occured while wallet change."
-		fi
-	;;
 	batch*)
 		i=$(echo $1 | sed 's/batch//')
 		#if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
@@ -214,6 +156,39 @@ case $1 in
 			fi
 		else
 			[[ $3 != "--hello" ]] && msg "Batch $i change" warning "$(date --rfc-3339=seconds)\n Error occured while wallet change."
+		fi
+	;;
+	miner_log)
+		screen -S $2 -X hardcopy /tmp/hardcopy
+		if [[ $? -eq 0 ]]; then
+			return=$(cat /tmp/hardcopy | sed 's/"//g')
+			msg "Log: $2" success "$return"
+		else
+			return="$(screen -ls)"
+			msg "Log: $2" error "$return"
+		fi
+	;;
+	restart_miner)
+		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
+		screen-kill $2
+		miner_now=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
+		if [[ $miner ]]; then
+			if [[ ! $miner_now ]]; then
+				msg "Restart $2" success \
+				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) succesfully restarted."
+			else
+				msg "Restart $2" error\
+				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) cannot be closed. Propably reboot will help."
+			fi
+		else
+			. $RIG_CFG
+			if [[ $2 -eq "miner1" ]]; then
+				miner=$MINER
+			elseif [[ $2 -eq "miner2" ]]
+				miner=$MINER2
+			fi
+			msg "Restart $2" warning \
+			"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) is not working.\nMay be this miner isn\`t suitable for your GPU."
 		fi
 	;;
 	change_name)
@@ -309,9 +284,6 @@ case $1 in
 		#	data="$(date --rfc-3339=seconds)\n$return"
 		fi
 		data=$data"$return\nExitcode: $exitcode"
-		
-		
-		#echo $return
 		msg "Teleconsole $argument" $type "$data"
 	;;
 	af)
@@ -369,8 +341,6 @@ case $1 in
 		esac
 	;;
 	benchmark)
-		#echo "BENCHMARK STARTRD"
-		#echo "$2" > /tmp/benchmark
 		case "$2" in
 			stop|log)
 				return=$(benchmark $2)
@@ -390,6 +360,11 @@ case $1 in
 			setup)
 				remotessh setup --config "$2"
 				[[ `echo $2 | jq -r '.use'` -eq 1 ]] && remotessh restart || remotessh stop
+				if [[ $? -eq 0 ]]; then
+					msg "RemoteSSH setup" success "$(date --rfc-3339=seconds) RemoteSSH success"
+				else
+					msg "RemoteSSH setup" error "$(date --rfc-3339=seconds) Error occured while RemoteSSH setup"
+				fi
 			;;
 			hello)
 				remotessh setup --config "$2"

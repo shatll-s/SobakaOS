@@ -81,4 +81,3 @@ case $1 in
 		echo -e "F.e. $bname --set china or $bname --set fixorgua"
 	;;
 esac
-
