@@ -37,7 +37,7 @@ case $1 in
 	get_bios)
 		#[[ $2 < 10 ]] && bus="0"$2
 		#bus=`echo $2 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` #now it`s mistake
-		bus=$2
+		bus=${2^^}
 		adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
 		#echo -e "argument=$2\nbus=$bus\nadapter=$adapter"
 		return=$(sudo atiflash -s $adapter "/tmp/amd${adapter}.rom")
@@ -74,6 +74,7 @@ case $1 in
 		fi
 		file=$(echo $file_gz | sed 's/.gz//') #0000004_bios_amd_bus02.rom
 		bus=$(echo $file | sed 's/.*bus\([0-9]*\).rom/\1/') #02
+		bus=${bus^^}
 		#bus=`echo $shortbus 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` 
 		adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//') && echo $adapter
 		return=$(atiflash -p $adapter -f "/tmp/$file")

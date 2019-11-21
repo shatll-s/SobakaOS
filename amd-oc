@@ -142,7 +142,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			if [[ ${CORE_VOLTAGE[$y]} ]]; then
 				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$y]}" -A1) \
 					| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
-				str="$str --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$y]}"
+				str="$str --vddc-table-set ${CORE_VOLTAGE[$y]} --volt-state $volt_state"
 			fi
 		fi
 		#str="$script -i $card"
