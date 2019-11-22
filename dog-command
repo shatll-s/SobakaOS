@@ -73,7 +73,7 @@ case $1 in
 			exit 1
 		fi
 		file=$(echo $file_gz | sed 's/.gz//') #0000004_bios_amd_bus02.rom
-		bus=$(echo $file | sed 's/.*bus\([0-9]*\).rom/\1/') #02
+		bus=$(echo $file | sed 's/.*bus\([0-9a-z]*\).rom/\1/') #02
 		bus=${bus^^}
 		#bus=`echo $shortbus 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` 
 		adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//') && echo $adapter
