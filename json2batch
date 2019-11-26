@@ -54,7 +54,7 @@ function convert_algo () { #for nicehash
 function get_variables () {	
 	#[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
 	local manifest="$1"
-	for option in miner coin wallet pass pool algo fork brand; do
+	for option in miner coin wallet pass pool algo fork brand dual_wallet dual_pool dual_pass; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\"`" #double slash, because eval open it
 			eval "$option=\"$option_value\""
@@ -64,6 +64,13 @@ function get_variables () {
 	for option in template addition; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`" #double slash, because eval open it
+			eval "$option=\"$option_value\""
+		fi
+	done
+
+	for option in dual_template; do
+		if [[ `echo $manifest | jq ".$option"` != null ]]; then
+			option_value="`echo $manifest | jq -r \".$option\" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$dual_wallet/"`" #double slash, because eval open it
 			eval "$option=\"$option_value\""
 		fi
 	done
@@ -348,7 +355,14 @@ function make_batch () {
 		;;
 		nbminer)
 			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			if [[ ! -z $algo ]]; then
+				minerexec+=" -a $algo"
+				if [[ $algo == "eaglesong_ethash" ]]; then
+					[[ ! -z $dual_pool ]]&& minerexec+=" -do $dual_pool"
+					[[ ! -z $dual_template ]]&& minerexec+=" -du $dual_template"
+					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
+				fi
+			fi
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=":$pass"
