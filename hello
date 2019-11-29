@@ -108,7 +108,7 @@ cpu_json=$(
 	jq -n \
 	--arg version "`dmidecode | grep "Processor Information" -A60 | grep "Version" | sed -e 's/Version\: //; s/\t//'`" \
 	--arg core "`dmidecode | grep "Processor Information" -A60 | grep  "Core Count" | sed -e 's/Core Count\: //; s/\t//'`" \
-	--arg cur_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Current Speed" | sed -e 's/Current Speed\: //; s/\t//; s/\n//'`" \
+	--arg cur_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Current Speed" | sed -e 's/Current Speed\: //; s/\t//' | tr -d '\n'`" \
 	--arg max_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Max Speed" | sed -e 's/Max Speed\: //; s/\t//'`" \
 	'{
 		$version,

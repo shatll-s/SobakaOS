@@ -144,7 +144,7 @@ case $1 in
 		i=$(echo $1 | sed 's/batch//')
 		#if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
 		if [[ $(echo $2 | jq '.') != 'null' ]]; then
-			[[ $2 != "--reconfigure" ]] && echo $2 | jq '.' > /tmp/$1 #I forgot, what is --reconfigure???
+			[[ $2 != "--reconfigure" ]] && echo "$2" | jq '.' > /tmp/$1 #I forgot, what is --reconfigure???
 			[[ $3 != "--hello" ]] && screen-kill miner$i #don`t kill miner if there is --hello argument
 			json2batch /tmp/$1
 
