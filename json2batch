@@ -273,14 +273,7 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			minerexec+=" --api ${APIPORT[$miner]}"
 		;;
-		xmrig_cpu)
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --http-enabled --http-port ${APIPORT[$miner]}"
-		;;
-		xmrig_new)
+		xmrig_cpu|xmrig_new)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
