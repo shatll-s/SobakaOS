@@ -32,6 +32,7 @@ APIPORT[t_rex]=42356
 APIPORT[nanominer]=9090
 APIPORT[lolminer]=8080
 APIPORT[gminer]=10050
+APIPORT[xmrig_new]=10054
 APIPORT[xmrig_amd]=10051
 APIPORT[xmrig_nvidia]=10052
 APIPORT[xmrig_cpu]=10053

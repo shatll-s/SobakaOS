@@ -280,6 +280,13 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --http-enabled --http-port ${APIPORT[$miner]}"
 		;;
+		xmrig_new)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --http-enabled --http-port ${APIPORT[$miner]}"
+		;;
 		xmrig*)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
