@@ -1,0 +1,67 @@
+#!/bin/bash
+. colors
+
+MEM_AVAIL=`cat /proc/meminfo | grep "MemFree" | awk '{ print $2 }'`             # Memory available
+MEM_RES_PERC=90                                                                 # % of available memory for reservation
+HPAGE_SIZE=`cat /proc/meminfo | grep "Hugepagesize" | awk '{ print $2 }'`       # HugePage size usually 2M
+HPAGES_CUR=`cat /proc/meminfo | grep "HugePages_Total" | awk '{ print $2 }'`    # Number of HugePages (current value)
+HPAGES_MAX=$(($HPAGES_CUR+$MEM_AVAIL/$HPAGE_SIZE*$MEM_RES_PERC/100))            # Number of HugePages (max calculated)
+
+print_help(){
+    echo -e "This tool allows you to set the desired value for hugepages."
+    echo -e "${DGRAY}The suggested value for CN-based algorithms is 128"
+    echo -e "The suggested value for RandomX is 1280"
+    echo
+    echo -e "${YELLOW}Usage: \n\t${CYAN}hugepages value${NOCOLOR}"
+    echo
+    echo -e "${YELLOW}Other examples of usage:${NOCOLOR}"
+    echo -e "\t${CYAN}hugepages -r${NOCOLOR}  - ${LGRAY}restoring system defaults"
+    echo -e "\t${CYAN}hugepages -rx${NOCOLOR} - ${LGRAY}try set suggested value (1280) for RandomX"
+    echo -e "\t${CYAN}hugepages -cn${NOCOLOR} - ${LGRAY}try set suggested value (128) for CN-based "
+    echo -e "\t${CYAN}hugepages -h${NOCOLOR}  - ${LGRAY}this help "
+}
+
+################################################################################
+echo -e "Current Hugepages\t\t${CYAN}${HPAGES_CUR}${WHITE}"
+
+case $1 in
+    -h|--help|'')
+		bname=`basename $0`
+		echo -e "This tool allows you to set the desired value for hugepages"
+		echo -e "Usage: ${CYAN}$bname -r|-rx|-cn|-h|128|1280${WHITE}"
+		echo -e "-r, --restore\trestoring system defaults"
+		echo -e "-rx\t\ttry set suggested value (1280) for RandomX"
+		echo -e "-cn\t\ttry set suggested value (128) for CN-based "
+		echo -e "-h, --help\tdisplay this text"
+		exit 0
+    ;;
+    -r|--restore)
+        HPAGES_REQ=`cat /etc/sysctl.conf | grep vm.nr_hugepages | tr '=' ' ' | awk '{ print $2 }'`
+		[[ ! $HPAGES_REQ ]] && HPAGES_REQ=0
+    ;;
+    -rx)
+        HPAGES_REQ=1280
+    ;;
+    -cn)
+        HPAGES_REQ=128
+    ;;
+ 	*)
+		re="^[0-9]+$"
+        if ! [[ $1 =~ $re ]] ; then
+            echo -e "${RED}Invalid value/option given${WHITE}"
+			exit 1
+        fi
+		HPAGES_REQ=$1
+	;;
+esac
+
+if [[ $HPAGES_REQ -gt $HPAGES_MAX ]]; then
+	echo -e "HugePages requested ($HPAGES_REQ) more then maximum suggested ($HPAGES_MAX)"
+	HPAGES_REQ=$HPAGES_MAX
+fi 
+
+echo -e "Try set HugePages value\t\t${CYAN}${HPAGES_REQ}${WHITE}"
+echo "$HPAGES_REQ" > /proc/sys/vm/nr_hugepages
+HPAGES_SET=`cat /proc/sys/vm/nr_hugepages`
+
+echo -e "New HugePages value\t\t${GREEN}$HPAGES_SET${WHITE}"

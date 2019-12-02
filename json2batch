@@ -38,6 +38,9 @@ function convert_algo () { #for nicehash
 		CUCKAROOD29)
 			local output_algo="GRINCUCKAROOD29"
 		;;
+		CUCKOO29)
+			local output_algo="CUCKOOCYCLE"
+		;;
 		CUCKATOO|CUCKATOO31)
 			local output_algo="GRINCUCKATOO31"
 		;;
