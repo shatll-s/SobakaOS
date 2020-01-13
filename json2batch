@@ -393,7 +393,10 @@ function make_batch () {
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			if [[ ! -z $pool ]]; then
+				[[ $pool != "stratum"* ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/dog/log/teamredminer.log"

@@ -218,7 +218,7 @@ case $1 in
 		miner_fan=(`echo $stats_template | jq '.devs.DEVS[]."Fan Percent"'`)
 		miner_share=(`echo $stats_template | jq '.devs.DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
-		if [[ $miner_algo == "phi2" ]]; then
+		if [[ "phi2 ethash" == *$miner_algo* ]]; then
 			local x=1000
 		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
 			local x=1000000
@@ -629,7 +629,23 @@ echo $miner_total_hr > /tmp/hr.$1
 
 ##################################################################
 function stats {
-[[ `gpu-detect NVIDIA` -gt 0 ]] && local nvidia_smi=`nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader`
+if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+	nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
+
+	local timer=0
+	while [[ $timer -le 10 ]]; do
+		if  [[ -f $NVIDIASMI_FILE ]]; then #We got nvidia-smi file
+			break
+		fi
+		sleep 0.5
+		((timer+=1))
+	done
+	if [[ -f $NVIDIASMI_FILE ]]; then
+		local nvidia_smi=`cat $NVIDIASMI_FILE`
+		rm $NVIDIASMI_FILE
+	fi
+
+fi
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
@@ -654,7 +670,6 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
 		local power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
-		#nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader> $NVIDIASMI_FILE
 		local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
         local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 		local fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
@@ -810,7 +825,9 @@ if [[ $response ]] ; then #if we get answer (pass is ok, etc)
 			local command_type=$(echo $response | jq ".[$i].command_type" --raw-output)
 			local command_argument=$(echo $response | jq ".[$i].command_argument" --raw-output)
 			local title=$(echo $response | jq ".[$i].title" --raw-output)
-			dog-command "$command_type" "$command_argument" >> $LOG &
+			command_result=`dog-command "$command_type" "$command_argument" >> $LOG &`
+			#echo "screen -dmS command.$command_type bash -c \"dog-command \"$command_type\" \"$command_argument\" >> $LOG\"" >> $LOG
+			#screen -dmS command.$command_type dog-command "$command_type" "$command_argument" >> $LOG
 		done
 	#else #if $count < 1, no commands received
 	#	echo "($count commands)" >> $LOG

@@ -150,6 +150,7 @@ case $1 in
 
 			if [[ $3 != "--hello" && $3 != "--quiet" ]]; then #don`t send msg if there is --hello argument
 				if [[ $(echo $2 | jq -R '.') != '""' ]]; then #if this is not STOP command
+					wd restart #restart watchdog if batch is changed
 					msg "Batch $i change" ok "$(date --rfc-3339=seconds)\n Batch files changed, miners restarted." 
 				else #it`s STOP command
 					msg "Miner $i stop" ok "$(date --rfc-3339=seconds)\n Miner stopped" 
