@@ -31,7 +31,7 @@ case $1 in
 		if [[ $exitcode -eq 0 ]]; then
 			msg "$1 : $2" success "$return"
 		else
-			msg "$1 : $2" warning $return
+			msg "$1 : $2" warning "Exitcode: $exitcode\n$return"
 		fi
 	;;
 	get_bios)

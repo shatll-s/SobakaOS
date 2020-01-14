@@ -156,7 +156,33 @@ function make_batch () {
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dcoin \$"${MINER}"_DUALCOIN"
 				#[[ ! -z $pass `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" -dpsw \$APASS"
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
+			[[ $addition != *"-mport"* ]] && minerexec+=" -mport ${APIPORT[$miner]}"
+			minerexec+=" -r 1 -logfile /dog/log/"$miner"_noappend.log"
+		;;
+		phoenix)
+			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
+			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
+
+			if [[ ! -z $epools ]]; then
+				for ((i=0; i < ${#epools[@]}; i++)); do
+					epools_str+="POOL: ${epools[$i]}"
+					[[ ! -z $template ]]&& epools_str+=", WAL: $template"
+					[[ ! -z $pass ]]&& epools_str+=", PSW: $pass"
+					for ((y=1; y < ${#add_array[@]}; y++)); do
+						add=(`echo "${add_array[$y]}"`)
+						epools_str+=", ${add[0]^^}"
+						unset add[0]
+						epools_str+=" ${add[@]}"
+					done
+					epools_str+="\n"
+				done
+				echo -e "$epools_str" > "$miner_dir/epools.txt"
+			fi
+
+			[[ ! -z $template ]]&& minerexec+=" -wal $template"
+			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
+			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport ${APIPORT[$miner]}"
+			minerexec+=" -log 1 -logfile /dog/log/phoenix.log"
 		;;
 		ewbf)
 			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
@@ -365,30 +391,6 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/dog/log/wildrig.log"
-		;;
-		phoenix)
-			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
-			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
-
-			if [[ ! -z $epools ]]; then
-				for ((i=0; i < ${#epools[@]}; i++)); do
-					epools_str+="POOL: ${epools[$i]}"
-					[[ ! -z $template ]]&& epools_str+=", WAL: $template"
-					[[ ! -z $pass ]]&& epools_str+=", PSW: $pass"
-					for ((y=1; y < ${#add_array[@]}; y++)); do
-						add=(`echo "${add_array[$y]}"`)
-						epools_str+=", ${add[0]^^}"
-						unset add[0]
-						epools_str+=" ${add[@]}"
-					done
-					epools_str+="\n"
-				done
-				echo -e "$epools_str" > "$miner_dir/epools.txt"
-			fi
-
-			[[ ! -z $template ]]&& minerexec+=" -wal $template"
-			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
-			minerexec+=" -cdmport ${APIPORT[$miner]} -log 1 -logfile /dog/log/phoenix.log"
 		;;
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh

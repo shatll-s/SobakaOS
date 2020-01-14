@@ -45,7 +45,22 @@ case $1 in
 		done
 	;;
 	claymore|phoenix)
-		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat2"}' | nc -w $API_TIMEOUT localhost $port | jq '.result'`
+		[[ "claymore phoenix" == *$miner1* ]] && batch=$batch1 || batch=$batch2
+		if [[ $1 == "claymore" ]]; then
+			port_arg="-mport"
+			pass_arg="-mpsw" 
+		else
+			port_arg="-cdmport"
+			pass_arg="-cdmpass"
+		fi
+		local request='{"id":0,"jsonrpc":"2.0","method":"miner_getstat2"}'
+		if [[ $batch == *$pass_arg* ]]; then
+			pass_value=`echo $batch | sed "s/.*$pass_arg \([-_0-9a-zA-Z@]*\).*/\1/"`
+			request=`jq ". += {\"psw\": \"$pass_value\"}" <<< "$request"`
+		fi
+		[[ $batch == *$port_arg* ]] && port=`echo $batch | sed "s/.*$port_arg \([0-9]*\).*/\1/"`
+
+		local stats_template=`echo $request | nc -w $API_TIMEOUT localhost $port | jq '.result'`
 		miner_ver=`echo $stats_template | jq -r '.[0]'`
 		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
 		if (($miner_online_raw)); then

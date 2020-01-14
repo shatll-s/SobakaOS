@@ -21,8 +21,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/dog/lib
 export CUDA_DEVICE_ORDER
 
 #OC
+[[ $(gpu-detect all) -gt 0 ]] && sleep 7
 [[ $(gpu-detect AMD) -gt 0 ]] && amd-oc --firstrun
-[[ $(gpu-detect NVIDIA) -gt 0 ]] && sleep 7 && nvidia-oc --pill-delay
+[[ $(gpu-detect NVIDIA) -gt 0 ]] && nvidia-oc --pill-delay
 
 while true; do
 	#source here for online updates

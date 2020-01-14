@@ -60,7 +60,3 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		(( y++ ))
 	fi
 done
-
-
-
-
