@@ -801,7 +801,10 @@ local request=$(
 
 )
 
-[[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
+hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`
+[[ ! -z $avg_cpu_temp ]] && request=`jq ".stats.temp += {\"CPU_TEMP\": \"$avg_cpu_temp\"}" <<< "$request"`
+[[ ! -z $hddtemp ]] && request=`jq ".stats.temp += {\"HDD_TEMP\": \"$hddtemp\"}" <<< "$request"`
+[[ ! -z $THERMO_RODOS ]] && request=`jq ".stats.temp += {\"RODOS_TEMP\": \""$(rodos --temp $THERMO_RODOS)"\"}" <<< "$request"`
 
 echo $request | jq '.' -c #echo in screen
 

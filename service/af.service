@@ -1,0 +1,12 @@
+[Unit]
+Description=OSdog AutoFan Service
+After=mining.service
+#Requires=sobaka.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/dog/af start
+
+[Install]
+WantedBy=multi-user.target

@@ -231,19 +231,7 @@ function autofan () {
 
 function start () {
 	start_time=`date +%s`
-	cfg=`cat $AF_CFG`
-	enabled=`echo $cfg | jq '.af_enabled'`
-	[[ $enabled -ne 1 ]] && echo -e "${RED}Autofan is not enabled, exit${WHITE}" && exit 1
-	target_temp=`echo $cfg | jq '.af_tt'`
-	hyst=`echo $cfg | jq '.af_hyst'`
-	fan_shift=`echo $cfg | jq '.af_shift'`
-	fan_max=`echo $cfg | jq '.af_fanmax'`
-	fan_min=`echo $cfg | jq '.af_fanmin'`
-	delay=`echo $cfg | jq '.af_delay'`
-	crit_temp=80
-	[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
-	crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
-
+	
 	echo -e "${GREEN}Thank you for using ${CYAN}OSdog${GREEN} Autofan v 0.3"
 	echo -e "${BROWN}$LOGO${GREEN}"
 	echo -e "Visit ${CYAN}www.os.dog${WHITE}"
@@ -266,8 +254,31 @@ function start () {
 	done
 	
 	while true; do
-		autofan
-		sleep $delay
+		cfg=`cat $AF_CFG`
+		enabled=`echo $cfg | jq '.af_enabled'`
+		if [[ $enabled -ne 1 ]]; then
+			if [[ $msg_trigger != 1 ]]; then
+				echo -n "Autofan is not enabled, waiting."
+				msg_trigger=1
+			else
+				echo -n "."
+			fi
+			sleep 10
+		else
+			[[ $msg_trigger == 1 ]] && msg_trigger=0 && echo ""
+			target_temp=`echo $cfg | jq '.af_tt'`
+			hyst=`echo $cfg | jq '.af_hyst'`
+			fan_shift=`echo $cfg | jq '.af_shift'`
+			fan_max=`echo $cfg | jq '.af_fanmax'`
+			fan_min=`echo $cfg | jq '.af_fanmin'`
+			delay=`echo $cfg | jq '.af_delay'`
+			crit_temp=80
+			[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
+			crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
+
+			autofan
+			sleep $delay
+		fi
 	done
 }
 
@@ -277,16 +288,16 @@ case $1 in
 		screen -r af
 	;;
 	stop)
-		screen-kill af
+		/dog/screen-kill af
 		echo "$(date --rfc-3339=seconds) Autofan stopped"
 	;;
 	loop)
 		start
 	;;
 	start|restart)
-		screen-kill af
+		/dog/screen-kill af
 		screen -dmS af bash -c "/dog/af loop"
-		echo "$(date --rfc-3339=seconds) Autofan (re)started"
+		#echo "$(date --rfc-3339=seconds) Autofan (re)started"
 	;;
 	*)
 		bname=`basename $0`

@@ -72,6 +72,7 @@ netsetup -f
 
 /dog/sbin/wd-opendev initial
 /dog/sbin/wd-qinheng initial
+/dog/sbin/rodos --initial
 hello
 . $RIG_CFG
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then

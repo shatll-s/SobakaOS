@@ -305,10 +305,10 @@ case $1 in
 			af="$2"
 			echo "$af" > /dog/cfg/af.cfg
 			if [[ `echo $af | jq '.af_enabled'` -eq 1 ]]; then
-				af restart
+				#af restart
 				text="Autofan (re)started"
 			else
-				af stop
+				#af stop
 				text="Autofan stopped"
 			fi
 			[[ $3 != '--hello' ]] && msg "$text" info "$(date --rfc-3339=seconds) $text"

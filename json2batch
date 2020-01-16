@@ -32,14 +32,17 @@ function convert_algo () { #for nicehash
 		CUCKAROO29)
 			local output_algo="GRINCUCKAROO29"
 		;;
+		CUCKAROOM29)
+			local output_algo="CUCKAROOM"
+		;;
 		EQUIHASH144_5)
 			local output_algo="ZHASH"
 		;;
 		CUCKAROOD29)
 			local output_algo="GRINCUCKAROOD29"
 		;;
-		CUCKOO29)
-			local output_algo="CUCKOOCYCLE"
+		CUCKOO29|AETERNITY)
+			local output_algo="CUCKOOCYCLE" 
 		;;
 		CUCKATOO|CUCKATOO31)
 			local output_algo="GRINCUCKATOO31"
