@@ -35,7 +35,8 @@ echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
 
 export DISPLAY=:0
 
-screen-kill pill
+pkill -f '/dog/sbin/nvidia-pill'
+pkill -f '/dog/sbin/OhGodAnETHlargementPill-r2'
 
 echo -e $BROWN"================================================================"$WHITE
 n=$(gpu-detect NVIDIA)
@@ -126,12 +127,9 @@ done < <(/dog/gpu-detect NVIDIA list)
 if [[ $PILL == 1 ]]; then
 	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
 		sleep=30 
-		echo "Pill will be served after $sleep seconds"
-	else
-		sleep=0
- 		echo "Pill is served"
 	fi
- 	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
+	nvidia-pill "$PILL_ARGS" "$sleep" 	
+	#screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
 fi
 echo -e $BROWN"================================================================"$WHITE
 

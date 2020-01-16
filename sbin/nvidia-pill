@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+PILL_ARGS=$1
+[[ ! -z $2 ]] && DELAY=$2 || DELAY=0
+
+echo "Pill will be served after $DELAY seconds"
+sleep $DELAY
+#screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
+nohup /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS > /dev/null 2>&1 &
