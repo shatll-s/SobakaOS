@@ -226,7 +226,7 @@ function make_batch () {
 			minerexec+=" -P"
 			[[ $template != *://* ]]&& minerexec+=" stratum://"		
 			minerexec+="$template:$pass@$pool" #USERNAME.WORKERNAME:WORKERPWD
-			echo $brand	
+			#echo $brand	
 			minerexec+=" --farm-recheck 500 --report-hashrate --api-port ${APIPORT[$miner]} --HWMON 1 $brand"
 		;;
 		claymore_c)
