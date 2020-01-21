@@ -5,6 +5,7 @@ export PATH
 export CUDA_DEVICE_ORDER
 RIG_CFG="/dog/cfg/rig.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
+TMP_FILE="/tmp/wd_hardcopy"
 #exec &>>$LOG
 
 SLEEP=5 #seconds to sleep over iteration
@@ -19,6 +20,14 @@ LOGO="
     (_/'~~      ''''(;
 "
 LOGO=${BROWN}$LOGO${WHITE}
+
+function get_log () {
+	[[ -f $TMP_FILE ]] && rm -f $TMP_FILE
+	screen -S $1 -X hardcopy $TMP_FILE
+	local exitcode=$?
+	[[ $exitcode -eq 0 ]] && local return=`cat $TMP_FILE | sed 's/\"//g'` || local return=`screen -ls`
+	echo "$return"
+}
 
 function loop() {
 
@@ -75,7 +84,7 @@ function loop() {
 		echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE} | restart ${GREEN}${miner_restart_timeout}s${WHITE})"
 		if [[ ! -z $WD_REBOOT ]]; then
 			if [[ $elapsed -ge $reboot_timeout ]]; then
-				msg "Watchdog: $miner low hashrate ($hr kH/s), rebooting" danger "$(date --rfc-3339=seconds) reboot"
+				msg "Watchdog: $miner low hashrate ($hr kH/s), rebooting" danger "`get_log miner$1`"
 				echo -e "${RED}Rebooting after $WD_REBOOT minutes${NOCOLOR}"
 				nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
 			fi
@@ -89,7 +98,7 @@ function loop() {
 			#debug			
 			#echo "restart_time $restart_time | miner_restart_timeout $miner_restart_timeout | miner_restart_timeout2 $miner_restart_timeout2"
 			if [[ $elapsed -ge $miner_restart_timeout2 ]]; then
-				msg "Watchdog: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) Restarting after $miner_restart_timeout2 seconds for $restart_time time"
+				msg "Watchdog: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) Restarting after $miner_restart_timeout2 seconds for $restart_time time\n`get_log miner$1`"
 				echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $miner_restart_timeout2 seconds for $restart_time time${WHITE}"
 				(( miner_restart_count++ ))
 				screen-kill $miner
