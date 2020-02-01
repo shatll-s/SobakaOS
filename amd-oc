@@ -6,7 +6,7 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE="/tmp/.amd-oc.lock"
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_tweak fan enhanced; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak fan enhanced; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -48,6 +48,7 @@ CORE_STATE=($CORE_STATE)
 CORE_VOLTAGE=($CORE_VOLTAGE)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
+MEMORY_VOLTAGE=($MEMORY_VOLTAGE)
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
 
@@ -57,6 +58,7 @@ for (( i=0; i < $n; ++i )); do
 	[[ ! ${CORE_VOLTAGE[$i]} && ! -z ${CORE_VOLTAGE[0]} ]]&& CORE_VOLTAGE[$i]=${CORE_VOLTAGE[-1]}
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${MEMORY_STATE[$i]} && ! -z ${MEMORY_STATE[0]} ]]&& MEMORY_STATE[$i]=${MEMORY_STATE[-1]}
+	[[ ! ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_VOLTAGE[0]} ]]&& MEMORY_VOLTAGE[$i]=${MEMORY_VOLTAGE[-1]}
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
 done
 
@@ -66,6 +68,7 @@ echo -e ${CYAN}"Core State:${WHITE}\t${CORE_STATE[@]}"
 echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
 echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
+echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
 echo -e ${CYAN}"Memory Tweak:${WHITE}\t${MEMORY_TWEAK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 [ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
@@ -84,25 +87,29 @@ for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
 	done
 done
 
-#restoring default pp_table
-#if [[ -z $1 && $1 -ne "--firstrun" ]]; then
-#	for ppfile in /tmp/pp_tables/card*/pp_table ; do
-#		card=$(echo $ppfile | sed 's/.*card\([0-9]*\).*/\1/')
-#		[[ -z $card ]] && echo "Can\`t find saved Power Play table. Try to reboot" && continue
-#		dir="/sys/class/drm/card$card/device/pp_table"
-#		[[ -z $dir ]] && echo "Can\`t find existing Power Play table. Try to reboot" && continue
-#		cp $ppfile $dir
-#		echo "Copying pp_table to $dir"
-#	done
-#fi
 y=0 #$y = OC values, because not all $i are amdgpu cards, 
 for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
 		#wolfamdctrl -i 0 --mem-state 2 --mem-clock 2000 --core-state 4 --core-clock 1100 --volt-state 4 --vddc-table-set 900
 		#wolfamdctrl -i /sys/class/drm/card5/device --core-state 3 --core-clock 1100 also works
-		card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9]*\)\/device/\1/')
+		card=$(echo ${core_addr[$i]} | sed 's/\/sys\/class\/drm\/card\([0-9a-z]*\)\/device/\1/')
 		gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 		echo -e "${LIGHTRED}GPU $y: ${gpu_name[$i]}${WHITE} (${core_addr[$i]})"
+
+		if [[ -f ${core_addr[$i]}/pp_od_clk_voltage ]]; then
+			if [[ -f ${core_addr[$i]}/pp_table ]]; then
+				if [[ -f /tmp/pp_tables/card$card/pp_table ]]; then
+					echo "Copying Power Play table to restore defaults"
+					cp /tmp/pp_tables/card$card/pp_table ${core_addr[$i]}/pp_table
+				else
+					echo "Can\`t find saved Power Play table. Try to reboot"
+				fi
+			else
+				echo "Can\`t find existing Power Play table. Try to reboot"
+			fi
+		else
+			echo "Something is wrong, may be you need to upgrade to work with Power Play tables"
+		fi
 		[[ ${gpu_name[$i]} == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
 
 		if [[ $ENHANCED -eq 1 && ${gpu_name[$i]} != *"Vega"* ]]; then
@@ -155,6 +162,14 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 
 		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
+
+		if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
+			mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
+			echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
+			echo $mem_str > ${core_addr[$i]}/pp_od_clk_voltage
+			echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
+		fi
+
 		amdmemtweak --i $y $MEMORY_TWEAK
 
 		#Fan section

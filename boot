@@ -63,7 +63,19 @@ else
 	echo "It seems this is not flash drive"
 fi
 
-[[ `gpu-detect AMD` -gt 0 ]] && sleep 2 && amdmeminfo -q -s > $AMDMEMINFO_FILE
+if [[ `gpu-detect AMD` -gt 0 ]]; then
+	sleep 2
+	echo "Saving Power Play tables:"
+	for ppfile in /sys/class/drm/card*/device/pp_table ; do
+		echo -e "\tSaving $ppfile"
+		card=$(echo $ppfile | sed 's/.*card\([0-9a-z]*\).*/\1/')
+		[[ -z $card ]] && echo "$0: Error matching card number in $ppfile" && continue
+		mkdir -p /tmp/pp_tables/card$card
+		cp $ppfile /tmp/pp_tables/card$card/pp_table
+	done
+
+	amdmeminfo -q -s > $AMDMEMINFO_FILE
+fi
 
 if [[ ! -f /dog/log/firstrun.log ]]; then
 	tech_info > /dog/log/firstrun.log

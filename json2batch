@@ -227,8 +227,14 @@ function make_batch () {
 		;;
 		ethminer)
 			minerexec+=" -P"
-			[[ $template != *://* ]]&& minerexec+=" stratum://"		
-			minerexec+="$template:$pass@$pool" #USERNAME.WORKERNAME:WORKERPWD
+			if [[ $pool != *://* ]]; then
+				minerexec+=" stratum://"
+				cleanpool=pool
+			elif [[ $pool == *ssl://* ]]; then
+				minerexec+=" stratum1+ssl://"
+				cleanpool=`echo $pool | sed  's/^.*ssl:\/\///'`
+			fi
+			minerexec+="$template:$pass@$cleanpool" #USERNAME.WORKERNAME:WORKERPWD
 			#echo $brand	
 			minerexec+=" --farm-recheck 500 --report-hashrate --api-port ${APIPORT[$miner]} --HWMON 1 $brand"
 		;;
