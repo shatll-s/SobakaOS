@@ -137,10 +137,11 @@ ip_json='{}'
 mac_json='{}'
 for ((i=0; i < ${#ip[@]}; i++)); do
 	mac[$i]=`ifconfig | grep "${ip[$i]}" -A4 | grep "ether" | awk '{print $2}'`
-	mac_json=$(jq -n --arg data "$mac_json" \
-		--arg key "$i" \
-		--arg value "${mac[$i]^^}" \
-		'$data | fromjson + { ($key) : ($value)}')
+	[[ ! -z ${mac[$i]} ]] && 
+		mac_json=$(jq -n --arg data "$mac_json" \
+			--arg key "$i" \
+			--arg value "${mac[$i]^^}" \
+			'$data | fromjson + { ($key) : ($value)}')
 
 	ip_json=$(jq -n --arg data "$ip_json" \
 		--arg key "$i" \

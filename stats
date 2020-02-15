@@ -302,7 +302,7 @@ case $1 in
 		miner_badshare=(`echo $devices | jq -r '.[].Denied'`)
 	;;
 	lolminer)
-		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:8080/summary`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/summary`
 		
 		miner_ver=`echo $stats_template | jq -r '.Software'`
 		miner_online=`echo $stats_template | jq -r '.Session.Startup'`
@@ -389,6 +389,15 @@ case $1 in
 		for ((i=0; i < ${#miner_hr[@]}; i++)); do #total hr from summary is incorrect
 			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
 		done
+
+		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	xmr_stak)
 		stats_template=`curl --connect-timeout 2 --silent --max-time 10 --noproxy '*' http://127.0.0.1:$port/api.json`
@@ -423,6 +432,15 @@ case $1 in
 		miner_total_share=`echo $stats_template | jq -r '.results.shares_good'`
 		[[ ! -z $miner_all_share && ! -z $miner_total_share ]] && miner_total_badshare=$(($miner_all_share - $miner_total_share))
 		miner_threads_hr=(`echo $stats_template | jq -r '.hashrate.threads[][0]'`)
+
+		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000000" | bc -l`
+			if [[ ! -z $miner_threads_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_threads_hr[@]}; i++)); do
+					miner_threads_hr[$i]=`echo "scale=2; ${miner_threads_hr[$i]} / 1000000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	nbminer)
 		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/api/v1/status`
@@ -673,7 +691,7 @@ if [[ $miner_algo ]]; then
 	
 	if [[ $miner_algo == *"equihash"* ]];then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s#[,/]#.#g; s/beam-pow//"`
-		[[ $miner_algo == "equihash150.5.3" ]] && miner_algo="beamhashii"
+		[[ $miner_algo == *"150.5.3"* ]] && miner_algo="beamhashii"
 	elif [[ $miner_algo == *"cuckaroo"* ]];then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s/grin//"`
 	fi
