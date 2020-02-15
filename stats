@@ -15,7 +15,7 @@ LOG="/dog/log/agent.log"
 #####################################################
 function miner_stats() {
 . $VARIABLES_CFG
-port=${APIPORT["$1"]}
+[[ ! -z ${APIPORT["$1"]} ]] && port=${APIPORT["$1"]}
 case $1 in
 	ewbf)
 		stats_template=`echo "GET /getstat" | nc -w $API_TIMEOUT localhost $port | tail -n 1`
@@ -441,23 +441,28 @@ case $1 in
 
 		miner_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares'`)
 		miner_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares'`)
+		
+		local dual_trigger=`echo $stats_template | jq -r '.stratum.difficulty2'`
+		
 		#dual
-		[[ $miner_algo == "eaglesong_ethash" ]] && miner_algo="eaglesong" && miner_dual_algo="ethash"
-		miner_dual_hr_raw=(`echo $stats_template | jq -r '.miner.devices[].hashrate2_raw'`)
-		miner_dual_total_hr=0
-		for ((i=0; i < ${#miner_dual_hr_raw[@]}; i++)); do
-			[[ $miner_dual_algo == "ethash" ]] && delimiter=1000 || delimiter=1
-			miner_dual_hr[i]=`echo "scale=2; ${miner_dual_hr_raw[i]} / $delimiter" | bc -l`
-			miner_dual_total_hr=`echo "$miner_dual_total_hr + ${miner_dual_hr[$i]}" | bc -l`
-		done
-		miner_dual_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares2'`)
-		miner_dual_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares2'`)
+		if [[ ! -z $dual_trigger && $dual_trigger != null ]]; then
+			[[ $miner_algo == "eaglesong_ethash" ]] && miner_algo="eaglesong" && miner_dual_algo="ethash"
+			miner_dual_hr_raw=(`echo $stats_template | jq -r '.miner.devices[].hashrate2_raw'`)
+			miner_dual_total_hr=0
+			for ((i=0; i < ${#miner_dual_hr_raw[@]}; i++)); do
+				[[ $miner_dual_algo == "ethash" ]] && delimiter=1000 || delimiter=1
+				miner_dual_hr[i]=`echo "scale=2; ${miner_dual_hr_raw[i]} / $delimiter" | bc -l`
+				miner_dual_total_hr=`echo "$miner_dual_total_hr + ${miner_dual_hr[$i]}" | bc -l`
+			done
+			miner_dual_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares2'`)
+			miner_dual_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares2'`)
+		fi
 	;;
 	ttminer)
 		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}' | nc -w $API_TIMEOUT localhost $port | jq '.result'`
 		[[ $miner1 == "ttminer" ]] && batch=$batch1 || batch=$batch2
 		miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
-	miner_ver=`echo $stats_template | jq -r '.[0]' | sed "s#TT-Miner/##"`
+		miner_ver=`echo $stats_template | jq -r '.[0]' | sed "s#TT-Miner/##"`
 		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
 		if (($miner_online_raw)); then
 			miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
@@ -481,7 +486,51 @@ case $1 in
 				done
 			fi
 		fi
+	;;
+	qitmeer)
+		local MINER_LOG="/tmp/qitmeer_tmp.log"
+		local log=`cat $MINER_LOG | tr -d '\0'`
+		local minername="linux-miner"
 
+		[[ $miner1 == $1 ]] && local batch=$batch1 || local batch=$batch2
+		local miner_ver=`echo $batch | sed 's#.*/dog/miners/qitmeer/\([.0-9a-zA-Z]*\)/.*#\1#'`
+		local miner_algo=`echo $batch | sed 's/.*--pow=\([0-9a-zA-Z]*\).*/\1/'`
+		local miner_online_raw=`ps -C $minername -o etimes= | awk '{print $1}'`
+		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		
+		local miner_total_hr=0
+		for (( i=0; i < `gpu-detect all`; i++ )); do
+            local hr=`echo "$log" | grep -a " # $i" | tail -n 1 | sed 's/.*: \([.0-9]*\).*/\1/'`
+			if [[ ! -z $hr ]]; then
+				local miner_hr[$i]=$hr
+				miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+			fi
+        done
+
+		local miner_total_share=`echo "$log" | grep -a "Global stats:" | tail -n 1 | sed 's/.*Accepted: \([0-9]*\).*/\1/'`
+		local miner_total_badshare=`echo "$log" | grep -a "Global stats:" | tail -n 1 | sed 's/.*Rejected: \([0-9]*\).*/\1/'`
+	;;
+	sushiminer)
+		local MINER_LOG="/dog/log/sushiminer.log"
+		local log=`cat $MINER_LOG | tr -d '\0'`
+		local minername="sushi-miner-ope"
+
+		[[ $miner1 == $1 ]] && local batch=$batch1 || local batch=$batch2
+		local miner_ver=`echo $batch | sed 's#.*/dog/miners/sushiminer/\([.0-9a-zA-Z]*\)/.*#\1#'`
+		local miner_algo='argon2d'
+		local miner_online_raw=`ps -C $minername -o etimes= | awk '{print $1}'`
+		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		
+		local offset=9
+		local miner_total_hr=0
+		for (( i=0; i < `gpu-detect all`; i++ )); do
+			local hr=`cat $MINER_LOG | grep -a "GPU" | tail -n 1 | awk -v offset="$offset" '{ printf $offset"\n" }'`
+			if [[ ! -z $hr ]]; then
+				local miner_hr[$i]=$hr
+				miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+			fi
+           	let offset+=4
+        done
 	;;
 esac
 

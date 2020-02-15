@@ -131,9 +131,17 @@ mb_json=$(
 )
 
 #ip=(`ifconfig | grep "inet addr" | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
-ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
+ifconfig=`ifconfig`
+ip=(`echo "$ifconfig" | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
 ip_json='{}'
+mac_json='{}'
 for ((i=0; i < ${#ip[@]}; i++)); do
+	mac[$i]=`ifconfig | grep "${ip[$i]}" -A4 | grep "ether" | awk '{print $2}'`
+	mac_json=$(jq -n --arg data "$mac_json" \
+		--arg key "$i" \
+		--arg value "${mac[$i]^^}" \
+		'$data | fromjson + { ($key) : ($value)}')
+
 	ip_json=$(jq -n --arg data "$ip_json" \
 		--arg key "$i" \
 		--arg value "${ip[$i]}" \
@@ -189,6 +197,7 @@ local request=$(
 	--arg refresh "$(date +%s)" \
 	--arg online $(date --date "`uptime -s`" +%s) \
 	--argjson ip "$ip_json" \
+	--argjson mac "$mac_json" \
 	--argjson gpu_busid "$gpu_busid_json" \
 	--argjson gpu_name "$rig_gpu_name_json" \
 	--argjson gpu_info "$rig_gpu_info_json" \
@@ -202,6 +211,7 @@ local request=$(
 			$refresh,
 			$online,
 			$ip,
+			$mac,
 			$gpu_busid,
 			$gpu_name,
 			$gpu_info,

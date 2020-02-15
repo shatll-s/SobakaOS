@@ -454,6 +454,35 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -m $template"
 			[[ ! -z $pass ]]&& minerexec+=" -n $pass"
 			minerexec+=" --stats_server=127.0.0.1:${APIPORT[$miner]} --log_level=info --minerlog=/dog/log/qitmeer.log"
+		;;
+		sushiminer)
+			dog_json=$(
+				jq -n \
+				--arg address "$wallet" \
+				--arg host "$pool" \
+				--arg port "$port" \
+				--arg name "$name" \
+				'{
+					$address, $host, $port, $name
+				}'
+			)
+
+			#looking for keys in json
+			if [[ $config != "{null}" ]]; then
+				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+				for ((y=0; y < ${#keys[@]}; y++)); do
+					#echo "Check ${keys[$y]}"
+					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
+						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
+
+					value=`echo $config | jq ".\"${keys[$y]}\""`
+					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
+				done
+			fi	
+				echo -e "$dog_json" | jq '.' > "${miner_dir}miner.conf"
+
+
+	  		
 		;;		
 		*)
 			: #do nothing

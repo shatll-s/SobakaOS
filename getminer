@@ -36,7 +36,8 @@ function getminer () {
 		echo -e "${GREEN}$miner $ver downloaded${WHITE}"
 	fi
 	folder="/dog/miners/$miner/$ver/"
-	[[ ! -d $folder ]] && echo -e "No folder ${GREEN}$folder${WHITE}, creating..." && mkdir -p $folder
+	[[ -d $folder ]] && echo -e "Deleting old folder ${GREEN}$folder${WHITE}" && rm -rf $folder
+	echo -e "Creating new folder ${GREEN}$folder${WHITE}" && mkdir -p $folder
 	tar -xf $file -C $folder
 	if [[ $? -ne 0 ]]; then
 		echo -e "${RED}Problem while extracting ${GREEN}$file${RED}. Exiting...${WHITE}"
