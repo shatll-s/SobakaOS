@@ -44,3 +44,4 @@ APIPORT[teamredminer]=10065
 APIPORT[cryptodredge]=10066
 APIPORT[nbminer]=10067
 APIPORT[qitmeer]=1235
+APIPORT[miniz]=20000

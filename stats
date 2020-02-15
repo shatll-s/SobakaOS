@@ -532,6 +532,33 @@ case $1 in
            	let offset+=4
         done
 	;;
+	miniz)
+		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT localhost:$port -X '{"id":"0", "method":"getstat"}'`
+		#echo $stats_template
+		miner_online=`echo $stats_template | jq -r '.start_time'`
+		miner_ver=`echo $stats_template | jq -r '.version'`
+		miner_algo=`echo $stats_template | jq -r '.algorithm'`
+		[[ $miner_algo == 'equihash150.5.3' ]] && miner_algo='beamhashii'
+		
+
+		#miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares'`
+		#miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares'`
+		miner_busid=(`echo $stats_template | jq -r '.result[].busid' | awk -F ':' '{print $2}'`)
+		miner_temp=(`echo $stats_template | jq -r '.result[].temperature'`)
+		miner_fan=(`echo $stats_template | jq -r '.result[].gpu_fan_speed'`)
+		#miner_power=(`echo $stats_template | jq -r '.result[].gpu_power_usage'`) #no need
+		miner_hr=(`echo $stats_template | jq -r '.result[].speed_sps'`)
+		miner_share=(`echo $stats_template | jq -r '.result[].accepted_shares'`)
+		miner_badshare=(`echo $stats_template | jq -r '.result[].rejected_shares'`)
+		miner_total_hr=0
+		miner_total_share=0
+		miner_total_badshare=0
+		for ((i=0; i < ${#miner_hr[@]}; i++)); do
+			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+			miner_total_share=`echo "scale=2; $miner_total_share + ${miner_share[$i]}" | bc -l`
+			miner_total_badshare=`echo "scale=2; $miner_total_badshare + ${miner_badshare[$i]}" | bc -l`
+		done
+	;;
 esac
 
 ##################################################################
@@ -646,6 +673,7 @@ if [[ $miner_algo ]]; then
 	
 	if [[ $miner_algo == *"equihash"* ]];then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s#[,/]#.#g; s/beam-pow//"`
+		[[ $miner_algo == "equihash150.5.3" ]] && miner_algo="beamhashii"
 	elif [[ $miner_algo == *"cuckaroo"* ]];then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s/grin//"`
 	fi

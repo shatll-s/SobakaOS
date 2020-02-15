@@ -483,7 +483,15 @@ function make_batch () {
 
 
 	  		
-		;;		
+		;;
+		miniz)
+	  		[[ ! -z $algo ]]&& minerexec+=" --par=$algo"
+			[[ ! -z $coin ]]&& minerexec+=" --symbol=$coin" || minerexec+=" --smart-pers"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
+			
+			minerexec+=" --telemetry=${APIPORT[$miner]} --log-file=/dog/log/miniz.log"
+		;;	
 		*)
 			: #do nothing
 		;;
