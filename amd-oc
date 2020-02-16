@@ -96,11 +96,12 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 		echo -e "${LIGHTRED}GPU $y: ${gpu_name[$i]}${WHITE} (${core_addr[$i]})"
 
-		if [[ -f ${core_addr[$i]}/pp_od_clk_voltage ]]; then
+		if [[ -f ${core_addr[$i]}/pp_od_clk_voltage ]]; then #grub error is fixed, amdgpu.ppfeaturemask=0xffff7fff used
 			if [[ -f ${core_addr[$i]}/pp_table ]]; then
 				if [[ -f /tmp/pp_tables/card$card/pp_table ]]; then
 					echo "Copying Power Play table to restore defaults"
 					cp /tmp/pp_tables/card$card/pp_table ${core_addr[$i]}/pp_table
+					sync
 				else
 					echo "Can\`t find saved Power Play table. Try to reboot"
 				fi
@@ -116,7 +117,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			echo -e "${LIGHTRED}Enhanced overclock (for all states)${WHITE}"
 			if [[ ! -z ${CORE_CLOCK[$y]} ]]; then
 				dpm_state=(`echo -e $($script -i $card --show-core | grep "DPM state" | sed -e 's/://g; s/DPM state \([0-9]*\)/\1/')`)
-				for ((z=0; z < ${#dpm_state[@]}; z++)); do
+				for ((z=1; z < ${#dpm_state[@]}; z++)); do
 					$script -i $card --core-state ${dpm_state[$z]} --core-clock ${CORE_CLOCK[$y]}
 				done
 			fi
@@ -130,8 +131,9 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		else
 			str="$script -i $card"
 			if [[ -z ${CORE_STATE[$y]} || ${CORE_STATE[$y]} == "A" ]]; then
-				CORE_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
-				cs_trigger=1
+				#CORE_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
+				#cs_trigger=1
+				CORE_STATE[$y]=5 #if Core State is not set, use default
 			fi
 			
 			if [[ ${CORE_CLOCK[$y]} ]]; then
@@ -149,14 +151,15 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			if [[ ${CORE_VOLTAGE[$y]} ]]; then
 				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$y]}" -A1) \
 					| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
-				str="$str --vddc-table-set ${CORE_VOLTAGE[$y]} --volt-state $volt_state"
+				str="$str --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$y]}"
 			fi
 		fi
 		#str="$script -i $card"
 
 		if [[ -z ${MEMORY_STATE[$y]} || ${MEMORY_STATE[$y]} == "A" ]]; then
-			MEMORY_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed -e 's/*//; s/:.*//'`
-			ms_trigger=1
+			#MEMORY_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed -e 's/*//; s/:.*//'`
+			#ms_trigger=1
+			MEMORY_STATE[$y]=`$script -i $card --show-mem | grep -E "Memory state ([0-9]+):" | tail -n 1 | sed "s/Memory state \([0-9]*\).*/\1/"`
 		fi
 		[[ ${MEMORY_CLOCK[$y]} ]]&&	str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
 

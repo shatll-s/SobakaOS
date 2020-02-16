@@ -338,6 +338,15 @@ case $1 in
 		for ((i=0; i < ${#miner_hr[@]}; i++)); do
 			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
 		done
+		
+		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=0; $miner_total_hr / 1000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=0; ${miner_hr[$i]} / 1000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	xmrig_cpu|xmrig_new)
 		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/1/summary`
