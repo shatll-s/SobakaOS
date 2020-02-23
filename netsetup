@@ -182,6 +182,7 @@ function setup()
 				string+="                addresses: [8.8.8.8, 8.8.4.4]\n"
 			else
 				string+="            dhcp4: yes\n"
+				string+="            dhcp-identifier: mac\n"
 			fi
 			string+="            dhcp6: no\n"
 			string+="            optional: true\n"
@@ -243,6 +244,7 @@ function setup()
 					string+="                addresses: [8.8.8.8, 8.8.4.4]\n"
 				else
 					string+="            dhcp4: yes\n"
+					string+="            dhcp-identifier: mac\n"
 				fi
 				string+="            dhcp6: no\n"
 				string+="            optional: true\n"
