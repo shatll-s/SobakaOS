@@ -312,6 +312,12 @@ function make_batch () {
 			[[ ! -z $port ]]&& minerexec+=" --port $port"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
+			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --proto stratum"
+
+			[[ ! -z $dual_pool ]]&& minerexec+=" --dserver $dual_pool"
+			[[ ! -z $dual_template ]]&& minerexec+=" --duser $dual_template"
+			[[ ! -z $dual_pass ]]&& minerexec+=" --dpass $dual_pass"
+			[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
 			minerexec+=" --api ${APIPORT[$miner]}"
 		;;
 		xmrig_cpu|xmrig_new)
@@ -408,7 +414,7 @@ function make_batch () {
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			if [[ ! -z $pool ]]; then
-				[[ $pool != "stratum"* ]] && pool="stratum+tcp://$pool"
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
 				minerexec+=" -o $pool"
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
@@ -425,17 +431,31 @@ function make_batch () {
 		;;
 		nbminer)
 			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
+			if [[ ! -z $pool && `echo $pool | grep -c "://"` -eq 0 ]]; then
+				[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool="nicehash+tcp://$pool" || pool="stratum+tcp://$pool"
+			fi
+			if [[ ! -z $dual_pool && `echo $dual_pool | grep -c "://"` -eq 0 ]]; then
+				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] && dual_pool="nicehash+tcp://$dual_pool" || dual_pool="stratum+tcp://$dual_pool"
+			fi
+				
 			if [[ ! -z $algo ]]; then
 				minerexec+=" -a $algo"
-				if [[ $algo == "eaglesong_ethash" ]]; then
-					[[ ! -z $dual_pool ]]&& minerexec+=" -do $dual_pool"
-					[[ ! -z $dual_template ]]&& minerexec+=" -du $dual_template"
+				if [[ $algo == *"_ethash" ]]; then
+					#main and dual are reverted
+					[[ ! -z $dual_pool ]]&& minerexec+=" -o $dual_pool"
+					[[ ! -z $dual_template ]]&& minerexec+=" -u $dual_template"
 					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
+
+					[[ ! -z $pool ]]&& minerexec+=" -do $pool"
+					[[ ! -z $template ]]&& minerexec+=" -du $template"
+					[[ ! -z $pass ]]&& minerexec+=":$pass"
+				else
+					[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+					[[ ! -z $template ]]&& minerexec+=" -u $template"
+					[[ ! -z $pass ]]&& minerexec+=":$pass"
 				fi
 			fi
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $pass ]]&& minerexec+=":$pass"
+			
 			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --log" #log in miner folder :(
 		;;
 		ttminer)
