@@ -156,6 +156,7 @@ function make_batch () {
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dcoin \$"${MINER}"_DUALCOIN"
 				#[[ ! -z $pass `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" -dpsw \$APASS"
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
+			[[ $addition != *"-mpsw"* ]] && APIPORT[$miner]="-${APIPORT[$miner]}"
 			[[ $addition != *"-mport"* ]] && minerexec+=" -mport ${APIPORT[$miner]}"
 			minerexec+=" -r 1 -logfile /dog/log/"$miner"_noappend.log"
 		;;

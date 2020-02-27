@@ -1,5 +1,5 @@
 #!/bin/bash
-[ -t 1 ] && . colors
+. colors
 
 function nvidia_stop () {
 	try_count=3

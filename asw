@@ -3,7 +3,7 @@
 BATCH_CFG="/dog/cfg/batch.cfg"
 AUTOSWITCH_CFG="/dog/cfg/autoswitch.cfg"
 AUTOSWITCH_TMP="/tmp/autoswitch"
-[ -t 1 ] && . colors
+. colors
 
 ########## functions ##########
 function set_fixstr () {

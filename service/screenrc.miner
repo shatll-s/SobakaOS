@@ -1,0 +1,12 @@
+#sessionname miner
+
+hardstatus             alwayslastline
+#hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
+hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}[ %{W}%t%?(%u)%?%{r} ]%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
+
+deflog on
+logfile flush 1
+logtstamp on
+logtstamp after 122
+#logfile /run/dog/teleconsole.%n
+

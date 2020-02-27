@@ -1,5 +1,5 @@
 #!/bin/bash
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors
 AMD_CFG="/dog/cfg/amd.cfg"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 [[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
@@ -183,7 +183,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		else 
 			echo -e "${CYAN}Manual${WHITE} fan (${FAN[$y]})." 
 			echo 1 > ${fan_addr[$i]}/pwm1_enable
-			if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
+			if [[ ${gpu_name[$i]} == *"Vega@@@"* ]]; then #Need to check
 				rpm_min=`cat ${fan_addr[$i]}/fan1_min`
 				rpm_max=`cat ${fan_addr[$i]}/fan1_max`
 				fan_target=`echo "scale=0; ${FAN[$y]} * $rpm_max / 100" | bc -l`

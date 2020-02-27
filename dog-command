@@ -26,7 +26,7 @@ echo $(date --rfc-3339=seconds)" Start doing \"$1\"" # \"$2\""
 
 case $1 in
 	exec)
-		return=$(timeout 300 bash -c "$2" 0> /dev/null)
+		return=$(timeout 300 bash -c "$2 | tr -d '\0'" 0> /dev/null)
 		exitcode=$?
 		if [[ $exitcode -eq 0 ]]; then
 			msg "$1 : $2" success "$return"
@@ -161,14 +161,24 @@ case $1 in
 		fi
 	;;
 	miner_log)
-		screen -S $2 -X hardcopy /tmp/hardcopy
-		if [[ $? -eq 0 ]]; then
-			return=$(cat /tmp/hardcopy | sed 's/"//g')
+		logfile="/dog/log/$2.log"
+		return=`tail -n 100 $logfile`
+
+		if [[ ! -z $return ]]; then
 			msg "Log: $2" success "$return"
 		else
-			return="$(screen -ls)"
-			msg "Log: $2" error "$return"
+			msg "Log: $2" error "No log file found. May be miner is not running?"
 		fi
+
+		#screen -S $2 -X hardcopy /tmp/hardcopy
+		#if [[ $? -eq 0 ]]; then
+		#	#return=$(cat /tmp/hardcopy | sed 's/"//g')
+		#	return=`cat -v /tmp/hardcopy`
+		#	msg "Log: $2" success "$return"
+		#else
+		#	return="$(screen -ls)"
+		#	msg "Log: $2" error "$return"
+		#fi
 	;;
 	restart_miner)
 		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")

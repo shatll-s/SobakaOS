@@ -1,5 +1,5 @@
 #!/bin/bash
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors
 NVIDIA_CFG="/dog/cfg/nvidia.cfg"
 LOCK_FILE="/tmp/.nvidia-oc.lock"
 

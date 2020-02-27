@@ -1,6 +1,6 @@
 #!/bin/bash
 AMDMEMINFO_FILE=/tmp/amdmeminfo
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors
 
 n=$(gpu-detect AMD)
 if [ $n == 0 ]; then

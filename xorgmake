@@ -1,5 +1,5 @@
 #!/bin/bash
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors
 
 #echo -e $BROWN"================================================================"$WHITE
 n=$(/dog/gpu-detect NVIDIA)

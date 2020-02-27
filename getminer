@@ -1,6 +1,6 @@
 #!/bin/bash
 #variables
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors
 VERSION_FILE='/dog/cfg/miner_versions.json'
 RIG_CFG="/dog/cfg/rig.cfg"
 
@@ -50,6 +50,7 @@ function getminer () {
 	miner_ver=`jq ".\"$miner\" += {\"$ver\" : \"\"}" <<< "$miner_ver"`
 	echo -e $miner_ver | jq '.' > $VERSION_FILE
 	echo "Miner added to $VERSION_FILE"
+	
 	msg "Miner download" success "$(date --rfc-3339=seconds)\nNew miner <b>$miner $ver</b> successfully downloaded and installed in system."
 }
 

@@ -2,7 +2,7 @@
 ########## variables ##########
 RIG_CFG="/dog/cfg/rig.cfg"
 KEY="/dog/cfg/.ssh/remotessh.key"
-[ -t 1 ] && . colors
+. colors
 
 function getdata () {
 	for option in private_key server port use login port_vnc use_vnc; do

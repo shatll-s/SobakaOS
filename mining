@@ -2,8 +2,10 @@
 #at first make Nvidia & AMD OC, then every 10 sec checks if the miners are closed, return them to live. Logic: second miner closes if it has same name with first
 LOG="/dog/log/mining.log"
 exec &>>$LOG
-
 BATCH_CFG="/dog/cfg/batch.cfg"
+MINERLOG1="/dog/log/miner1.log"
+MINERLOG2="/dog/log/miner2.log"
+SCREEN_CFG="/dog/service/screenrc.miner"
 
 echo "================================================================"
 echo $(date --rfc-3339=seconds)" Started new session $0"
@@ -36,13 +38,13 @@ while true; do
 			fi
 		elif [[ $(screen_check miner1) -eq 0 ]]; then #miner is set up, screens = 0
 			#wd restart
-			screen -dmS miner1.$miner1 bash -c "miner-loop $miner1 \"$batch1\""
+			screen -c $SCREEN_CFG -dmS miner1.$miner1 -Logfile $MINERLOG1 bash -c "miner-loop $miner1 \"$batch1\""
 			echo -n $(date --rfc-3339=seconds)" Started miner1 screen with $miner1 "
 			[[ $batch1 == $lastcheck ]] && echo "[code 2: miner is not changed, but closed]" || echo "[code 0: simple start]"
 		elif [[	$batch1 != $lastcheck ]]; then #miner is set up, screens > 0, just check if miner changed, if not, everething is ok
 			screen-kill miner1
 			#wd restart
-			screen -dmS miner1.$miner1 bash -c "miner-loop $miner1 \"$batch1\""
+			screen -c $SCREEN_CFG -dmS miner1.$miner1 -Logfile $MINERLOG1 bash -c "miner-loop $miner1 \"$batch1\""
 			echo $(date --rfc-3339=seconds)" Restarted miner1 screen with $miner1 [code 1: miner changed]"
 		fi
 		
@@ -55,7 +57,7 @@ while true; do
 			if [[ $(screen_check miner2) == 0 ]]; then
 				if [[ $batch2 != $batch1 ]]; then #if miner2 is set up, screen = 0, miner2 != miner1
 					#wd restart
-					screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
+					screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 \"$batch2\""
 					echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 2: miner is not changed, but closed]"
 				fi
 			else #ok, miner is set up and miner = last check and miner2 = miner1
@@ -67,14 +69,14 @@ while true; do
 		elif [[ $(screen_check miner2) == 0 ]]; then 
 			if [[ ! $batch2 == $batch1 ]]; then #miner is set up, miner != last check (changed or first run) and screen = 0 and miner1 != miner2
 				#wd restart
-				screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
+				screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 \"$batch2\""
 				echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 0: simple start]"
 			fi
 		else #miner is set up, miner != last check, screen > 0
 			if [[ ! $batch2 == $batch1 ]]; then  #miner is set up, miner != last check (changed or first run), screen > 0, miner1 != miner2
 				screen-kill miner2
 				wd restart
-				#screen -dmS miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
+				#screen -dmSL miner2.$miner2 bash -c "miner-loop $miner2 \"$batch2\""
 				echo $(date --rfc-3339=seconds)" Restarted miner2 screen with $miner2 [code 1: miner changed]"
 			else #miner is set up, miner != last check (changed or first run), screen > 0, miner1 = miner2 => miner2 changed to the same to miner 
 				screen-kill miner2
@@ -88,6 +90,19 @@ while true; do
 		echo $(date --rfc-3339=seconds)" Batch file $BATCH_CFG doesn\`t exist, sleep 10 seconds"	
 	fi
 	sleep 10
-	echo "$(tail -n 1000 $LOG)" > $LOG 
+	echo "$(tail -n 1000 $LOG)" > $LOG
+	
+	for ((i=1; i <= 2; i++)); do
+		eval "logfile=\$MINERLOG$i"
+		echo "logfile=$logfile"
+		eval "batch=\$batch$i"
+		
+		if [[ ! -z $batch ]]; then
+			strings=`wc $logfile | awk '{print $1}'`
+			[[ $strings -gt 1000 ]] && echo `$(tail -n 1000 $logfile` > $logfile
+		else
+			[[ -f $logfile ]] && rm $logfile
+		fi
+	done
 	
 done

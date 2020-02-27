@@ -4,7 +4,7 @@ RIG_CFG="/dog/cfg/rig.cfg"
 tmp_dir="/tmp"
 [[ -f $RIG_CFG ]] && . $RIG_CFG
 [[ -z $HOST ]] && HOST="https://os.dog/message.php"
-[ -t 1 ] && . colors
+. colors
 
 function upgrade_deb () {
 	local debname=$1

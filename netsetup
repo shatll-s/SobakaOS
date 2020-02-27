@@ -6,7 +6,7 @@ NETWORK_CFG_FLASH="/dog-flash/network.txt"
 TMP_FILE="/tmp/network"
 LOG="/dog/log/netsetup.log"
 
-[ -t 1 ] && . colors
+. colors
 
 function net_check()
 {

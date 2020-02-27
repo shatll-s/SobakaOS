@@ -7,7 +7,7 @@ LOCK_FILE="/tmp/.benchmark.lock"
 LOG="/dog/log/benchmark.log"
 VARIABLES_CFG="/dog/service/variables"
 . $VARIABLES_CFG
-[ -t 1 ] && . colors
+. colors
 algodata='{
 "dividers": {
     "CRYPTONIGHTV7": "1000000000",
