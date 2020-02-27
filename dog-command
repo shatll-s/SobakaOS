@@ -1,11 +1,13 @@
 #!/bin/bash
-[ -t 1 ] && . colors #source colors only if running in terminal
+. colors 
 AMD_CFG="/dog/cfg/amd.cfg"
 NVIDIA_CFG="/dog/cfg/nvidia.cfg"
 RIG_CFG="/dog/cfg/rig.cfg"
 WALLET_CFG="/dog/cfg/wallet.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
 LOCK_DIR="/tmp/dog-command"
+LF='
+'
 
 
 ########################################################
@@ -31,12 +33,10 @@ case $1 in
 		if [[ $exitcode -eq 0 ]]; then
 			msg "$1 : $2" success "$return"
 		else
-			msg "$1 : $2" warning "Exitcode: $exitcode\n$return"
+			msg "$1 : $2" warning "Exitcode: $exitcode${LF}$return"
 		fi
 	;;
 	get_bios)
-		#[[ $2 < 10 ]] && bus="0"$2
-		#bus=`echo $2 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` #now it`s mistake
 		bus=${2^^}
 		adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
 		#echo -e "argument=$2\nbus=$bus\nadapter=$adapter"
@@ -49,7 +49,7 @@ case $1 in
 			#base64 -w 0 "/tmp/amd${adapter}.rom" | gzip -9 -c | msg "Bios-rig"${RIG_ID}"-GPU${adapter}.rom" file payload #it works
 			gzip -9 -c "/tmp/amd${adapter}.rom" | base64 -w 0 | msg "Bios-rig"${RIG_ID}"-GPU"${adapter}".rom" file payload
 		else
-			msg "BIOS save error" warning "Error occured while saving bios for adapter ${adapter} (bus id $2)\n$return"
+			msg "BIOS save error" warning "`date -R`${LF}Error occured while saving bios for adapter ${adapter} (bus id $2)${LF}$return"
 		fi
 	;;
 	flash_bios)
@@ -59,7 +59,7 @@ case $1 in
 		wget -q $link 
 		exitcode=$?
 		if [[ ! $exitcode -eq 0 ]]; then
-			msg "Flash BIOS" error "Error occured during download BIOS ($exitcode)\n$return"
+			msg "Flash BIOS" error "`date -R`${LF}Error occured during download BIOS ($exitcode)${LF}$return"
 			rm $PID_file
 			exit 1
 		fi
@@ -68,7 +68,7 @@ case $1 in
 		gzip -df $file_gz 
 		exitcode=$?
 		if [[ ! $exitcode -eq 0 ]]; then
-			msg "Flash BIOS" error "Error occured during unzipping BIOS ($exitcode)\n$return"
+			msg "Flash BIOS" error "Error occured during unzipping BIOS ($exitcode)${LF}$return"
 			rm $PID_file
 			exit 1
 		fi
@@ -82,7 +82,7 @@ case $1 in
 		if [[ $exitcode -eq 0 ]]; then
 			msg "Flash BIOS" success "$return"
 		else
-			msg "Flash BIOS" error "Something goes wrong ($exitcode)\n$return"
+			msg "Flash BIOS" error "Something goes wrong ($exitcode)${LF}$return"
 		fi
 	;;
 	change_host)
@@ -90,10 +90,10 @@ case $1 in
 		if [[ $2 ]]; then
 			[[ ! -z $(grep "HOST=" $RIG_CFG) ]]&& sed -i "s/.*HOST=.*/HOST=$2/g" $RIG_CFG || echo "HOST=$2" >> $RIG_CFG
 			msg "Host change" ok \
-			"$(date --rfc-3339=seconds)\nHost succesfully changed to <b>$2</b>."
+			"$(date --rfc-3339=seconds)${LF}Host succesfully changed to <b>$2</b>."
 		else
 			msg "Host change" warning \
-			"$(date --rfc-3339=seconds)\nHost is not changed (connection will be lose if you will set empty host)."
+			"$(date --rfc-3339=seconds)${LF}Host is not changed (connection will be lose if you will set empty host)."
 		fi
 	;;
 	change_amd_oc)
@@ -115,14 +115,14 @@ case $1 in
 		if [[ $exitcode -eq 0 ]]; then
 			msg "NVIDIA OC" success "$return"
 		else
-			msg "NVIDIA OC" warning "Something goes wrong ($exitcode).\n$return"
+			msg "NVIDIA OC" warning "Something goes wrong ($exitcode).${LF}$return"
 		fi
 	;;
 	upgrade)
 		return=`upgrade`
 		exitcode=$?
 		if [[ $exitcode -eq 0 ]]; then
-			msg "Upgrade" success "<b>Upgraded successfully</b>\n$return"
+			msg "Upgrade" success "<b>Upgraded successfully</b>${LF}$return"
 			while [[ $try -lt 20 ]]; do
 				if [ `ls -a $LOCK_DIR | wc -l` -eq 3 ]; then
 					rm $PID_file
@@ -133,11 +133,11 @@ case $1 in
 			done
 			msg "Upgrade" warning "Upgrade was successfull, but I can not restart OSdog services, because some commands are still running.<br>Sometimes we need to reboot or restart OSdog services (if you need it, try to reboot or send <b>systemctl restart agent</b> command to rig."
 		else
-			msg "Upgrade" warning "<b>Something goes wrong</b>\n$return"
+			msg "Upgrade" warning "<b>Something goes wrong</b>${LF}$return"
 		fi
 	;;
 	reboot)
-		msg "Rebooting" ok "$(date --rfc-3339=seconds)\nRebooting."
+		msg "Rebooting" ok "$(date --rfc-3339=seconds)${LF}Rebooting."
 		nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1
 	;;
 	batch*)
@@ -151,13 +151,13 @@ case $1 in
 			if [[ $3 != "--hello" && $3 != "--quiet" ]]; then #don`t send msg if there is --hello argument
 				if [[ $(echo $2 | jq -R '.') != '""' ]]; then #if this is not STOP command
 					wd restart #restart watchdog if batch is changed
-					msg "Batch $i change" ok "$(date --rfc-3339=seconds)\n Batch files changed, miners restarted." 
+					msg "Batch $i change" ok "$(date --rfc-3339=seconds)${LF}Batch files changed, miners restarted." 
 				else #it`s STOP command
-					msg "Miner $i stop" ok "$(date --rfc-3339=seconds)\n Miner stopped" 
+					msg "Miner $i stop" ok "$(date --rfc-3339=seconds)${LF}Miner stopped" 
 				fi
 			fi
 		else
-			[[ $3 != "--hello" ]] && msg "Batch $i change" warning "$(date --rfc-3339=seconds)\n Error occured while wallet change."
+			[[ $3 != "--hello" ]] && msg "Batch $i change" warning "$(date --rfc-3339=seconds)${LF}Error occured while wallet change."
 		fi
 	;;
 	miner_log)
@@ -169,16 +169,6 @@ case $1 in
 		else
 			msg "Log: $2" error "No log file found. May be miner is not running?"
 		fi
-
-		#screen -S $2 -X hardcopy /tmp/hardcopy
-		#if [[ $? -eq 0 ]]; then
-		#	#return=$(cat /tmp/hardcopy | sed 's/"//g')
-		#	return=`cat -v /tmp/hardcopy`
-		#	msg "Log: $2" success "$return"
-		#else
-		#	return="$(screen -ls)"
-		#	msg "Log: $2" error "$return"
-		#fi
 	;;
 	restart_miner)
 		miner=$(screen -ls | grep $2 | sed "s/.*$2.\([a-z]*\).*/\1/")
@@ -187,10 +177,10 @@ case $1 in
 		if [[ $miner ]]; then
 			if [[ ! $miner_now ]]; then
 				msg "Restart $2" success \
-				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) succesfully restarted."
+				"$(date --rfc-3339=seconds)${LF}$2 (<b>$miner</b>) succesfully restarted."
 			else
 				msg "Restart $2" error\
-				"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) cannot be closed. Propably reboot will help."
+				"$(date --rfc-3339=seconds)${LF}$2 (<b>$miner</b>) cannot be closed. Propably reboot will help."
 			fi
 		else
 			. $RIG_CFG
@@ -200,7 +190,7 @@ case $1 in
 				miner=$MINER2
 			fi
 			msg "Restart $2" warning \
-			"$(date --rfc-3339=seconds)\n$2 (<b>$miner</b>) is not working.\nMay be this miner isn\`t suitable for your GPU."
+			"$(date --rfc-3339=seconds)${LF}$2 (<b>$miner</b>) is not working.\nMay be this miner isn\`t suitable for your GPU."
 		fi
 	;;
 	change_name)
@@ -216,9 +206,9 @@ case $1 in
 				dog-command batch1 --reconfigure --quiet
 				dog-command batch2 --reconfigure --quiet
 			fi
-			[[ $3 != '--hello' && $3 != '--quiet' ]] && msg "Name change" ok "$(date --rfc-3339=seconds)\n Name successfully changed to $2, may be you need reboot to get effect."
+			[[ $3 != '--hello' && $3 != '--quiet' ]] && msg "Name change" ok "$(date --rfc-3339=seconds)${LF}Name successfully changed to $2, may be you need reboot to get effect."
 		else
-			msg "Name change" warning "$(date --rfc-3339=seconds)\nError occured while changing name"
+			msg "Name change" warning "$(date --rfc-3339=seconds)${LF}Error occured while changing name"
 		fi
 	;;
 	change_password) #doesn`t work now
@@ -238,7 +228,7 @@ case $1 in
 			wget -q $link
 			exitcode=$?
 			if [[ ! $exitcode -eq 0 ]]; then
-				msg "OpenVPN config" error "Error occured while download config ($exitcode)\n$return"
+				msg "OpenVPN config" error "Error occured while download config ($exitcode)${LF}$return"
 				rm $PID_file
 				exit 1
 			fi
@@ -246,7 +236,7 @@ case $1 in
 			gzip -df $file_gz
 			exitcode=$?
 			if [[ ! $exitcode -eq 0 ]]; then
-				msg "OpenVPN config" error "Error occured while unzipping config ($exitcode)\n$return"
+				msg "OpenVPN config" error "Error occured while unzipping config ($exitcode)${LF}$return"
 				rm $PID_file
 				exit 1
 			fi
@@ -273,7 +263,7 @@ case $1 in
 		if [[ $exitcode -eq 0 ]]; then
 			msg "OpenVPN config" success "$return"
 		else
-			msg "OpenVPN config" error "Something goes wrong ($exitcode)\n$return"
+			msg "OpenVPN config" error "Something goes wrong ($exitcode)${LF}$return"
 		fi
 	;;
 	telec*)
@@ -290,12 +280,12 @@ case $1 in
 			link=`echo "$raw_return" | grep "WebUI for this session" | sed 's/.*\(https.*\)$/\1/'`
 			#[[ $link ]] && title="Teleconsole <a href=$link>$argument</a>" || title="Teleconsole $argument"
 			#data="$(date --rfc-3339=seconds)\nLink <a href='$link'>connect to console</a>$return"
-			[[ $link ]] && data=$data"<a href='$link' target='_blank'>Connect to console</a>\n"
+			[[ $link ]] && data=$data"<a href='$link' target='_blank'>Connect to console</a>"
 		#else
 		#	#title="Teleconsole $argument"
 		#	data="$(date --rfc-3339=seconds)\n$return"
 		fi
-		data=$data"$return\nExitcode: $exitcode"
+		data=$data"$return${LF}Exitcode: $exitcode"
 		msg "Teleconsole $argument" $type "$data"
 	;;
 	af)
@@ -348,7 +338,7 @@ case $1 in
 			;;
 			*)
 				echo "$data" > /dog/cfg/autoswitch.cfg
-				[[ $3 != '--hello' ]] && msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved\n$2"
+				[[ $3 != '--hello' ]] && msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved${LF}$2"
 			;;
 		esac
 	;;
@@ -356,7 +346,7 @@ case $1 in
 		case "$2" in
 			stop|log)
 				return=$(benchmark $2)
-				msg "Benchmark $2" primary "$(date --rfc-3339=seconds)\n$return"
+				msg "Benchmark $2" primary "$(date --rfc-3339=seconds)${LF}$return"
 			;;
 			*)
 				echo "$2" > /tmp/benchmark
@@ -400,7 +390,7 @@ case $1 in
 		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
 		
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
-			"$(date --rfc-3339=seconds)\nRig settings applied:\n$2"
+			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"
 	;;
 	*)
 		#echo "I don\`t know this command($1)"
