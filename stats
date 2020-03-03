@@ -58,8 +58,7 @@ case $1 in
 			pass_value=`echo $batch | sed "s/.*$pass_arg \([-_0-9a-zA-Z@]*\).*/\1/"`
 			request=`jq ". += {\"psw\": \"$pass_value\"}" <<< "$request"`
 		fi
-		[[ $batch == *$port_arg* ]] && port=`echo $batch | sed "s/.*$port_arg \([0-9]*\).*/\1/"`
-
+		[[ $batch == *$port_arg* ]] && port=`echo $batch | sed "s/.*$port_arg [-]*\([0-9]*\).*/\1/"`
 		local stats_template=`echo $request | nc -w $API_TIMEOUT localhost $port | jq '.result'`
 		miner_ver=`echo $stats_template | jq -r '.[0]'`
 		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
@@ -351,8 +350,8 @@ case $1 in
 			for ((i=0; i < ${#miner_dual_hr[@]}; i++)); do
 				miner_dual_total_hr=`echo "scale=2; $miner_dual_total_hr + ${miner_dual_hr[$i]}" | bc -l`
 			done
-			miner_dual_total_share=(`echo $stats_template | jq -r '.devices[].accepted_shares2'`)
-			miner_dual_total_badshare=(`echo $stats_template | jq -r '.devices[].rejected_shares2'`)
+			miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares2'`
+			miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares2'`
 		fi
 
 		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
