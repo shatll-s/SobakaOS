@@ -350,8 +350,8 @@ case $1 in
 			for ((i=0; i < ${#miner_dual_hr[@]}; i++)); do
 				miner_dual_total_hr=`echo "scale=2; $miner_dual_total_hr + ${miner_dual_hr[$i]}" | bc -l`
 			done
-			miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares2'`
-			miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares2'`
+			miner_dual_total_share=`echo $stats_template | jq -r '.total_accepted_shares2'`
+			miner_dual_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares2'`
 		fi
 
 		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
