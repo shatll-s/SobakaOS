@@ -45,3 +45,4 @@ APIPORT[cryptodredge]=10066
 APIPORT[nbminer]=10067
 APIPORT[qitmeer]=1235
 APIPORT[miniz]=20000
+APIPORT[srbminer]=21550

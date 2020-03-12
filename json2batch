@@ -319,7 +319,7 @@ function make_batch () {
 			[[ ! -z $dual_template ]]&& minerexec+=" --duser $dual_template"
 			[[ ! -z $dual_pass ]]&& minerexec+=" --dpass $dual_pass"
 			[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
-			minerexec+=" --api ${APIPORT[$miner]}"
+			minerexec+=" --api ${APIPORT[$miner]} --logfile /dog/log/gminer.log"
 		;;
 		xmrig_cpu|xmrig_new)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
@@ -420,7 +420,7 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/dog/log/teamredminer.log"
+			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/dog/log/teamredminer.log --bus_reorder"
 		;;
 		cryptodredge)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
@@ -512,6 +512,18 @@ function make_batch () {
 			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
 			
 			minerexec+=" --telemetry=${APIPORT[$miner]} --log-file=/dog/log/miniz.log"
+		;;
+		srbminer)
+			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
+			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool=" --nicehash true"
+			#echo "@"$template"@"
+			[[ ! -z $template ]]&& minerexec+=" --wallet $template"
+			#[[ ! -z $name ]]&& minerexec+=" --worker $name"
+			[[ ! -z $pass ]]&& minerexec+=" --password $pass"
+			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
+
+			
+			minerexec+=" --api-enable --api-port ${APIPORT[$miner]} --enable-opencl-cleanup --log-file=/dog/log/srbminer.log"
 		;;	
 		*)
 			: #do nothing

@@ -94,7 +94,7 @@ while true; do
 	
 	for ((i=1; i <= 2; i++)); do
 		eval "logfile=\$MINERLOG$i"
-		echo "logfile=$logfile"
+		#echo "logfile=$logfile"
 		eval "batch=\$batch$i"
 		
 		if [[ ! -z $batch ]]; then

@@ -76,12 +76,14 @@ case $1 in
 		miner_total_badshare=`echo $stats_template | jq -r '.[2]' | awk -F';' '{print $3}'`
 		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
 		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
+		
 		#dual
-		miner_dual_total_hr=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $1}'`
-		miner_dual_total_share=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $2}'`
-		miner_dual_total_badshare=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $3}'`
-		local miner_dual_hr=(`echo $stats_template | jq -r '.[5]' | sed 's/;/\n/g'`)
-		#[[ $miner_dual_total_hr ]] && . $WALLET_CFG && miner_dual_algo=$CLAYMORE_DUALCOIN
+		if [[ $batch == *"-dcoin "* ]]; then #-dcoin in batch is trigger
+ 			local miner_dual_total_hr=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $1}'`
+			local miner_dual_total_share=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $2}'`
+			local miner_dual_total_badshare=`echo $stats_template | jq -r '.[4]' | awk -F';' '{print $3}'`
+			local miner_dual_hr=(`echo $stats_template | jq -r '.[5]' | sed 's/;/\n/g'`)
+		fi
 	;;
 	bminer)
 		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/api/status`
@@ -98,6 +100,15 @@ case $1 in
 		done
 		miner_total_share=(`echo $stats_template | jq -r '.stratum.accepted_shares'`)
 		miner_total_badshare=(`echo $stats_template | jq -r '.stratum.rejected_shares'`)
+
+		if [[ $miner_algo == "ethash" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000" | bc`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc`
+				done
+			fi
+		fi
 	;;
 	ccminer|cryptodredge)
 		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
@@ -603,6 +614,34 @@ case $1 in
 			miner_total_badshare=`echo "scale=2; $miner_total_badshare + ${miner_badshare[$i]}" | bc -l`
 		done
 	;;
+	srbminer)
+		[[ "srbminer" == $miner1 ]] && batch=$batch1 || batch=$batch2
+		if [[ $batch == *$pass_arg* ]]; then
+			pass_value=`echo $batch | sed "s/.*$pass_arg \([-_0-9a-zA-Z@]*\).*/\1/"`
+			request=`jq ". += {\"psw\": \"$pass_value\"}" <<< "$request"`
+		fi
+		[[ $batch == *"--api-port"* ]] && port=`echo $batch | sed "s/.*--api-port \([0-9]*\).*/\1/"`
+		[[ -z $port ]] && port=${APIPORT["$1"]}
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port`
+		#echo $stats_template | jq '.'
+		local miner_online_raw=`echo $stats_template | jq -r '.start_time'`
+		miner_online_raw=`echo $stats_template | jq -r '.mining_time'`
+		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		miner_ver=`echo $stats_template | jq -r '.miner_version'`
+		miner_algo=`echo $stats_template | jq -r '.algorithm'`
+
+		miner_busid=(`echo $stats_template | jq -r '.gpu_devices[].bus_id'`)
+		miner_temp=(`echo $stats_template | jq -r '.gpu_devices[].temperature'`)
+		miner_hr_raw=`echo $stats_template | jq '.gpu_hashrate[]'` # | jq 'del(total)'`
+		miner_hr=(`echo $miner_hr_raw | jq -r 'del(.total)[]'`)
+		miner_total_hr=`echo $stats_template | jq -r '.gpu_hashrate[].total'`
+		
+		#echo $miner_hr_raw | jq '.'
+
+		miner_total_share=`echo $stats_template | jq -r '.shares.accepted'`
+		miner_total_badshare=`echo $stats_template | jq -r '.shares.rejected'`
+	
+	;;
 esac
 
 ##################################################################
@@ -768,24 +807,30 @@ echo $miner_total_hr > /tmp/hr.$1
 ##################################################################
 function stats {
 if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
-	#nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
 	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits > $NVIDIASMI_FILE
-
-	[[ $? > 0 ]] && return
-	local timer=0
-	while [[ $timer -le 10 ]]; do
-		if  [[ -f $NVIDIASMI_FILE ]]; then #We got nvidia-smi file
-			break
+	#local nvidia_smi=`timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits ` #> $NVIDIASMI_FILE >/tmp/ko 2>/dev/null
+	exitcode=$?
+	#echo "@$nvidia_smi@"
+	
+	#echo "exitcode $exitcode"
+	if [[ $exitcode -eq 0 ]]; then
+		local timer=0
+		while [[ $timer -le 10 ]]; do
+			if  [[ -f $NVIDIASMI_FILE ]]; then #We got nvidia-smi file
+				break
+			fi
+			sleep 0.5
+			((timer+=1))
+		done
+		if [[ -f $NVIDIASMI_FILE ]]; then
+			local nvidia_smi=`cat $NVIDIASMI_FILE`
+			rm $NVIDIASMI_FILE
 		fi
-		sleep 0.5
-		((timer+=1))
-	done
-	if [[ -f $NVIDIASMI_FILE ]]; then
-		local nvidia_smi=`cat $NVIDIASMI_FILE`
-		rm $NVIDIASMI_FILE
+	else
+		echo -e "${RED}Nvidia drivers errror${WHITE}"
 	fi
-
 fi
+
 core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
 	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
@@ -810,13 +855,15 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
 		local power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
-		if [[ ! -z $nvidia_smi ]]; then
+		#BAD nvidia-smi call:
+		#NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
+		if [[ ! -z $nvidia_smi && $nvidia_smi != *"NVIDIA-SMI"* ]]; then
 			local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		    local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 			local rig_gpu_fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
 			[[ ${fan_raw[$i]} == *"Unknown Error"* ]] && rig_gpu_fan_raw[$i]=555
 			local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`
-			[[ power_raw[$i] != *"Not Supported"* ]] && local power[$i]=`echo "scale = 0; ${power_raw[$i]} / 1" | bc -l`
+			[[ ! -z power_raw[$i] && power_raw[$i] != *"Not Supported"* ]] && local power[$i]=`echo "scale=0; ${power_raw[$i]}/1" | bc -l`
 		fi
 	fi
 done
@@ -928,12 +975,14 @@ local request=$(
 
 )
 
-hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`
+if [[ $LOGS != "OFF" ]]; then #in 99% cases LOGS="OFF" only on USB flash drive
+	hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`
+	[[ ! -z $hddtemp ]] && request=`jq ".stats.temp += {\"HDD_TEMP\": \"$hddtemp\"}" <<< "$request"`
+fi
 [[ ! -z $avg_cpu_temp ]] && request=`jq ".stats.temp += {\"CPU_TEMP\": \"$avg_cpu_temp\"}" <<< "$request"`
-[[ ! -z $hddtemp ]] && request=`jq ".stats.temp += {\"HDD_TEMP\": \"$hddtemp\"}" <<< "$request"`
 [[ ! -z $THERMO_RODOS ]] && request=`jq ".stats.temp += {\"RODOS_TEMP\": \""$(rodos --temp $THERMO_RODOS)"\"}" <<< "$request"`
 
-echo $request | jq '.' -c #echo in screen
+echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
 
 #get server answer
 local response=$(echo $request | curl -s --data @- \
