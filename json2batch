@@ -47,6 +47,9 @@ function convert_algo () { #for nicehash
 		CUCKATOO|CUCKATOO31)
 			local output_algo="GRINCUCKATOO31"
 		;;
+		CUCKATOO32)
+			local output_algo="GRINCUCKATOO32"
+		;;
 		LYRA2V3)
 			local output_algo="LYRA2REV3"
 		;;

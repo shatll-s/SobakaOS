@@ -6,12 +6,25 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE="/tmp/.amd-oc.lock"
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak fan enhanced; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak_type fan enhanced; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
 		fi
 	done
+	if [[ `echo $1 | jq ".memory_tweak"` != null ]]; then
+		local memory_tweak="`echo $1 | jq -r \".memory_tweak\"`"
+		if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
+			MEMORY_TWEAK="$memory_tweak"
+		else
+			oldIFS="$IFS"
+			IFS='
+'
+			IFS=${IFS:0:1}
+			MEMORY_TWEAK=($memory_tweak)
+			IFS="$oldIFS"
+		fi
+	fi
 }
 
 if  [[ -e $LOCK_FILE ]]; then
@@ -69,9 +82,20 @@ echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
 echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
 echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
-echo -e ${CYAN}"Memory Tweak:${WHITE}\t${MEMORY_TWEAK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
-[ -t 1 ] && echo -e ${ITALIC}"*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
+echo -en ${CYAN}"Memory Tweak:${WHITE}\t"
+if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
+	echo "Common"
+	echo "$MEMORY_TWEAK"
+else
+	echo "Individual"
+	for (( i=0; i < ${#MEMORY_TWEAK[@]}; i++ )); do
+		[[ $i > 0 ]] && echo -e "${BROWN}--------------------------${WHITE}"
+		echo "${MEMORY_TWEAK[$i]}"
+	done
+fi
+
+[ -t 1 ] && echo -e ${ITALIC}"\n*If there is not enough settings (i.e. you try to apply FAN 70 70 50,\nbut you have 5 GPU, last 2 GPU will use last available value = 50)"${WHITE}
 echo -e $BROWN"================================================================"$WHITE
 
 #making sorted array of core addresses
@@ -138,10 +162,15 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			
 			if [[ ${CORE_CLOCK[$y]} ]]; then
 				if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
-					$script -i $card --core-state 4 --core-clock $((${CORE_CLOCK[$y]}-30)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					$script -i $card --core-state 5 --core-clock $((${CORE_CLOCK[$y]}-20)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					$script -i $card --core-state 6 --core-clock $((${CORE_CLOCK[$y]}-10)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					$script -i $card --core-state 7 --core-clock ${CORE_CLOCK[$y]} | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					for (( vega_state=1; vega_state <= 7; vega_state++ )); do
+						vega_clock=`echo "scale=0; ${CORE_CLOCK[$y]} - (7-$vega_state)*10" | bc -l`
+						$script -i $card --core-state $vega_state --core-clock $vega_clock | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+						#echo "$vega_state = $vega_clock"
+					done
+					#$script -i $card --core-state 4 --core-clock $((${CORE_CLOCK[$y]}-30)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					#$script -i $card --core-state 5 --core-clock $((${CORE_CLOCK[$y]}-20)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					#$script -i $card --core-state 6 --core-clock $((${CORE_CLOCK[$y]}-10)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+					#$script -i $card --core-state 7 --core-clock ${CORE_CLOCK[$y]} | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 
 				else
 					str="$str --core-state ${CORE_STATE[$y]} --core-clock ${CORE_CLOCK[$y]}"
@@ -173,7 +202,12 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
 		fi
 
-		amdmemtweak --i $y $MEMORY_TWEAK
+		if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
+			amdmemtweak --i $y $MEMORY_TWEAK
+		else
+			#no need to use if args are too short
+			[[ ${#MEMORY_TWEAK[$y]} -gt 4 ]] && amdmemtweak --i $y $MEMORY_TWEAK || echo -e "${RED}There are no AMDMemTweak settings for this card${WHITE}"
+		fi
 
 		#Fan section
 		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
