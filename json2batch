@@ -161,7 +161,7 @@ function make_batch () {
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
 			[[ $addition != *"-mpsw"* ]] && APIPORT[$miner]="-${APIPORT[$miner]}"
 			[[ $addition != *"-mport"* ]] && minerexec+=" -mport ${APIPORT[$miner]}"
-			minerexec+=" -r 1 -logfile /dog/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -logfile /dog/log/$miner.log" #noappend
 		;;
 		phoenix)
 			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
@@ -201,7 +201,7 @@ function make_batch () {
 			minerexec+=" --server $raw_pool --port $port"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
-			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /dog/log/"$miner".log"
+			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /dog/log/$miner.log"
 		;;
 		bminer)
 			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
@@ -211,7 +211,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=$template
 			[[ ! -z $pass ]]	&& minerexec+=":"$pass
 			minerexec+="@$pool"
-			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/dog/log/"$miner".log -watchdog=false"
+			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/dog/log/$miner.log -watchdog=false"
 		;;
 		ccminer)
 			#minerexec+="$fork -o $pool"
@@ -245,12 +245,12 @@ function make_batch () {
 		claymore_c)
 			minerexec+=" -xpool $pool -xwal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/$miner.log"
 		;;
 		claymore_z)
 			minerexec+=" -zpool $pool -zwal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/"$miner"_noappend.log"
+			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/$miner.log"
 		;;
 		cpuminer)
 			minerexec+=" -o "
@@ -412,7 +412,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/dog/log/wildrig.log"
+			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/dog/log/$miner.log"
 		;;
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
@@ -423,15 +423,14 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=${APIPORT[$miner]} --log_file=/dog/log/teamredminer.log --bus_reorder"
+			minerexec+=" --api_listen=${APIPORT[$miner]} --bus_reorder --watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
 		cryptodredge)
-			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind ${APIPORT[$miner]} --log /dog/log/cryptodredge.log"
+			minerexec+=" --api-bind ${APIPORT[$miner]} --log /dog/log/$miner.log"
 		;;
 		nbminer)
 			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
@@ -477,7 +476,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -m $template"
 			[[ ! -z $pass ]]&& minerexec+=" -n $pass"
-			minerexec+=" --stats_server=127.0.0.1:${APIPORT[$miner]} --log_level=info --minerlog=/dog/log/qitmeer.log"
+			minerexec+=" --stats_server=127.0.0.1:${APIPORT[$miner]} --log_level=info --minerlog=/dog/log/$miner.log"
 		;;
 		sushiminer)
 			dog_json=$(
@@ -514,7 +513,7 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
 			
-			minerexec+=" --telemetry=${APIPORT[$miner]} --log-file=/dog/log/miniz.log"
+			minerexec+=" --telemetry=${APIPORT[$miner]} --log-file=/dog/log/$miner.log"
 		;;
 		srbminer)
 			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
@@ -526,7 +525,7 @@ function make_batch () {
 			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
 
 			
-			minerexec+=" --api-enable --api-port ${APIPORT[$miner]} --enable-opencl-cleanup --log-file=/dog/log/srbminer.log"
+			minerexec+=" --api-enable --api-port ${APIPORT[$miner]} --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
 		;;	
 		*)
 			: #do nothing

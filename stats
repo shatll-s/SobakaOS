@@ -849,7 +849,9 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	#echo "Card $i, core addr ${core_addr[$i]}"
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
 		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
-		local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
+		#local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
+		local rig_gpu_fan_raw[$i]=`cat "${fan_addr[$i]}/pwm1"`
+		rig_gpu_fan_raw[$i]=`echo "scale=0; ${rig_gpu_fan_raw[$i]}*100/255" | bc -l`
 		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
 		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is like 65000
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
@@ -1046,7 +1048,7 @@ if [[ -z $1 ]]; then
 	while true; do
 		[[ -f $RIG_CFG ]] && . $RIG_CFG || echo "No config file. Can\`t connect to host"  >> $LOG
 		[[ -f $BATCH_CFG ]] && . $BATCH_CFG
-		sleep 5
+		sleep 10
 		stats
 		echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
 	done

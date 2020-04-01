@@ -1,0 +1,53 @@
+#!/bin/bash
+LOG_DIR="/dog/log"
+#[[ -z $1 ]] && miner="claymore" || miner=$1
+miner=$1
+Miner=${miner^}
+logfile="${LOG_DIR}/${miner}.log"
+reboot_logfile="${LOG_DIR}/${miner}_reboot.log"
+#reboot_logfile2="${LOG_DIR}/${miner}_reboot.log2"
+[[ -f $reboot_logfile ]] && rm $reboot_logfile #remove old reboot log
+
+function get_lastmsg () {
+	if [[ $miner == "claymore" ]]; then
+		keywords="WATCHDOG|hangs"
+	elif [[ $miner == "teamredminer" ]]; then
+		keywords="DEAD"
+	fi
+	local logtext="$1"
+	local raw_msg=`echo $logtext | grep -m1 -E "$keywords"`
+	if [[ $miner == "claymore" ]]; then
+		local msg=`echo $raw_msg | sed -e 's/.*WATCHDOG: //' | tr -dc '[:print:]'`
+	elif [[ $miner == "teamredminer" ]]; then
+		local msg=`echo $raw_msg | sed -e 's/, will execute.*//' | tr -dc '[:print:]'`
+	fi
+	#echo "$1"
+	#echo "==="
+	#echo "$raw_msg"
+	#echo "==="
+	#echo "$msg" 
+}
+
+#save last messages about hanging cards
+if [[ -f $logfile ]]; then
+	tail -n 100 $logfile > $reboot_logfile
+	#lastmsg_raw=`tac $reboot_logfile` | grep -m1 -E "$keywords" | sed -e 's/.*WATCHDOG: //' | tr -dc '[:print:]'`
+	#tac $reboot_logfile2
+	get_lastmsg "`tac $reboot_logfile`"
+fi
+
+if [[ -z $lastmsg ]]; then
+	lastmsg="$Miner Reboot"
+else
+	lastmsg="$Miner Reboot: $lastmsg"
+fi
+
+if [[ -f $reboot_logfile ]]; then
+	return="`date --rfc-3339=seconds` Last 50 strings of $Miner log:\n`tail -n 50 $reboot_logfile`" #| sed -e 's/\"//g; /^\s*$/d;'`
+	/dog/msg "$lastmsg" danger "$return"
+else
+	/dog/msg "$lastmsg" danger "$return"
+fi
+
+nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
+exit 0

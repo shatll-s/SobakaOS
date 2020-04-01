@@ -206,7 +206,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			amdmemtweak --i $y $MEMORY_TWEAK
 		else
 			#no need to use if args are too short
-			[[ ${#MEMORY_TWEAK[$y]} -gt 4 ]] && amdmemtweak --i $y $MEMORY_TWEAK || echo -e "${RED}There are no AMDMemTweak settings for this card${WHITE}"
+			[[ ${#MEMORY_TWEAK[$y]} -gt 4 ]] && amdmemtweak --i $y ${MEMORY_TWEAK[$y]} || echo -e "${RED}There are no AMDMemTweak settings for this card${WHITE}"
 		fi
 
 		#Fan section
@@ -225,15 +225,18 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 				[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
 				echo $fan_target > ${fan_addr[$i]}/fan1_target
 			else
-				let fan_adapted[$i]=${FAN[$y]}*255/100 #fan power is beetween 0 and 255
+				let fan_adapted[$i]=`echo "scale=0; ${FAN[$y]}*255/100" | bc -l` #fan power is beetween 0 and 255
 				echo ${fan_adapted[$i]} > ${fan_addr[$i]}/pwm1
 			fi
 		fi
 		if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
-			echo "echo manual > ${core_addr[$i]}/power_dpm_force_performance_level"
-			echo "echo 4 > ${core_addr[$i]}/pp_power_profile_mode"
-			echo "manual" > ${core_addr[$i]}/power_dpm_force_performance_level
-			echo 4 > ${core_addr[$i]}/pp_power_profile_mode		
+			#echo "echo manual > ${core_addr[$i]}/power_dpm_force_performance_level"
+			#echo "manual" > ${core_addr[$i]}/power_dpm_force_performance_level
+			#echo "echo 4 > ${core_addr[$i]}/pp_power_profile_mode"
+			#echo 4 > ${core_addr[$i]}/pp_power_profile_mode
+
+			echo "echo auto > ${core_addr[$i]}/power_dpm_force_performance_level"
+			echo "auto" > ${core_addr[$i]}/power_dpm_force_performance_level	
 		else
 			if [[ $ENHANCED -eq 1 && ${gpu_name[$i]} != *"Vega"* ]]; then
 				echo auto > ${core_addr[$i]}/power_dpm_force_performance_level
