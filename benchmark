@@ -64,20 +64,6 @@ function screen_check () {
 	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
 }
 
-function check_con () {
-	echo -n "Killing old connections ..."
-	while true; do
-  		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
-			killcx $con lo $?>/dev/null
-			echo -n "."
-  		done
-		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &>/dev/null &&
-			continue ||
-			break
-	done
-	echo " DONE"
-}
-
 function services_stop () {
 	echo -e "${GREEN}> Stopping services${WHITE}"
 	wd stop > /dev/null 2>&1
@@ -124,17 +110,16 @@ function benchmark () {
 	for ((i=0; i < ${#algos[@]}; i++)); do
 		echo2 "----------------------------------------------------------------"
 		local algo=`echo $cfg | jq ".algo.${algos[$i]}"`
-		echo $algo > /tmp/bm_current_algo
-		local miner=`echo $cfg | jq -r ".algo.${algos[$i]}.miner"`
-		local batch=`json2batch /tmp/bm_current_algo "return"`
+		echo $algo > /tmp/batch1
+		[[ ! -z $port1 ]] && release-port $port1 &
+		json2batch /tmp/batch1
+		. $BATCH_CFG
 		local check_time=`echo $time_array | jq -r ".${algos[$i]}"`
 		local warm_up=`echo $warmup_array | jq -r ".${algos[$i]}"`
 		[[ -z $check_time ]] && check_time=300
 		[[ -z $warm_up ]] && warm_up=60
-		echo2 "Algo: ${CYAN}${algos[$i]}${WHITE}\tminer: ${CYAN}$miner${WHITE}\tcheck${CYAN} $check_time${WHITE}\twarm-up${CYAN} $warm_up${WHITE}"
-		echo -e "miner1=\"$miner\"\nbatch1=\"$batch\"" > $BATCH_CFG
-		check_con $miner
-		screen -dmS miner1.benchmark bash -c "miner-loop $miner \"$batch\""
+		echo2 "Algo: ${CYAN}${algos[$i]}${WHITE}\tminer: ${CYAN}$miner1${WHITE}\tcheck${CYAN} $check_time${WHITE}\twarm-up${CYAN} $warm_up${WHITE}"
+		screen -dmS miner1.benchmark bash -c "miner-loop $miner1 $port1 \"$batch1\""
 		sleep $warm_up
 		echo2 "$warm_up seconds warm-up passed, start checking hashrate"
 		local now=`date +%s`
@@ -143,10 +128,10 @@ function benchmark () {
 		local hr_sum=0
 		while [[ `date +%s` -le $stop_time ]]; do
 			((iterations++))
-			local stats=`stats $miner`
+			local stats=`stats $miner1 $port1 "$batch1"`
 			[[ `echo $stats | jq '.miner_total_hr'` != null ]] && local hr=`echo $stats | jq -r '.miner_total_hr'` ||
 				local hr=0
-			if [[ "phoenix claymore ethminer" == *$miner* ]]; then
+			if [[ "phoenix claymore ethminer" == *$miner1* ]]; then
 				hr=`echo "scale=2; $hr / 1000" | bc -l`
 			elif [[ "X16R" == *${algos[$i]^^}* ]]; then
 				hr=`echo "scale=2; $hr / 1000000" | bc -l`

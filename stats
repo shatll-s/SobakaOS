@@ -15,7 +15,9 @@ LOG="/dog/log/agent.log"
 #####################################################
 function miner_stats() {
 . $VARIABLES_CFG
-[[ ! -z ${APIPORT["$1"]} ]] && port=${APIPORT["$1"]}
+#local miner=$1
+local port=$2
+local batch="$3"
 case $1 in
 	ewbf)
 		stats_template=`echo "GET /getstat" | nc -w $API_TIMEOUT localhost $port | tail -n 1`
@@ -45,20 +47,15 @@ case $1 in
 		done
 	;;
 	claymore|phoenix)
-		[[ "claymore phoenix" == *$miner1* ]] && batch=$batch1 || batch=$batch2
-		if [[ $1 == "claymore" ]]; then
-			port_arg="-mport"
-			pass_arg="-mpsw" 
-		else
-			port_arg="-cdmport"
-			pass_arg="-cdmpass"
-		fi
+		[[ $1 == "claymore" ]] && pass_arg="-mpsw" || pass_arg="-cdmpass"
+
 		local request='{"id":0,"jsonrpc":"2.0","method":"miner_getstat2"}'
 		if [[ $batch == *$pass_arg* ]]; then
 			pass_value=`echo $batch | sed "s/.*$pass_arg \([-_0-9a-zA-Z@]*\).*/\1/"`
 			request=`jq ". += {\"psw\": \"$pass_value\"}" <<< "$request"`
 		fi
-		[[ $batch == *$port_arg* ]] && port=`echo $batch | sed "s/.*$port_arg [-]*\([0-9]*\).*/\1/"`
+		#[[ $batch == *$port_arg* ]] && port=`echo $batch | sed "s/.*$port_arg [-]*\([0-9]*\).*/\1/"`
+
 		local stats_template=`echo $request | nc -w $API_TIMEOUT localhost $port | jq '.result'`
 		miner_ver=`echo $stats_template | jq -r '.[0]'`
 		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
@@ -165,35 +162,20 @@ case $1 in
 		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s)
-		#miner_total_hr=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*\nKHS=\([0-9.]*\)\n.*/\1/; s/\.[0-9]*//'`
 		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_total_share=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ACC=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_total_badshare=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*REJ=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		threads=`echo "threads" | nc -w 5 localhost $port | tr -d '\0'`
 		cpuarr=`echo "$threads" | sed -e 's/|/\n/g; s/;/\n/g'`
 		miner_hr=(`echo "$cpuarr" | grep 'H/s=' | sed 's#H/s=\([0-9]*\).*#\1#'`)
-		#if [[ $miner_total_hr == "0" && ! -z $miner_hr ]]; then #strange bug: sometimes cpuminer shows 0 total hr
+
 		miner_total_hr=0	
 		for ((i=0; i < ${#miner_hr[@]}; i++)); do
-			#let miner_hr[$i]=miner_hr[$i]/1000
-			#[[ ${miner_hr[$i]} -lt 1000 ]] && 
-			#miner_hr[$i]=$(echo "scale=2; ${miner_hr[$i]}/1000" | bc -l)
-			#echo ${miner_hr[$i]}
-			#miner_total_hr=$(($miner_total_hr+${miner_hr[$i]}))
 			miner_total_hr=$(echo "scale=2;$miner_total_hr+${miner_hr[$i]}" | bc -l)
-
 		done
-		#fi
+
 	;;
 	claymore_*)
-		case $1 in
-			claymore_z)
-				port="3337" && miner_algo="equihash"
-			;;
-			claymore_c)
-				port="3335" && miner_algo="cryptonight"
-		esac
-		#[[ $1 == "claymore_z" ]] && port="3337" || port="3335"
 		local stats_template=`echo '{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}' | nc -w $API_TIMEOUT localhost $port | jq '.result'`
 		miner_ver=`echo $stats_template | jq -r '.[0]'`
 		miner_online_raw=`echo $stats_template | jq -r '.[1]'`
@@ -208,11 +190,10 @@ case $1 in
 	;;
 	sgminer)
 		#stupid sgminer API doesn`t give algo, let`s get it from config
-		[[ $miner1 == "sgminer" ]] && batch=$batch1 || batch=$batch2
 		miner_algo=`echo $batch | sed 's/.*-k \([0-9a-zA-Z]*\).*/\1/'`
 		#ok, we got it
 
-		stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
+		local stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
 		miner_ver=`echo $stats_template | jq -r '.summary[0].STATUS[0].Description'`
 		miner_online_raw=`echo $stats_template | jq -r '.summary[0].SUMMARY[0].Elapsed'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -227,11 +208,10 @@ case $1 in
 	;;
 	teamredminer)
 		#stupid BASED ON sgminer API doesn`t give algo, let`s get it from config
-		[[ $miner1 == "teamredminer" ]] && batch=$batch1 || batch=$batch2
 		miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
 		#ok, we got it
 
-		stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
+		local stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
 		miner_ver=`echo $stats_template | jq -r '.summary.STATUS[0].Description' | sed 's/TeamRedMiner //'`
 		miner_online_raw=`echo $stats_template | jq -r '.summary.SUMMARY[0].Elapsed'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -258,8 +238,7 @@ case $1 in
 		fi
 	;;
 	t_rex)
-		#stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost ${APIPORT[$1]}`
-		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:${APIPORT[$1]}/summary`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/summary`
 		miner_ver=`echo $stats_template | jq -r '.version'`
 		miner_algo=`echo $stats_template | jq -r '.algorithm'`
 		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
@@ -286,7 +265,7 @@ case $1 in
 		manifest=`cat $batch`
 		[[ `echo $manifest | jq ".fork"` != null ]]	&& miner_ver=`echo $manifest | jq -r ".fork"`
 
-		local stats_template=$(curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET '127.0.0.1:9090/stats')
+		local stats_template=$(curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET "127.0.0.1:$port/stats")
 		miner_online_raw=`echo $stats_template | jq -r '.WorkTime'`
 		if (($miner_online_raw)); then
 			miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -331,7 +310,7 @@ case $1 in
 		done
 	;;
 	gminer)
-		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/stat`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/stat`
 		miner_ver=`echo $stats_template | jq -r '.miner' | sed 's/GMiner //'`
 		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
 		if (($miner_online_raw)); then
@@ -375,7 +354,7 @@ case $1 in
 		fi
 	;;
 	xmrig_cpu|xmrig_new)
-		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/1/summary`
+		local stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/1/summary`
 		miner_ver=`echo $stats_template | jq -r '.version'`
 		miner_online_raw=`echo $stats_template | jq -r '.connection.uptime'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -389,7 +368,7 @@ case $1 in
 		#echo "Miner threads hr: "${miner_threads_hr[@]}
 	;;
 	xmrig*)
-		stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/api/status`
+		local stats_template=`curl --connect-timeout 2 --max-time $API_TIMEOUT --silent --noproxy '*' http://127.0.0.1:$port/api/status`
 		miner_ver=`echo $stats_template | jq -r '.version'`
 		miner_online_raw=`echo $stats_template | jq -r '.connection.uptime'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -403,7 +382,7 @@ case $1 in
 		#echo "Miner threads hr: "${miner_threads_hr[@]}
 	;;
 	z_enemy)
-		stats_template=`echo 'summary' | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
+		local stats_template=`echo 'summary' | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
 		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_algo=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*ALGO=\([a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
@@ -435,7 +414,7 @@ case $1 in
 		fi
 	;;
 	xmr_stak)
-		stats_template=`curl --connect-timeout 2 --silent --max-time 10 --noproxy '*' http://127.0.0.1:$port/api.json`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time 10 --noproxy '*' http://127.0.0.1:$port/api.json`
 		
 		#stupid xmr_stak API doesn`t give algo, let`s get it from config
 		[[ $miner1 == "xmr_stak" ]] && pools_txt=`echo $batch1 | sed 's/.*-C //'` || pools_txt=`echo $batch2 | sed 's/.*-C //'`
@@ -456,7 +435,7 @@ case $1 in
 		miner_threads_hr=(`echo $stats_template | jq -r '.hashrate.threads[][0]'`)
 	;;
 	wildrig_multi)
-		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port` #nanominer
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port` #nanominer
 		miner_ver=`echo $stats_template | jq -r '.version'`
 		miner_algo=`echo $stats_template | jq -r '.algo'`
 		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
@@ -478,7 +457,7 @@ case $1 in
 		fi
 	;;
 	nbminer)
-		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/api/v1/status`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/api/v1/status`
 		miner_ver=(`echo $stats_template | jq -r '.version'`)
 		miner_algo=(`echo $stats_template | jq -r '.stratum.algorithm'`)
 		miner_online=(`echo $stats_template | jq -r '.start_time'`)
@@ -570,7 +549,6 @@ case $1 in
 		local log=`cat $MINER_LOG | tr -d '\0'`
 		local minername="sushi-miner-ope"
 
-		[[ $miner1 == $1 ]] && local batch=$batch1 || local batch=$batch2
 		local miner_ver=`echo $batch | sed 's#.*/dog/miners/sushiminer/\([.0-9a-zA-Z]*\)/.*#\1#'`
 		local miner_algo='argon2d'
 		local miner_online_raw=`ps -C $minername -o etimes= | awk '{print $1}'`
@@ -588,7 +566,7 @@ case $1 in
         done
 	;;
 	miniz)
-		stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT localhost:$port -X '{"id":"0", "method":"getstat"}'`
+		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT localhost:$port -X '{"id":"0", "method":"getstat"}'`
 		#echo $stats_template
 		miner_online=`echo $stats_template | jq -r '.start_time'`
 		miner_ver=`echo $stats_template | jq -r '.version'`
@@ -615,15 +593,8 @@ case $1 in
 		done
 	;;
 	srbminer)
-		[[ "srbminer" == $miner1 ]] && batch=$batch1 || batch=$batch2
-		if [[ $batch == *$pass_arg* ]]; then
-			pass_value=`echo $batch | sed "s/.*$pass_arg \([-_0-9a-zA-Z@]*\).*/\1/"`
-			request=`jq ". += {\"psw\": \"$pass_value\"}" <<< "$request"`
-		fi
-		[[ $batch == *"--api-port"* ]] && port=`echo $batch | sed "s/.*--api-port \([0-9]*\).*/\1/"`
-		[[ -z $port ]] && port=${APIPORT["$1"]}
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port`
-		#echo $stats_template | jq '.'
+		
 		local miner_online_raw=`echo $stats_template | jq -r '.start_time'`
 		miner_online_raw=`echo $stats_template | jq -r '.mining_time'`
 		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -943,8 +914,8 @@ if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]
 fi
 ##################################################################
 
-[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats $miner1) || miner1_stats='{}'
-[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats $miner2) || miner2_stats='{}'
+[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}'
+[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
 
 local request=$(
 	jq -n \
@@ -1021,12 +992,8 @@ if [[ $response ]] ; then #if we get answer (pass is ok, etc)
 			local command_type=$(echo $response | jq ".[$i].command_type" --raw-output)
 			local command_argument=$(echo $response | jq ".[$i].command_argument" --raw-output)
 			local title=$(echo $response | jq ".[$i].title" --raw-output)
-			command_result=`dog-command "$command_type" "$command_argument" >> $LOG &`
-			#echo "screen -dmS command.$command_type bash -c \"dog-command \"$command_type\" \"$command_argument\" >> $LOG\"" >> $LOG
-			#screen -dmS command.$command_type dog-command "$command_type" "$command_argument" >> $LOG
+			dog-command "$command_type" "$command_argument" >> $LOG &
 		done
-	#else #if $count < 1, no commands received
-	#	echo "($count commands)" >> $LOG
 	fi
 	msg_count=0
 fi
@@ -1053,6 +1020,6 @@ if [[ -z $1 ]]; then
 		echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
 	done
 else
-	echo `miner_stats $1`
+	echo `miner_stats $1 $2 $3` #port=$2 batch="$3"
 fi
 

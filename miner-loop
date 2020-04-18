@@ -1,25 +1,21 @@
 #!/bin/bash
-VARIABLES_CFG="/dog/service/variables"
-. $VARIABLES_CFG
 . colors
 
 miner="$1"
-batch="$2"
+port="$2"
+batch="$3"
 
 function check_con () {
 	while true; do
-  		for con in `netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} | awk '{print $5}'`; do
+  		for con in `netstat -anp | grep TIME_WAIT | grep $port | awk '{print $5}'`; do
 			echo -e "${YELLOW}> Trying to purge previous connections${WHITE}" 
 			killcx $con lo #$?>/dev/null
   		done
-		netstat -anp | grep TIME_WAIT | grep ${APIPORT[$1]} &&
-			continue ||
-			break
+		[[ `netstat -anp | grep TIME_WAIT | grep -c $port` -ne 0 ]] && continue || break
 	done
 }
 
 [[ -z $1 || -z $2 ]] && echo -e "${RED}No config given${WHITE}" && read answer #&& exit 1
-[[ ! -f $VARIABLES_CFG ]] && echo "Configuration file $VARIABLES_CFG does not exist! Can\`t mine without configs..." && read answer
 
 check_con $miner
 

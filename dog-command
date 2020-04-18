@@ -6,9 +6,9 @@ RIG_CFG="/dog/cfg/rig.cfg"
 WALLET_CFG="/dog/cfg/wallet.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
 LOCK_DIR="/tmp/dog-command"
+API_DIR="/run/dog/apiports/"
 LF='
 '
-
 
 ########################################################
 #exec comand and return								   #
@@ -24,7 +24,7 @@ PID=$$
 PID_file="$LOCK_DIR/$PID"
 touch $PID_file
 
-echo $(date --rfc-3339=seconds)" Start doing \"$1\"" # \"$2\""
+echo $(date --rfc-3339=seconds)" Start doing \"$1\"" #"\"$2\""
 
 case $1 in
 	exec)
@@ -142,11 +142,28 @@ case $1 in
 	;;
 	batch*)
 		i=$(echo $1 | sed 's/batch//')
-		#if [[ $(echo $2 | jq -R '.') != '""' && $(echo $2 | jq '.') != 'null' ]]; then
 		if [[ $(echo $2 | jq '.') != 'null' ]]; then
 			[[ $2 != "--reconfigure" ]] && echo "$2" | jq '.' > /tmp/$1 #I forgot, what is --reconfigure???
-			[[ $3 != "--hello" ]] && screen-kill miner$i #don`t kill miner if there is --hello argument
+			
+			if [[ $3 != "--hello" ]]; then  #don`t kill miner and ports if there is --hello argument
+				. $BATCH_CFG
+				eval "old_port=\$port${i}"
+				eval "old_aswports=(\$aswports${i})"
+			fi
+
 			json2batch /tmp/$1
+
+			if [[ $3 != "--hello" ]]; then  #don`t kill miner and ports if there is --hello argument
+				screen-kill miner$i
+				if [[ ! -z $old_aswports ]]; then
+					for ((y=0; y < ${#old_aswports[@]}; y++)); do
+						old_port=${old_aswports[$y]}
+						release-port $old_port &
+					done
+				elif [[ ! -z $old_port ]]; then
+					release-port $old_port &
+				fi
+			fi
 
 			if [[ $3 != "--hello" && $3 != "--quiet" ]]; then #don`t send msg if there is --hello argument
 				if [[ $(echo $2 | jq -R '.') != '""' ]]; then #if this is not STOP command

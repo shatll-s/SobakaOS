@@ -5,6 +5,8 @@ VARIABLES_CFG="/dog/service/variables"
 AUTOSWITCH_TMP="/tmp/autoswitch"
 [[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/dog/cfg/batch.cfg"
 . $VARIABLES_CFG
+API_DIR="/run/dog/apiports/"
+[[ ! -d $API_DIR ]] && sudo mkdir -p $API_DIR
 name=$(cat /etc/hostname)
 manifest=`cat $1`
 
@@ -110,6 +112,18 @@ function get_variables () {
 	done
 }
 
+function get_free_port () {
+	local port_count=${#API_PORTS[@]}
+	local port_i=`echo "$RANDOM%$port_count" | bc`
+	local apiport=${API_PORTS[$port_i]}
+	while [[ `netstat -anp | grep TIME_WAIT | grep -c $apiport` -ne 0 || -f ${API_DIR}${apiport} ]]; do
+		#echo "Ooops, $apiport is occupied"
+		port_i=`echo "$RANDOM%$port_count" | bc`
+		apiport=${API_PORTS[$port_i]}
+	done
+	echo $apiport
+}
+
 function make_batch () {
 	[[ ! -z $fork ]] && miner_dir="/dog/miners/$miner/$fork/" || miner_dir="/dog/miners/$miner/"
 	local minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
@@ -159,8 +173,9 @@ function make_batch () {
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dcoin \$"${MINER}"_DUALCOIN"
 				#[[ ! -z $pass `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" -dpsw \$APASS"
 				#[[ ! -z $dualcoin `echo $manifest | jq ".dualcoin"` != null ]]&& minerexec+=" -dpool \$APOOL:\$APORT"
-			[[ $addition != *"-mpsw"* ]] && APIPORT[$miner]="-${APIPORT[$miner]}"
-			[[ $addition != *"-mport"* ]] && minerexec+=" -mport ${APIPORT[$miner]}"
+			local apiport=$API_port #May be we need to place "-" before port
+			[[ $addition != *"-mpsw"* ]] && apiport="-$apiport"
+			[[ $addition != *"-mport"* ]] && minerexec+=" -mport $apiport" || API_port=`echo $addition | sed "s/.*-mport [-]*\([0-9]*\).*/\1/"`
 			minerexec+=" -r 1 -logfile /dog/log/$miner.log" #noappend
 		;;
 		phoenix)
@@ -191,7 +206,8 @@ function make_batch () {
 
 			[[ ! -z $template ]]&& minerexec+=" -wal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
-			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport ${APIPORT[$miner]}"
+			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport $API_port" || API_port=`echo $addition | sed "s/.*-cdmport [-]*\([0-9]*\).*/\1/"`
+
 			minerexec+=" -log 1 -logfile /dog/log/phoenix.log"
 		;;
 		ewbf)
@@ -201,7 +217,7 @@ function make_batch () {
 			minerexec+=" --server $raw_pool --port $port"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
-			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --logfile /dog/log/$miner.log"
+			minerexec+=" --api 127.0.0.1:$API_port --logfile /dog/log/$miner.log"
 		;;
 		bminer)
 			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
@@ -211,7 +227,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=$template
 			[[ ! -z $pass ]]	&& minerexec+=":"$pass
 			minerexec+="@$pool"
-			minerexec+=" -api 127.0.0.1:${APIPORT[$miner]} -logfile=/dog/log/$miner.log -watchdog=false"
+			minerexec+=" -api 127.0.0.1:$API_port -logfile=/dog/log/$miner.log -watchdog=false"
 		;;
 		ccminer)
 			#minerexec+="$fork -o $pool"
@@ -219,7 +235,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]}"
+			minerexec+=" --api-bind 127.0.0.1:$API_port"
 		;;
 		sgminer)
 			#minerexec+="$fork -o $pool"
@@ -227,7 +243,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $algo ]]&& minerexec+=" -k $algo"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-listen --api-port ${APIPORT[$miner]}"
+			minerexec+=" --api-listen --api-port $API_port"
 		;;
 		ethminer)
 			minerexec+=" -P"
@@ -240,25 +256,25 @@ function make_batch () {
 			fi
 			minerexec+="$template:$pass@$cleanpool" #USERNAME.WORKERNAME:WORKERPWD
 			#echo $brand	
-			minerexec+=" --farm-recheck 500 --report-hashrate --api-port ${APIPORT[$miner]} --HWMON 1 $brand"
+			minerexec+=" --farm-recheck 500 --report-hashrate --api-port $API_port --HWMON 1 $brand"
 		;;
-		claymore_c)
-			minerexec+=" -xpool $pool -xwal $template"
-			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/$miner.log"
-		;;
-		claymore_z)
-			minerexec+=" -zpool $pool -zwal $template"
-			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
-			minerexec+=" -r 1 -mport -${APIPORT[$miner]} -logfile /dog/log/$miner.log"
-		;;
+#		claymore_c) #Dead
+#			minerexec+=" -xpool $pool -xwal $template"
+#			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
+#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
+#		;;
+#		claymore_z) #Dead
+#			minerexec+=" -zpool $pool -zwal $template"
+#			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
+#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
+#		;;
 		cpuminer)
 			minerexec+=" -o "
 			[[ $template != *://* ]]&& minerexec+="stratum+tcp://"
 			minerexec+="$pool -u $template"
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]}"
+			minerexec+=" --api-bind 127.0.0.1:$API_port"
 		;;
 		t_rex)
 			minerexec+=" -c config"
@@ -274,6 +290,7 @@ function make_batch () {
 			if [[ $config != "{null}" ]]; then
 				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
 				for ((y=0; y < ${#keys[@]}; y++)); do
+					[[ $keys[$y] == "api-bind-http" ]] && local api_trigger=1
 					#echo "Check ${keys[$y]}"
 					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
 						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
@@ -281,13 +298,17 @@ function make_batch () {
 					value=`echo $config | jq ".\"${keys[$y]}\""`
 					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
 				done
-			fi	
-				echo -e "$dog_json" | jq '.' > "${miner_dir}config"
+			fi
+			if [[ $api_trigger -ne 1 ]]; then
+				dog_json=`jq "del(.\"api-bind-http\")" <<< "$dog_json"` #if key exist, delete it
+				dog_json=`jq ". + { \"api-bind-http\": \"127.0.0.1:$API_port\" }" <<< "$dog_json"`
+			fi
+			echo -e "$dog_json" | jq '.' > "${miner_dir}config"
 		;;
 		nanominer)
 			minerexec+=" /dog/miners/nanominer/config.ini "
 			config="logPath=/dog/log/nanominer.log\n"
-			config+="port=9090\n"
+			config+="port=$API_port\n"
 			config+="mport=0\n"
 			config+="rigName = $name\n"
 			[[ ! -z $algo ]]&& config+="[$algo]\n"
@@ -307,7 +328,7 @@ function make_batch () {
 			[[ ! -z $port ]]&& minerexec+=" --port $port"
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
-			minerexec+=" --apiport ${APIPORT[$miner]}"
+			minerexec+=" --apiport $API_port"
 		;;
 		gminer)
 			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
@@ -322,28 +343,28 @@ function make_batch () {
 			[[ ! -z $dual_template ]]&& minerexec+=" --duser $dual_template"
 			[[ ! -z $dual_pass ]]&& minerexec+=" --dpass $dual_pass"
 			[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
-			minerexec+=" --api ${APIPORT[$miner]} --logfile /dog/log/gminer.log"
+			minerexec+=" --api $API_port --logfile /dog/log/gminer.log"
 		;;
 		xmrig_cpu|xmrig_new)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --http-enabled --http-port ${APIPORT[$miner]}"
+			minerexec+=" --http-enabled --http-port $API_port"
 		;;
 		xmrig*)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-port ${APIPORT[$miner]}"
+			minerexec+=" --api-port $API_port"
 		;;
 		z_enemy)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind=${APIPORT[$miner]} --log=/dog/log/z_enemy.log"
+			minerexec+=" --api-bind=$API_port --log=/dog/log/z_enemy.log"
 		;;
 		xmr_stak)
 			minerexec+=" -c ${miner_dir}config.txt -C ${miner_dir}pools.txt"
@@ -390,13 +411,18 @@ function make_batch () {
 				if [[ $config != "{null}" ]]; then
 					keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
 					for ((y=0; y < ${#keys[@]}; y++)); do
+						[[ $keys[$y] == "api-bind-http" ]] && local api_trigger=1
 						[[ `echo $config_txt | jq ".\"${keys[$y]}\""` != null ]] &&
 							config_txt=`jq "del(.\"${keys[$y]}\")" <<< "$config_txt"` #if key exist, delete it
 
 						value=`echo $config | jq ".\"${keys[$y]}\""`
 						config_txt=`jq ". + { \"${keys[$y]}\": $value }" <<< "$config_txt"`
 					done
-				fi	
+				fi
+				if [[ $api_trigger -ne 1 ]]; then
+					config_txt=`jq "del(.\"httpd_port\")" <<< "$config_txt"` #if key exist, delete it
+					config_txt=`jq ". + { \"httpd_port\": $apiport }" <<< "$config_txt"`
+				fi
 				echo -e "$config_txt" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/config.txt"
 			#end of config.txt section
 
@@ -412,7 +438,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-port=${APIPORT[$miner]} --log-file=/dog/log/$miner.log"
+			minerexec+=" --api-port=$API_port --log-file=/dog/log/$miner.log"
 		;;
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
@@ -423,14 +449,14 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=${APIPORT[$miner]} --bus_reorder --watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
+			minerexec+=" --api_listen=$API_port --bus_reorder --watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
 		cryptodredge)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind ${APIPORT[$miner]} --log /dog/log/$miner.log"
+			minerexec+=" --api-bind $API_port --log /dog/log/$miner.log"
 		;;
 		nbminer)
 			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
@@ -459,7 +485,7 @@ function make_batch () {
 				fi
 			fi
 			
-			minerexec+=" --api 127.0.0.1:${APIPORT[$miner]} --log" #log in miner folder :(
+			minerexec+=" --api 127.0.0.1:$API_port --log" #log in miner folder :(
 		;;
 		ttminer)
 	  		[[ ! -z $algo ]]&& minerexec+=" -a $algo"
@@ -468,7 +494,7 @@ function make_batch () {
 			[[ ! -z $wallet ]]&& minerexec+=" -u $wallet"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			[[ ! -z $name ]]&& minerexec+=" -w $name"
-			minerexec+=" --api-bind 127.0.0.1:${APIPORT[$miner]} --log"
+			minerexec+=" --api-bind 127.0.0.1:$API_port --log"
 		;;	
 		qitmeer)
 	  		[[ ! -z $algo ]]&& minerexec+=" --pow=$algo"
@@ -476,7 +502,7 @@ function make_batch () {
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -m $template"
 			[[ ! -z $pass ]]&& minerexec+=" -n $pass"
-			minerexec+=" --stats_server=127.0.0.1:${APIPORT[$miner]} --log_level=info --minerlog=/dog/log/$miner.log"
+			minerexec+=" --stats_server=127.0.0.1:$API_port --log_level=info --minerlog=/dog/log/$miner.log"
 		;;
 		sushiminer)
 			dog_json=$(
@@ -513,7 +539,7 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
 			
-			minerexec+=" --telemetry=${APIPORT[$miner]} --log-file=/dog/log/$miner.log"
+			minerexec+=" --telemetry=$API_port --log-file=/dog/log/$miner.log"
 		;;
 		srbminer)
 			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
@@ -525,14 +551,14 @@ function make_batch () {
 			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
 
 			
-			minerexec+=" --api-enable --api-port ${APIPORT[$miner]} --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
+			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
 		;;	
 		*)
 			: #do nothing
 		;;
 	esac
 	[[ ! -z $addition && $miner != "nanominer" ]] && minerexec+=" $addition"
-	echo $minerexec
+	BATCH=$minerexec
 }
 ############################################### START HERE
 #Help command
@@ -558,7 +584,14 @@ fi
 case $2 in
 	return)
 		get_variables "$manifest"
-		echo `make_batch`
+		#Declare variables
+		API_port=`get_free_port` #
+		BATCH=
+		#Declaration ended
+		
+		make_batch
+		echo "$BATCH"
+		touch ${API_DIR}${API_port}
 	;;
 	*)
 		miner_i=$(echo $1 | sed 's/\/tmp\/batch//')
@@ -603,34 +636,55 @@ case $2 in
 				if [[ ! -z $miner ]]; then
 					/dog/getminer $miner $fork
 				fi
-				batch=`make_batch`
+				#Declare variables
+				API_port=`get_free_port`
+				BATCH=
+				#Declaration ended
+				make_batch
+				touch ${API_DIR}${API_port}
 				[[ $miner_i -eq 1 ]] && asw stop
-
 			else
-				batch=`make_batch`
+				#Declare variables
+				API_port=`get_free_port`
+				aswports+=($API_port)
+				BATCH=
+				#Declaration ended
+				make_batch
+				touch ${API_DIR}${API_port}
+
 				echo "Autoswitch detected"
 				algo=`convert_algo $algo`
 				json=$(
 					jq -n \
 					--arg algo "$algo" \
 					--arg miner "$miner" \
-					--arg batch "$batch" \
+					--arg port "$API_port" \
+					--arg batch "$BATCH" \
 					'{ autoswitch: [ {
 						$algo,
 						$miner,
+						$port,
 						$batch}]
 					}'
 				)
 				
 				for (( i=0; i < `echo $autoswitch_arr | jq 'length'`; i++ )); do
-					unset miner batch coin pass pool addition algo fork brand config config_pools config_nvidia config_amd config_cpu pool_without_port port batch #don`t delete template && wallet (it`s same in NiceHash)
+					unset miner coin pass pool addition algo fork brand config config_pools config_nvidia config_amd config_cpu pool_without_port port batch #don`t delete template && wallet (it`s same in NiceHash)
 					autoswitch=`echo $autoswitch_arr | jq ".[$i]"`
 					get_variables "$autoswitch"
 					#[[ $miner == "t_rex" ]] && echo "*** We need to download T-Rex miner for AutoSwitch right now because we need to edit included config file ***" && /dog/getminer $miner $fork 
 					/dog/getminer $miner $fork #not optimal - need to download all miners at start
-					batch=`make_batch`
+					
+					#Declare variables
+					API_port=`get_free_port` #initial, can be changed later
+					aswports+=($API_port)
+					BATCH=
+					#Declaration ended
+					make_batch
+					touch ${API_DIR}${API_port}
+
 					algo=`convert_algo $algo`
-					json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"batch\": \"$batch\"}]"`
+					json=`echo $json | jq ".autoswitch += [{\"algo\": \"$algo\", \"miner\": \"$miner\", \"port\": \"$API_port\", \"batch\": \"$BATCH\"}]"`
 				done
 				echo $json | jq '.' > $AUTOSWITCH_TMP
 				#miner="" #this is to empty batch.cfg
@@ -639,15 +693,22 @@ case $2 in
 			fi
 
 		fi
-			
+		
+		[[ -f $BATCH_CFG ]]	&& sed -i "/.*aswports$miner_i=.*/d" $BATCH_CFG
+		
 		if [[ -z $autoswitch_arr ]]; then
-			[[ -f $BATCH_CFG ]] && sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
-			[[ -f $BATCH_CFG ]] && sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
-			echo "batch$miner_i=\"$batch\"" >> $BATCH_CFG
+			if [[ -f $BATCH_CFG ]]; then
+				sed -i "/.*batch$miner_i=.*/d" $BATCH_CFG
+				sed -i "/.*miner$miner_i=.*/d" $BATCH_CFG
+				sed -i "/.*port$miner_i=.*/d" $BATCH_CFG
+			fi
+			echo "batch$miner_i=\"$BATCH\"" >> $BATCH_CFG
 			echo "miner$miner_i=\"$miner\"" >> $BATCH_CFG
+			echo "port$miner_i=\"$API_port\"" >> $BATCH_CFG
 			echo "$(date --rfc-3339=seconds) Batch $miner_i config is now wrote in $BATCH_CFG"
 		else
-			echo "$(date --rfc-3339=seconds) No changes wrote in $BATCH_CFG (AutoSwitch will do it)"
+			echo "aswports$miner_i=\"${aswports[@]}\"" >> $BATCH_CFG
+			echo "$(date --rfc-3339=seconds) Autoswitch API ports added to $BATCH_CFG"
 		fi
 	;;
 esac

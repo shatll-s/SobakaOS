@@ -1,0 +1,17 @@
+#!/bin/bash
+API_DIR="/run/dog/apiports/"
+
+port=$1
+echo "`date --rfc-3339=seconds` Start checking and purging connections on port $port"
+while true; do
+	for con in `netstat -anp | grep TIME_WAIT | grep $port | awk '{print $5}'`; do
+		#echo -e "${YELLOW}> Trying to purge previous connections${WHITE}" 
+		killcx $con lo >/dev/null 2>&1
+	done
+	[[ `netstat -anp | grep TIME_WAIT | grep -c $port` -ne 0 ]] && continue || break
+done
+rm -f ${API_DIR}${port}
+echo "`date --rfc-3339=seconds` No more connections, release port $port"
+
+
+
