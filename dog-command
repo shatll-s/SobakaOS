@@ -14,6 +14,39 @@ LF='
 #exec comand and return								   #
 ########################################################
 
+#Functions
+function screen_check () {
+	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
+}
+
+function services_stop () {
+	echo -e "`date --rfc-3339=seconds` ${GREEN}Stopping services${WHITE}"
+	wd stop > /dev/null 2>&1
+	#systemctl stop mining
+	mv /dog/cfg/batch.cfg /tmp/batch.cfg
+	if [[ $(screen_check miner1) -gt 0 ]]; then
+		screen-kill miner1
+	fi
+	if [[ $(screen_check miner2) -gt 0 ]]; then
+		screen-kill miner2
+	fi	
+
+	if [[ $(screen_check asw) -gt 0 ]]; then
+		echo 1 > /tmp/asw_trigger
+		screen-kill asw
+	fi	
+}
+
+function services_start () {
+	echo -e "`date --rfc-3339=seconds` ${GREEN}Starting services${WHITE}"
+	#systemctl start mining
+	mv /tmp/batch.cfg /dog/cfg/batch.cfg
+	systemctl start wd
+	af restart
+	[[ -f /tmp/asw_trigger && `cat /tmp/asw_trigger` -eq 1 ]] && asw restart
+}
+#Functions end
+
 if (( $# < 1 )); then
 	echo "Usage: $0 \"command\" [\"argument\"]"
 	exit 1
@@ -53,17 +86,21 @@ case $1 in
 		fi
 	;;
 	flash_bios)
+		url=`echo $2 | jq -r ".url" `
+		bus=`echo $2 | jq -r ".bus" `
+		disable_services=`echo $2 | jq -r ".disable_services" `
+		echo $url
 		. $RIG_CFG		
 		cd /tmp
-		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$2 #https://os.dog/files/1/upload/0000001_bios_amd_bus02.rom.gz
-		wget -q $link 
+		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$url #https://os.dog/files/1/upload/0000001_bios_amd_bus02.rom.gz
+		wget $link 
 		exitcode=$?
 		if [[ ! $exitcode -eq 0 ]]; then
 			msg "Flash BIOS" error "`date -R`${LF}Error occured during download BIOS ($exitcode)${LF}$return"
 			rm $PID_file
 			exit 1
 		fi
-		file_gz=$(echo $2 | sed 's/.*\/\([_.a-z0-9]*\)$/\1/') #0000003_bios_amd_bus02.rom.gz
+		file_gz=$(echo $url | sed 's/.*\/\([_.a-z0-9]*\)$/\1/') #0000003_bios_amd_bus02.rom.gz
 		#echo "Filename: "$file
 		gzip -df $file_gz 
 		exitcode=$?
@@ -73,16 +110,30 @@ case $1 in
 			exit 1
 		fi
 		file=$(echo $file_gz | sed 's/.gz//') #0000004_bios_amd_bus02.rom
-		bus=$(echo $file | sed 's/.*bus\([0-9a-z]*\).rom/\1/') #02
-		bus=${bus^^}
-		#bus=`echo $shortbus 10 | awk '{ print ($1 >= $2) ? $1 : 0$1 }'` 
-		adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//') && echo $adapter
-		return=$(atiflash -p $adapter -f "/tmp/$file")
-		exitcode=$?
-		if [[ $exitcode -eq 0 ]]; then
-			msg "Flash BIOS" success "$return"
+		
+		[[ $disable_services -eq 1 ]] && services_stop
+		if [[ $bus != 'all' ]]; then
+			adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
+			result=$(atiflash -p $adapter -f "/tmp/$file")
+			exitcode=$?
 		else
-			msg "Flash BIOS" error "Something goes wrong ($exitcode)${LF}$return"
+			logfile='/tmp/amd_flash.log'
+			rm -f $logfile
+			for ((i=0; i < `gpu-detect AMD`; i++)); do
+				echo -e "$BROWN================================================================$WHITE" >> $logfile
+				echo -e "${LIGHTRED}GPU $i${WHITE}" >> $logfile
+				atiflash -p $i -f "/tmp/$file" >> $logfile
+				exitcode=$?
+				[[ $exitcode -ne 0 ]] && echo -e "${RED}Error (exitcode $exitcode) while flasing GPU $i${WHITE}" >> $logfile
+			done
+			result=`cat $logfile`
+		fi
+		[[ $disable_services -eq 1 ]] && services_start
+
+		if [[ $exitcode -eq 0 ]]; then
+			msg "Flash BIOS" success "`date --rfc-3339=seconds` Successfull BIOS flashing${LF}$result"
+		else
+			msg "Flash BIOS" error "`date --rfc-3339=seconds` Something goes wrong ($exitcode)${LF}$result"
 		fi
 	;;
 	change_host)
