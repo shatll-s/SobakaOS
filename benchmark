@@ -3,6 +3,7 @@ BENCHMARK_CFG="/tmp/benchmark"
 AUTOSWITCH_CFG="/dog/cfg/autoswitch.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
 RIG_CFG="/dog/cfg/rig.cfg"
+ASW_TRIGGER="/rug/dog/asw_trigger"
 LOCK_FILE="/tmp/.benchmark.lock"
 LOG="/dog/log/benchmark.log"
 VARIABLES_CFG="/dog/service/variables"
@@ -69,7 +70,7 @@ function services_stop () {
 	wd stop > /dev/null 2>&1
 	systemctl stop mining
 	if [[ $(screen_check asw) -gt 0 ]]; then
-		echo 1 > /tmp/asw_trigger
+		echo 1 > $ASW_TRIGGER
 		screen-kill asw
 	fi	
 }
@@ -79,7 +80,7 @@ function services_start () {
 	systemctl start mining
 	systemctl start wd
 	af restart
-	[[ -f /tmp/asw_trigger && `cat /tmp/asw_trigger` -eq 1 ]] && asw restart
+	[[ -f $ASW_TRIGGER && `cat $ASW_TRIGGER` -eq 1 ]] && asw restart
 }
 
 function send_data () {

@@ -70,30 +70,81 @@ case $1 in
 		fi
 	;;
 	get_bios)
+		. $RIG_CFG
+
+		function get_bios () {
+			adapter=$1
+			return=$(sudo atiflash -s $adapter "/tmp/amd${adapter}.rom")
+			exitcode=$?
+			if [[ $exitcode -eq 0 ]]; then
+				chown user:user "/tmp/amd$adapter.rom"
+				gzip -9 -c "/tmp/amd${adapter}.rom" | base64 -w 0 | msg "Bios-rig"${RIG_ID}"-GPU"${adapter}".rom" file payload
+			else
+				msg "BIOS save error" warning "`date -R`${LF}Error occured while saving bios for adapter ${adapter} (bus id $2)${LF}$return"
+			fi
+		}
+
 		bus=${2^^}
-		adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
-		#echo -e "argument=$2\nbus=$bus\nadapter=$adapter"
-		return=$(sudo atiflash -s $adapter "/tmp/amd${adapter}.rom")
-		exitcode=$?
-		if [[ $exitcode -eq 0 ]]; then
-			. $RIG_CFG
-			chown user:user "/tmp/amd$adapter.rom"
-			#gzip -9 -c "/tmp/amd$adapter.rom" 
-			#base64 -w 0 "/tmp/amd${adapter}.rom" | gzip -9 -c | msg "Bios-rig"${RIG_ID}"-GPU${adapter}.rom" file payload #it works
-			gzip -9 -c "/tmp/amd${adapter}.rom" | base64 -w 0 | msg "Bios-rig"${RIG_ID}"-GPU"${adapter}".rom" file payload
+		if [[ $bus != 'ALL' ]]; then
+			adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
+			get_bios
 		else
-			msg "BIOS save error" warning "`date -R`${LF}Error occured while saving bios for adapter ${adapter} (bus id $2)${LF}$return"
+			for ((i=0; i < `gpu-detect AMD`; i++)); do
+				get_bios $i
+			done
 		fi
 	;;
+	get_bios_nvidia)
+		. $RIG_CFG
+
+		function get_bios () {
+			adapter=$1
+			bios_ver=`nvidia-tool bios_ver $adapter`
+			file="/tmp/${bios_ver}.rom"
+			return=`nvidia-tool save_bios $adapter $file`
+			exitcode=$?
+			if [[ $exitcode -eq 0 ]]; then
+				chown user:user $file
+				gzip -9 -c "$file" | base64 -w 0 | msg "Bios-rig${RIG_ID}-GPU${adapter}_${bios_ver}.rom" file payload
+			else
+				msg "BIOS save error" warning "`date -R`${LF}Error occured while saving bios for adapter ${adapter} (bus id $2)${LF}$return"
+			fi
+		}
+		bus=${2^^}
+		
+		nvidia-tool stop
+		exitcode=$?
+		[[ $exitcode -ne 0 ]] && msg "BIOS save error" warning "`date -R`${LF}Error occured while stopping services" && exit 1
+
+		if [[ $bus != 'ALL' ]]; then
+			adapter=`nvflash --list | grep "B:$bus" | sed "s/^<\([0-9]*\).*/\1/"`
+			[[ ! $adapter ]] && msg "BIOS save error" warning "`date -R`${LF}Error occured (wrong $bus bus number)" && exit 1
+			get_bios $adapter
+		else
+			for ((i=0; i < `gpu-detect NVIDIA`; i++)); do
+				get_bios $i
+			done
+		fi
+
+		nvidia-tool start
+		exitcode=$?
+		[[ $exitcode -ne 0 ]] && msg "BIOS save error" warning "`date -R`${LF}Error occured while starting services. Try to reboot.${LF}$return"
+	;;
 	flash_bios)
+		echo $2 > /tmp/lol
+		platform=`echo $2 | jq -r ".platform" `
+		ignore_mismatch=`echo $2 | jq -r ".ignore_mismatch" `
+		#echo "Plat: $platform"
+		[[ $platform -ne 'amd' || $platform -ne 'nvidia' ]] && msg "Flash BIOS" error "`date --rfc-3339=seconds` Something goes wrong. Contact administrator." && exit 1
+
 		url=`echo $2 | jq -r ".url" `
 		bus=`echo $2 | jq -r ".bus" `
 		disable_services=`echo $2 | jq -r ".disable_services" `
-		echo $url
+
 		. $RIG_CFG		
 		cd /tmp
 		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$url #https://os.dog/files/1/upload/0000001_bios_amd_bus02.rom.gz
-		wget $link 
+		wget -q $link 
 		exitcode=$?
 		if [[ ! $exitcode -eq 0 ]]; then
 			msg "Flash BIOS" error "`date -R`${LF}Error occured during download BIOS ($exitcode)${LF}$return"
@@ -111,24 +162,53 @@ case $1 in
 		fi
 		file=$(echo $file_gz | sed 's/.gz//') #0000004_bios_amd_bus02.rom
 		
-		[[ $disable_services -eq 1 ]] && services_stop
-		if [[ $bus != 'all' ]]; then
-			adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
-			result=$(atiflash -p $adapter -f "/tmp/$file")
-			exitcode=$?
-		else
-			logfile='/tmp/amd_flash.log'
-			rm -f $logfile
-			for ((i=0; i < `gpu-detect AMD`; i++)); do
-				echo -e "$BROWN================================================================$WHITE" >> $logfile
-				echo -e "${LIGHTRED}GPU $i${WHITE}" >> $logfile
-				atiflash -p $i -f "/tmp/$file" >> $logfile
+		if [[ $platform == 'amd' ]]; then		
+			[[ $disable_services -eq 1 ]] && services_stop
+			if [[ $bus != 'all' ]]; then
+				adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
+				result=$(atiflash -p $adapter -f "/tmp/$file")
 				exitcode=$?
-				[[ $exitcode -ne 0 ]] && echo -e "${RED}Error (exitcode $exitcode) while flasing GPU $i${WHITE}" >> $logfile
-			done
-			result=`cat $logfile`
+			else
+				logfile='/tmp/amd_flash.log'
+				rm -f $logfile
+				for ((i=0; i < `gpu-detect AMD`; i++)); do
+					echo -e "$BROWN================================================================$WHITE" >> $logfile
+					echo -e "${LIGHTRED}GPU $i${WHITE}" >> $logfile
+					atiflash -p $i -f "/tmp/$file" >> $logfile
+					exitcode=$?
+					[[ $exitcode -ne 0 ]] && echo -e "${RED}Error (exitcode $exitcode) while flasing GPU $i${WHITE}" >> $logfile
+				done
+				result=`cat $logfile`
+			fi
+			[[ $disable_services -eq 1 ]] && services_start
+		elif [[ $platform == 'nvidia' ]]; then
+			[[ $ignore_mismatch -eq 1 ]] && add="-6"
+			nvidia-tool stop
+			exitcode=$?
+			[[ $exitcode -ne 0 ]] && msg "BIOS flash error" warning "`date -R`${LF}Error occured while stopping services" && exit 1
+
+			if [[ $bus != 'all' ]]; then
+				adapter=`nvflash --list | grep "B:$bus" | sed "s/^<\([0-9]*\).*/\1/"`
+				[[ ! $adapter ]] && msg "BIOS flash error" warning "`date -R`${LF}Error occured (wrong $bus bus number)" && exit 1
+				result=$(nvidia-tool flash $adapter $file "$add")
+				exitcode=$?
+			else
+				logfile='/tmp/nvidia_flash.log'
+				rm -f $logfile
+				for ((i=0; i < `gpu-detect NVIDIA`; i++)); do
+					echo -e "$BROWN================================================================$WHITE" >> $logfile
+					echo -e "${GREEN}GPU $i${WHITE}" >> $logfile
+					nvidia-tool flash $i $file "$add" >> $logfile
+					exitcode=$?
+					[[ $exitcode -ne 0 ]] && echo -e "${RED}Error (exitcode $exitcode) while flasing GPU $i${WHITE}" >> $logfile
+				done
+				result=`cat $logfile`
+			fi
+
+			nvidia-tool start
+			exitcode=$?
+			[[ $exitcode -ne 0 ]] && msg "BIOS save error" warning "`date -R`${LF}Error occured while starting services. Try to reboot.${LF}$return"
 		fi
-		[[ $disable_services -eq 1 ]] && services_start
 
 		if [[ $exitcode -eq 0 ]]; then
 			msg "Flash BIOS" success "`date --rfc-3339=seconds` Successfull BIOS flashing${LF}$result"

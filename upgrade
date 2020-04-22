@@ -62,7 +62,7 @@ eval "$versions"
 upgrade_deb dog-libs $dog_libs
 upgrade_deb dog-sbin $dog_sbin
 
-apt-get -q=2 install lm-sensors hddtemp
+apt-get -q=2 install lm-sensors expect hddtemp
 
 crontab="/var/spool/cron/crontabs/root"
 crontab_remove="/dog/service/crontab.root.remove"

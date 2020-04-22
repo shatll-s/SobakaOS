@@ -3,6 +3,7 @@ API_TIMEOUT=10
 RIG_CFG="/dog/cfg/rig.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
 VARIABLES_CFG="/dog/service/variables"
+NV_STOP_TRIGGER="/run/dog/nvidia_stop_trigger"
 NVIDIASMI_FILE=/tmp/nvidiasmi #need to get some info from nvidia-smi
 RESPONSE_FILE=/dog/log/response.log
 COMMANDS_FILE=/dog/log/commands.log
@@ -777,7 +778,7 @@ echo $miner_total_hr > /tmp/hr.$1
 
 ##################################################################
 function stats {
-if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
 	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits > $NVIDIASMI_FILE
 	#local nvidia_smi=`timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits ` #> $NVIDIASMI_FILE >/tmp/ko 2>/dev/null
 	exitcode=$?
