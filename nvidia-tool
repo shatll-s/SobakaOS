@@ -93,17 +93,23 @@ function flash_bios () {
 	[[ -z $1 || -z $2 ]] && echo -e "${RED}Not enough arguments \"$*\", exiting${WHITE}" && return 1
 	gpu_i=$1
 	file=$2
-	[[ ! -z $3 ]] && add=$3
-	
+	[[ ! -z $3 ]] && add="$3"
+	[[ -z `dpkg -l | grep expect | awk '{print $3}'` ]] && echo "Need to install some packages" && apt-get install -y expect
 	echo "Starting autoflash with arguments \"$*\""
 	#exp_internal 1
 	#set timeout -1
+	#Press y to confirm, press y to confirm override PCI subsystem ID
 	expect -c "
-		set timeout 10
-		spawn nvflash -i $gpu_i $file "$add"
-		expect -re \".*Press 'y' to confirm.*\"
-		send \"y\"
-		expect eof
+		set timeout -1		
+		spawn nvflash -i $gpu_i $file $add
+		while { true } {
+			expect {
+				-re \".*ress 'y' to confirm.*\" { send \"y\" }
+				-re \".*reboot is required.*\" { exit }
+				-re \".*ERROR.*\" { exit }
+				-re \".*Firmware image filename must have a valid extension.*\" { exit }
+			}
+		}
 	"
 }
 
@@ -121,7 +127,7 @@ case $1 in
 		save_bios $2 $3
 	;;
 	flash_bios|flash)
-		flash_bios $2 $3 $4
+		flash_bios $2 $3 "$4"
 	;;
 	*)
 		bname=`basename $0`

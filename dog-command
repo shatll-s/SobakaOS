@@ -182,7 +182,7 @@ case $1 in
 			fi
 			[[ $disable_services -eq 1 ]] && services_start
 		elif [[ $platform == 'nvidia' ]]; then
-			[[ $ignore_mismatch -eq 1 ]] && add="-6"
+			[[ $ignore_mismatch -eq 1 ]] && add="-6 -override"
 			nvidia-tool stop
 			exitcode=$?
 			[[ $exitcode -ne 0 ]] && msg "BIOS flash error" warning "`date -R`${LF}Error occured while stopping services" && exit 1
