@@ -249,7 +249,7 @@ function make_batch () {
 			minerexec+=" -P"
 			if [[ $pool != *://* ]]; then
 				minerexec+=" stratum://"
-				cleanpool=pool
+				cleanpool=$pool
 			elif [[ $pool == *ssl://* ]]; then
 				minerexec+=" stratum1+ssl://"
 				cleanpool=`echo $pool | sed  's/^.*ssl:\/\///'`
