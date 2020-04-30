@@ -936,6 +936,9 @@ if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]
 	fi
 fi
 ##################################################################
+[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}' 
+[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
+
 local request=$(
 	jq -n \
 	--arg password "$PASSWD" \
@@ -946,6 +949,8 @@ local request=$(
 	--argjson gpu_fan "$rig_gpu_fan_json" \
 	--argjson gpu_power "$power_json" \
 	--arg cpu_avg "`uptime | awk -F': ' '{print $2}' | sed 's/\, /X/g' | sed 's/\,/\./g' | sed 's/X/\, /g'`" \
+	--argjson miner1 "$miner1_stats" \
+	--argjson miner2 "$miner2_stats" \
 	'{	
 		"method": "sendstats",
 		"jsonrpc": "2.0",
@@ -957,17 +962,13 @@ local request=$(
 			$gpu_temp,
 			$gpu_fan,
 			$gpu_power,
-			$cpu_avg
+			$cpu_avg,
+			$miner1,
+			$miner2
 		}
 	}'
 
 )
-
-[[ ! -z $miner1 ]] && miner_json=$(miner_stats "$miner1" "$port1" "$batch1") &&
-	request=`jq ".stats += {\"miner1\": $miner_json}" <<< "$request"`
-[[ ! -z $miner2 ]] && miner_json=$(miner_stats "$miner2" "$port2" "$batch2") &&
-	request=`jq ".stats += {\"miner2\": $miner_json}" <<< "$request"`
-
 
 [[ $mem_clock_json != '{}' ]] && request=`jq ".stats += {\"mem_clock\": $mem_clock_json}" <<< "$request"`
 [[ $core_clock_json != '{}' ]] && request=`jq ".stats += {\"core_clock\": $core_clock_json}" <<< "$request"`
