@@ -779,7 +779,7 @@ echo $miner_total_hr > /tmp/hr.$1
 ##################################################################
 function stats {
 if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
-	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits > $NVIDIASMI_FILE
+	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
 	#local nvidia_smi=`timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits ` #> $NVIDIASMI_FILE >/tmp/ko 2>/dev/null
 	exitcode=$?
 	#echo "@$nvidia_smi@"
@@ -837,6 +837,8 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			local rig_gpu_fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
 			[[ ${fan_raw[$i]} == *"Unknown Error"* ]] && rig_gpu_fan_raw[$i]=555
 			local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`
+			local core_clock[$i]=`awk -F ', ' '{print $10}' <<< $nvidiainfo`
+			local mem_clock[$i]=`awk -F ', ' '{print $11}' <<< $nvidiainfo`
 			[[ ! -z power_raw[$i] && power_raw[$i] != *"Not Supported"* ]] && local power[$i]=`echo "scale=0; ${power_raw[$i]}/1" | bc -l`
 		fi
 	fi
@@ -894,6 +896,26 @@ for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
                 '$data | fromjson + { ($key) : ($value)}')
 done
 ##################################################################
+local core_clock_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	if [[ ! -z ${core_clock[$i]} ]]; then
+        local core_clock_json=$(jq -n --arg data "$core_clock_json" \
+        --arg key "$i" \
+        --arg value "${core_clock[$i]}" \
+                '$data | fromjson + { ($key) : ($value)}')
+	fi
+done
+##################################################################
+local mem_clock_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	if [[ ! -z ${mem_clock[$i]} ]]; then
+        local mem_clock_json=$(jq -n --arg data "$mem_clock_json" \
+        --arg key "$i" \
+        --arg value "${mem_clock[$i]}" \
+                '$data | fromjson + { ($key) : ($value)}')
+	fi
+done
+##################################################################
 ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
 ip_json='{}'
 for ((i=0; i < ${#ip[@]}; i++)); do
@@ -914,10 +936,6 @@ if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]
 	fi
 fi
 ##################################################################
-
-[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}'
-[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
-
 local request=$(
 	jq -n \
 	--arg password "$PASSWD" \
@@ -928,8 +946,6 @@ local request=$(
 	--argjson gpu_fan "$rig_gpu_fan_json" \
 	--argjson gpu_power "$power_json" \
 	--arg cpu_avg "`uptime | awk -F': ' '{print $2}' | sed 's/\, /X/g' | sed 's/\,/\./g' | sed 's/X/\, /g'`" \
-	--argjson miner1 "$miner1_stats" \
-	--argjson miner2 "$miner2_stats" \
 	'{	
 		"method": "sendstats",
 		"jsonrpc": "2.0",
@@ -941,13 +957,20 @@ local request=$(
 			$gpu_temp,
 			$gpu_fan,
 			$gpu_power,
-			$cpu_avg,
-			$miner1,
-			$miner2
+			$cpu_avg
 		}
 	}'
 
 )
+
+[[ ! -z $miner1 ]] && miner_json=$(miner_stats "$miner1" "$port1" "$batch1") &&
+	request=`jq ".stats += {\"miner1\": $miner_json}" <<< "$request"`
+[[ ! -z $miner2 ]] && miner_json=$(miner_stats "$miner2" "$port2" "$batch2") &&
+	request=`jq ".stats += {\"miner2\": $miner_json}" <<< "$request"`
+
+
+[[ $mem_clock_json != '{}' ]] && request=`jq ".stats += {\"mem_clock\": $mem_clock_json}" <<< "$request"`
+[[ $core_clock_json != '{}' ]] && request=`jq ".stats += {\"core_clock\": $core_clock_json}" <<< "$request"`
 
 if [[ $LOGS != "OFF" ]]; then #in 99% cases LOGS="OFF" only on USB flash drive
 	hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`

@@ -34,7 +34,8 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		#local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
 		local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
-		local gpu_mem[$i]=`dmesg | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0: VRAM:\s.*" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`
+		local gpu_vendor[$i]=`cat ${core_addr[$i]}/subsystem_vendor | tr '[:lower:]' '[:upper:]'` 
+		local gpu_mem[$i]=`dmesg | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0: VRAM:\s.*" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`"b"
 		local gpu_info[$i]=${gpu_mem[$i]}", "$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5; print ","; print $4 }')
 		if [[ -z ${gpu_info[$i]} ]]; then
 			amdmeminfo -q -s > $AMDMEMINFO_FILE
@@ -45,17 +46,20 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local gpu_brand[$i]="A"
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 		[[ ! -f $NVIDIASMI_FILE ]] &&
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
 		local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		if [[ -z $nvidiainfo ]]; then
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
 			sleep 2
 			local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		fi
 		local gpu_name[$i]=`awk -F ', ' '{print $2}' <<< $nvidiainfo`
-		local gpu_mem[$i]=`awk -F ', ' '{print $9}' <<< $nvidiainfo`
-		local gpu_info[$i]=`awk -F ', ' '{print $6$7$8 }' <<< $nvidiainfo`
-		local gpu_info[$i]="${gpu_mem[$i]}, Power Limit (min/default/max): "$(echo ${gpu_info[$i]} | sed -e 's/\.00//g; s/ W/\//g; s/\/$/ W/')
+		local gpu_vendor[$i]=`cat ${core_addr[$i]}/subsystem_vendor | tr '[:lower:]' '[:upper:]'` 
+		local mem[$i]=`awk -F ', ' '{print $9}' <<< $nvidiainfo`
+		local pl[$i]=`awk -F ', ' '{print $6"/"$7"/"$8" W"}' <<< $nvidiainfo | sed 's/\.00//g'`
+		local vbios[$i]=`awk -F ', ' '{print $12}' <<< $nvidiainfo`
+		local gpu_info[$i]="${mem[$i]}Mb, ${vbios[$i]}"
+		local gpu_info2[$i]="Power Limit (min/default/max): ${pl[$i]}"
 		local gpu_brand[$i]="N"
 	else #GPU is INTEL
 		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
@@ -99,6 +103,26 @@ for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
         	--arg key "$i" \
         	--arg value "${gpu_brand[$i]}" \
 		'$data | fromjson + { ($key) : ($value)}')
+done
+##################################################################
+local gpu_info2_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	if [[ ! -z ${gpu_info2[$i]} ]]; then
+        local gpu_info2_json=$(jq -n --arg data "$gpu_info2_json" \
+        --arg key "$i" \
+        --arg value "${gpu_info2[$i]}" \
+                '$data | fromjson + { ($key) : ($value)}')
+	fi
+done
+##################################################################
+local gpu_vendor_json='{}' #nullify json
+for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	if [[ ! -z ${gpu_vendor[$i]} ]]; then
+        local gpu_vendor_json=$(jq -n --arg data "$gpu_vendor_json" \
+        --arg key "$i" \
+        --arg value "${gpu_vendor[$i]}" \
+                '$data | fromjson + { ($key) : ($value)}')
+	fi
 done
 
 ##################################################################
@@ -222,10 +246,12 @@ local request=$(
 	}'
 )
 
+[[ $gpu_info2_json != '{}' ]] && request=`jq ".stats += {\"gpu_info2\": $gpu_info2_json}" <<< "$request"`
+[[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 
 [[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
 
-#echo $request | jq '.' 
+echo $request | jq '.' 
 
 try=0
 
