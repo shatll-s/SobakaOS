@@ -87,7 +87,7 @@ case $1 in
 		bus=${2^^}
 		if [[ $bus != 'ALL' ]]; then
 			adapter=$(sudo atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
-			get_bios
+			get_bios $adapter
 		else
 			for ((i=0; i < `gpu-detect AMD`; i++)); do
 				get_bios $i
@@ -131,7 +131,6 @@ case $1 in
 		[[ $exitcode -ne 0 ]] && msg "BIOS save error" warning "`date -R`${LF}Error occured while starting services. Try to reboot.${LF}$return"
 	;;
 	flash_bios)
-		echo $2 > /tmp/lol
 		platform=`echo $2 | jq -r ".platform" `
 		ignore_mismatch=`echo $2 | jq -r ".ignore_mismatch" `
 		#echo "Plat: $platform"
