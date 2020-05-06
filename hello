@@ -128,12 +128,15 @@ done
 ##################################################################
 # get system info
 ##################################################################
+dmidecode_processor=`dmidecode -t Processor`
+dmidecode_mb=`dmidecode -t Baseboard`
+dmidecode_bios=`dmidecode -t BIOS`
 cpu_json=$(
 	jq -n \
-	--arg version "`dmidecode | grep "Processor Information" -A60 | grep "Version" | sed -e 's/Version\: //; s/\t//' | tr -d '\n'`" \
-	--arg core "`dmidecode | grep "Processor Information" -A60 | grep  "Core Count" | sed -e 's/Core Count\: //; s/\t//' | tr -d '\n'`" \
-	--arg cur_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Current Speed" | sed -e 's/Current Speed\: //; s/\t//' | tr -d '\n'`" \
-	--arg max_speed "`dmidecode | grep "Processor Information" -A60 | grep  "Max Speed" | sed -e 's/Max Speed\: //; s/\t//' | tr -d '\n'`" \
+	--arg version "`echo "$dmidecode_processor" | grep "Version" | sed -e 's/Version\: //; s/\t//' | tr -d '\n'`" \
+	--arg core "`echo "$dmidecode_processor" | grep  "Core Count" | sed -e 's/Core Count\: //; s/\t//' | tr -d '\n'`" \
+	--arg cur_speed "`echo "$dmidecode_processor" | grep  "Current Speed" | sed -e 's/Current Speed\: //; s/\t//' | tr -d '\n'`" \
+	--arg max_speed "`echo "$dmidecode_processor" | grep  "Max Speed" | sed -e 's/Max Speed\: //; s/\t//' | tr -d '\n'`" \
 	'{
 		$version,
 		$core,
@@ -144,13 +147,15 @@ cpu_json=$(
 
 mb_json=$(
 	jq -n \
-	--arg product_name "`dmidecode | grep "Base Board Information" -A5 | grep  "Product Name" | sed -e 's/Product Name\: //; s/\t//' | tr -d '\n'`" \
-	--arg manufacturer "`dmidecode | grep "Base Board Information" -A5 | grep  "Manufacturer" | sed -e 's/Manufacturer\: //; s/\t//' | tr -d '\n'`" \
-	--arg sn "`dmidecode | grep "Base Board Information" -A5 | grep  "Serial Number" | sed -e 's/Serial Number\: //; s/\t//' | tr -d '\n'`" \
+	--arg product_name "`echo "$dmidecode_mb" | grep  "Product Name" | sed -e 's/Product Name\: //; s/\t//' | tr -d '\n'`" \
+	--arg manufacturer "`echo "$dmidecode_mb" | grep  "Manufacturer" | sed -e 's/Manufacturer\: //; s/\t//' | tr -d '\n'`" \
+	--arg sn "`echo "$dmidecode_mb" | grep  "Serial Number" | sed -e 's/Serial Number\: //; s/\t//' | tr -d '\n'`" \
+	--arg bios "`dmidecode -s bios-version` `dmidecode -s bios-release-date`" \
 	'{
 		$product_name,
 		$manufacturer,
-		$sn
+		$sn,
+		$bios
 	}'
 )
 
@@ -248,8 +253,6 @@ local request=$(
 
 [[ $gpu_info2_json != '{}' ]] && request=`jq ".stats += {\"gpu_info2\": $gpu_info2_json}" <<< "$request"`
 [[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
-
-[[ $avg_cpu_temp ]] && request=`jq ".stats += {\"cpu_temp_avg\": \"$avg_cpu_temp\"}" <<< "$request"`
 
 #echo $request | jq '.' 
 
