@@ -128,7 +128,7 @@ function autofan () {
 			local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 			local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 			if [[ ! -f ${fan_addr[$i]}/pwm1 ]]; then
-				echo -e "${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 ${gpu_brand[$i]}\tNo fan data"				
+				echo -e "${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 AMD}\tNo fan data"				
 				continue
 			fi
 			local gpu_fan[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))

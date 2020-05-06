@@ -55,6 +55,9 @@ function convert_algo () { #for nicehash
 		LYRA2V3)
 			local output_algo="LYRA2REV3"
 		;;
+		KAWPOW)
+			local output_algo="KAWPOW"
+		;;
 		*)
 			local output_algo=$input_algo
 		;;
