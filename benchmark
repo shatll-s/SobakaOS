@@ -120,6 +120,7 @@ function benchmark () {
 		[[ -z $check_time ]] && check_time=300
 		[[ -z $warm_up ]] && warm_up=60
 		echo2 "Algo: ${CYAN}${algos[$i]}${WHITE}\tminer: ${CYAN}$miner1${WHITE}\tcheck${CYAN} $check_time${WHITE}\twarm-up${CYAN} $warm_up${WHITE}"
+		echo "$miner1 $port1 \"$batch1\""
 		screen -dmS miner1.benchmark bash -c "miner-loop $miner1 $port1 \"$batch1\""
 		sleep $warm_up
 		echo2 "$warm_up seconds warm-up passed, start checking hashrate"

@@ -311,8 +311,8 @@ function make_batch () {
 		nanominer)
 			minerexec+=" /dog/miners/nanominer/config.ini "
 			config="logPath=/dog/log/nanominer.log\n"
-			config+="port=$API_port\n"
-			config+="mport=0\n"
+			config+="webPort=0\n"
+			config+="mport=-${API_port}\n"
 			config+="rigName = $name\n"
 			[[ ! -z $algo ]]&& config+="[$algo]\n"
 			[[ ! -z $coin ]]&& config+="coin=$coin\n"
