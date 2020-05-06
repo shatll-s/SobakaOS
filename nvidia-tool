@@ -116,7 +116,7 @@ function flash_bios () {
 function driver_install () {
 	url=$1
 	
-	df=`df | grep "/$" | awk '{print $4}'`; echo $df
+	df=`df | grep "/$" | awk '{print $4}'`
 	[[ $df -lt 500000 ]] && echo -e "${RED}You don\`t have enough disk space. Try to delete something or disk-expand. Exiting...${WHITE}" && exit 1
 		
 	if [[ -z $url ]]; then
