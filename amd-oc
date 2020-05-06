@@ -192,15 +192,20 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		fi
 		[[ ${MEMORY_CLOCK[$y]} ]]&&	str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
 
+		if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
+			if [[ ${gpu_name[$i]} != *"Vega"* ]]; then
+							
+				str="$str --vddci ${MEMORY_VOLTAGE[$y]}" #no need to change --mvdd --mvdd 1000"
+			else
+				mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
+				echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
+				echo $mem_str > ${core_addr[$i]}/pp_od_clk_voltage
+				echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
+			fi
+		fi
+
 		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
-
-		if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
-			mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
-			echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
-			echo $mem_str > ${core_addr[$i]}/pp_od_clk_voltage
-			echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
-		fi
 
 		if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
 			amdmemtweak --i $y $MEMORY_TWEAK
