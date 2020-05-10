@@ -210,7 +210,8 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -wal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
 			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport $API_port" || API_port=`echo $addition | sed "s/.*-cdmport [-]*\([0-9]*\).*/\1/"`
-
+			[[ $addition != *"-hstats"* ]] && minerexec+=" -hstats 0"
+		
 			minerexec+=" -log 1 -logfile /dog/log/phoenix.log"
 		;;
 		ewbf)

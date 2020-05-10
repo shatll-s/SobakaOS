@@ -792,7 +792,7 @@ echo $miner_total_hr > /tmp/hr.$1
 ##################################################################
 function stats {
 if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
-	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
+	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
 	#local nvidia_smi=`timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits ` #> $NVIDIASMI_FILE >/tmp/ko 2>/dev/null
 	exitcode=$?
 	#echo "@$nvidia_smi@"
@@ -836,7 +836,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
 		#local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
 		local rig_gpu_fan_raw[$i]=`cat "${fan_addr[$i]}/pwm1"`
-		rig_gpu_fan_raw[$i]=`echo "scale=0; ${rig_gpu_fan_raw[$i]}*100/255" | bc -l`
+		local rig_gpu_fan_raw[$i]=`echo "scale=0; ${rig_gpu_fan_raw[$i]}*100/255" | bc -l`
 		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
 		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is like 65000
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
@@ -994,7 +994,6 @@ fi
 [[ ! -z $THERMO_RODOS ]] && request=`jq ".stats.temp += {\"RODOS_TEMP\": \""$(rodos --temp $THERMO_RODOS)"\"}" <<< "$request"`
 
 echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
-
 #get server answer
 local response=$(echo $request | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
@@ -1055,6 +1054,11 @@ if [[ -z $1 ]]; then
 		[[ -f $BATCH_CFG ]] && . $BATCH_CFG
 		sleep 10
 		stats
+		if [[ ${THIRDPARTY_RIGONLINE} -eq 1 ]]; then
+			[[ `screen-check 3dparty_rigonline` -eq 0 ]] && screen -dmS 3dparty_rigonline rigonlineru
+		else
+			[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
+		fi
 		echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
 	done
 else

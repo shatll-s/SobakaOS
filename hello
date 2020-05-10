@@ -46,10 +46,10 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local gpu_brand[$i]="A"
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 		[[ ! -f $NVIDIASMI_FILE ]] &&
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
 		local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		if [[ -z $nvidiainfo ]]; then
-			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version --format=csv,noheader,nounits > $NVIDIASMI_FILE
+			nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
 			sleep 2
 			local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i ${gpu_busid_sys[$i]}":00.0"`
 		fi

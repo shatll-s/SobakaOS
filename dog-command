@@ -532,10 +532,14 @@ case $1 in
 	settings)
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
-		
+		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
+		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg
+		[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
+
 		[[ ! -z $(grep "NOTIFY_ON_BOOT=" $RIG_CFG) ]]&& sed -i "s/.*NOTIFY_ON_BOOT=.*/NOTIFY_ON_BOOT=$NOTIFY/g" $RIG_CFG || echo "NOTIFY_ON_BOOT=$NOTIFY" >> $RIG_CFG
 		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
-		
+		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
+
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"
 	;;
