@@ -123,9 +123,10 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		if [[ -f ${core_addr[$i]}/pp_od_clk_voltage ]]; then #grub error is fixed, amdgpu.ppfeaturemask=0xffff7fff used
 			if [[ -f ${core_addr[$i]}/pp_table ]]; then
 				if [[ -f /tmp/pp_tables/card$card/pp_table ]]; then
-					echo "Copying Power Play table to restore defaults"
-					cp /tmp/pp_tables/card$card/pp_table ${core_addr[$i]}/pp_table
-					sync
+					#echo "Copying Power Play table to restore defaults"
+					#cp /tmp/pp_tables/card$card/pp_table ${core_addr[$i]}/pp_table
+					#sync
+					echo "Copying Power Play table is temporary DISABLED"
 				else
 					echo "Can\`t find saved Power Play table. Try to reboot"
 				fi
