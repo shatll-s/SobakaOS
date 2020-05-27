@@ -249,7 +249,6 @@ local request=$(
 		}
 	}'
 )
-
 [[ $pl_json != '{}' ]] && request=`jq ".stats += {\"pl\": $pl_json}" <<< "$request"`
 [[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 
@@ -269,7 +268,7 @@ while [[ $try -lt 5 ]]; do
 		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
 			echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
 		
-		echo $response | jq
+		#echo $response | jq '.'
 		
 		if [[ $answer == "Data received" ]]; then
 			#name
