@@ -533,12 +533,35 @@ case $1 in
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
 		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
-		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg
 		[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
 
 		[[ ! -z $(grep "NOTIFY_ON_BOOT=" $RIG_CFG) ]]&& sed -i "s/.*NOTIFY_ON_BOOT=.*/NOTIFY_ON_BOOT=$NOTIFY/g" $RIG_CFG || echo "NOTIFY_ON_BOOT=$NOTIFY" >> $RIG_CFG
 		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
 		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
+
+
+		#WD section
+		[[ `cat $RIG_CFG | grep -c "##### WD SECTION"` -gt 0 ]] && sed -i "/.*##### WD SECTION.*/d" $RIG_CFG
+		echo "##### WD SECTION #####" >> $RIG_CFG
+		if [[ `echo $2 | jq '.wd'` != '""' && `echo $2 | jq '.wd'` != 'null' ]]; then
+			WD_RESTART=3	#default
+			WD_REBOOT=5		#default
+			for option in wd_enabled wd_restart wd_reboot wd_hr; do
+				[[ `cat $RIG_CFG | grep -c "${option^^}="` -gt 0 ]] && sed -i "/.*${option^^}=.*/d" $RIG_CFG
+				if [[ $option != 'wd_hr' ]]; then
+					if [[ `echo $2 | jq ".wd.$option"` != null ]]; then				
+						option_value="`echo $2 | jq -r \".wd.$option\"`"
+						echo "${option^^}=\"$option_value\"" >> $RIG_CFG 
+					fi
+				else
+					echo "WD_HR='"`echo $2 | jq '.wd.wd_hr'`"'" >> $RIG_CFG
+				fi
+			done
+			echo "##### WD SECTION END #####" >> $RIG_CFG
+			echo "$WD_ENABLED@$WD_RESTART@$WD_REBOOT@$WD_HR"
+		
+		fi
+		#WD section end
 
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"

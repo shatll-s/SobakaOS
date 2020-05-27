@@ -199,7 +199,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
 			mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
 			echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
-			echo $mem_str > ${core_addr[$i]}/pp_od_clk_voltage
+			echo "$mem_str" > ${core_addr[$i]}/pp_od_clk_voltage
 			echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
 			
 		fi

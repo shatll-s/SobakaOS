@@ -36,7 +36,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 		local gpu_vendor[$i]=`cat ${core_addr[$i]}/subsystem_vendor | tr '[:lower:]' '[:upper:]'` 
 		local gpu_mem[$i]=`dmesg | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0: VRAM:\s.*" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`"b"
-		local gpu_info[$i]=${gpu_mem[$i]}", "$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5; print ","; print $4 }')
+		local gpu_info[$i]=${gpu_mem[$i]}", "$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5 }')
 		if [[ -z ${gpu_info[$i]} ]]; then
 			amdmeminfo -q -s > $AMDMEMINFO_FILE
 			sleep 2
@@ -56,10 +56,9 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local gpu_name[$i]=`awk -F ', ' '{print $2}' <<< $nvidiainfo`
 		local gpu_vendor[$i]=`cat ${core_addr[$i]}/subsystem_vendor | tr '[:lower:]' '[:upper:]'` 
 		local mem[$i]=`awk -F ', ' '{print $9}' <<< $nvidiainfo`
-		local pl[$i]=`awk -F ', ' '{print $6"/"$7"/"$8" W"}' <<< $nvidiainfo | sed 's/\.00//g'`
+		local pl[$i]=`awk -F ', ' '{print $6"/"$7"/"$8}' <<< $nvidiainfo | sed 's/\.00//g'`
 		local vbios[$i]=`awk -F ', ' '{print $12}' <<< $nvidiainfo`
 		local gpu_info[$i]="${mem[$i]}Mb, ${vbios[$i]}"
-		local gpu_info2[$i]="Power Limit (min/default/max): ${pl[$i]}"
 		local gpu_brand[$i]="N"
 	else #GPU is INTEL
 		local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
@@ -105,12 +104,12 @@ for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
 		'$data | fromjson + { ($key) : ($value)}')
 done
 ##################################################################
-local gpu_info2_json='{}' #nullify json
+local pl_json='{}' #nullify json
 for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${gpu_info2[$i]} ]]; then
-        local gpu_info2_json=$(jq -n --arg data "$gpu_info2_json" \
+	if [[ ! -z ${pl[$i]} ]]; then
+        local pl_json=$(jq -n --arg data "$pl_json" \
         --arg key "$i" \
-        --arg value "${gpu_info2[$i]}" \
+        --arg value "${pl[$i]}" \
                 '$data | fromjson + { ($key) : ($value)}')
 	fi
 done
@@ -251,7 +250,7 @@ local request=$(
 	}'
 )
 
-[[ $gpu_info2_json != '{}' ]] && request=`jq ".stats += {\"gpu_info2\": $gpu_info2_json}" <<< "$request"`
+[[ $pl_json != '{}' ]] && request=`jq ".stats += {\"pl\": $pl_json}" <<< "$request"`
 [[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 
 #echo $request | jq '.' 
@@ -270,7 +269,7 @@ while [[ $try -lt 5 ]]; do
 		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
 			echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
 		
-		#echo $response | jq
+		echo $response | jq
 		
 		if [[ $answer == "Data received" ]]; then
 			#name
