@@ -5,7 +5,7 @@ ASW_TRIGGER="/run/dog/asw_trigger"
 RIG_CFG="/dog/cfg/rig.cfg"
 
 function services_stop () {
-	try_count=3
+	try_count=10
 	[[ ! -z $1 ]] && try_count=$1
 	echo -e "${CYAN}> Stopping services${WHITE}"
 	echo 1 > $NV_STOP_TRIGGER

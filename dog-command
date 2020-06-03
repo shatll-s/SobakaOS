@@ -139,7 +139,6 @@ case $1 in
 		url=`echo $2 | jq -r ".url" `
 		bus=`echo $2 | jq -r ".bus" `
 		disable_services=`echo $2 | jq -r ".disable_services" `
-
 		. $RIG_CFG		
 		cd /tmp
 		link=$(echo $HOST | sed 's/\/[a-z]*.php//')$url #https://os.dog/files/1/upload/0000001_bios_amd_bus02.rom.gz
@@ -268,7 +267,7 @@ case $1 in
 	;;
 	reboot)
 		msg "Rebooting" ok "$(date --rfc-3339=seconds)${LF}Rebooting."
-		nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1
+		nohup bash -c "sreboot $2" > /tmp/nohup.log 2>&1
 	;;
 	batch*)
 		i=$(echo $1 | sed 's/batch//')
@@ -414,10 +413,11 @@ case $1 in
 		fi
 	;;
 	telec*)
-		argument=`echo $1 | sed 's/telec //'`
-
-		raw_return=`$1 | sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"` #remove color
-		return=`echo $raw_return | sed '/^\s*$/d'`
+		#argument=`echo $1 | sed 's/telec //'`
+		
+		#raw_return=`$1 | sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"` #remove color
+		#return=`echo $raw_return | sed '/^\s*$/d'`
+		return=`telec $2 | sed '/^\s*$/d'`
 		exitcode=$?
 
 		[[ $exitcode -eq 0 ]] && type='info' || type='warning'
@@ -433,7 +433,7 @@ case $1 in
 		#	data="$(date --rfc-3339=seconds)\n$return"
 		fi
 		data=$data"$return${LF}Exitcode: $exitcode"
-		msg "Teleconsole $argument" $type "$data"
+		msg "Teleconsole $2" $type "$data"
 	;;
 	af)
 		case $2 in
@@ -446,12 +446,13 @@ case $1 in
 					return="$(screen -ls)"
 					msg "Autofan log" error "$return"
 				fi
+				echo "@$return@"
 				rm /tmp/af_hardcopy
 			;;
 			*)
 			af="$2"
 			echo "$af" > /dog/cfg/af.cfg
-			if [[ `echo $af | jq '.af_enabled'` -eq 1 ]]; then
+			if [[ `echo $af | jq -r '.af_enabled'` -eq 1 ]]; then
 				#af restart
 				text="Autofan (re)started"
 			else
@@ -463,31 +464,32 @@ case $1 in
 		esac
 	;;
 	autoswitch)
-		command=`echo $2 | jq -r '.command'`
-		data=`echo $2 | jq '.|del(.command)'`
-		case $command in
-			log)
-				screen -S asw -X hardcopy /tmp/asw_hardcopy
-				sleep 0.5
-				if [[ $? -eq 0 ]]; then
-					return=$(cat -v /tmp/asw_hardcopy | sed -e 's/M-0/\&deg/g; s/M-^X/\&#x2798/g; s/M-^W/\&#x279a/g;')
-					msg "AutoSwitch log" info "$return"
-				else
-					return="$(screen -ls)"
-					msg "AutoSwitch log" error "$return"
-				fi
-				rm /tmp/asw_hardcopy
-			;;
-			check)
-				echo "$data" > /dog/cfg/autoswitch.cfg
-				return="$(asw check)"
-				msg "Profit check" info "$return"
-			;;
-			*)
-				echo "$data" > /dog/cfg/autoswitch.cfg
-				[[ $3 != '--hello' ]] && msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved${LF}$2"
-			;;
-		esac
+		if [[ $2 == 'log' ]]; then
+			screen -S asw -X hardcopy /tmp/asw_hardcopy
+			sleep 0.5
+			if [[ $? -eq 0 ]]; then
+				return=$(cat -v /tmp/asw_hardcopy | sed -e 's/M-0/\&deg/g; s/M-^X/\&#x2798/g; s/M-^W/\&#x279a/g;')
+				msg "AutoSwitch log" info "$return"
+			else
+				return="$(screen -ls)"
+				msg "AutoSwitch log" error "$return"
+			fi
+			rm /tmp/asw_hardcopy
+		else
+			command=`echo $2 | jq -r '.command'`
+			data=`echo $2 | jq '.|del(.command)'`
+			case $command in
+				check)
+					echo "$data" > /dog/cfg/autoswitch.cfg
+					return="$(asw check)"
+					msg "Profit check" info "$return"
+				;;
+				*)
+					echo "$data" > /dog/cfg/autoswitch.cfg
+					[[ $3 != '--hello' ]] && msg "AutoSwitch config" info "$(date --rfc-3339=seconds) AutoSwitch config saved${LF}$2"
+				;;
+			esac
+		fi
 	;;
 	benchmark)
 		case "$2" in

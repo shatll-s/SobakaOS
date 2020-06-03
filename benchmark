@@ -110,7 +110,7 @@ function benchmark () {
 	data='{}' #nullify json
 	for ((i=0; i < ${#algos[@]}; i++)); do
 		echo2 "----------------------------------------------------------------"
-		local algo=`echo $cfg | jq ".algo.${algos[$i]}"`
+		local algo=`echo $cfg | jq -r ".algo.${algos[$i]}"`
 		echo $algo > /tmp/batch1
 		[[ ! -z $port1 ]] && release-port $port1 &
 		json2batch /tmp/batch1
@@ -199,8 +199,8 @@ function main () {
 		rm $LOCK_FILE
 		exit 1
 	fi
-	[[ `echo $cfg | jq ".time"` != null ]]	&& time_array=`echo $cfg | jq ".time"`
-	[[ `echo $cfg | jq ".warmup"` != null ]]	&& warmup_array=`echo $cfg | jq ".warmup"`
+	[[ `echo $cfg | jq ".time"` != null ]]	&& time_array=`echo $cfg | jq -r ".time"`
+	[[ `echo $cfg | jq ".warmup"` != null ]]	&& warmup_array=`echo $cfg | jq -r ".warmup"`
 	[[ `echo $cfg | jq ".notifications"` != null ]]	&& notifications=1 || notifications=0
 	[[ `echo $cfg | jq ".rewrite"` != null ]]	&& rewrite=1 || rewrite=0
 	[[ $notifications -eq 1 ]] && msg "Benchmark started" info "$(date --rfc-3339=seconds) Benchmark started"
