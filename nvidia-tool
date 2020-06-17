@@ -1,6 +1,7 @@
 #!/bin/bash
 . colors
 NV_STOP_TRIGGER="/run/dog/nvidia_stop_trigger"
+RO_TRIGGER="/run/dog/ro_trigger"
 ASW_TRIGGER="/run/dog/asw_trigger"
 RIG_CFG="/dog/cfg/rig.cfg"
 
@@ -8,8 +9,17 @@ function services_stop () {
 	try_count=10
 	[[ ! -z $1 ]] && try_count=$1
 	echo -e "${CYAN}> Stopping services${WHITE}"
-	echo 1 > $NV_STOP_TRIGGER
 
+	#kill 3rd party hujnia
+	. $RIG_CFG
+	if [[ $THIRDPARTY_RIGONLINE -eq 1 ]]; then
+		sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=0/g" $RIG_CFG
+		echo 1 > $RO_TRIGGER
+	fi
+	[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
+
+	echo 1 > $NV_STOP_TRIGGER
+	
 	for (( i=0; i < $try_count; i++ ))
 	do
 		wd stop > /dev/null 2>&1
@@ -59,6 +69,13 @@ function services_start () {
 	systemctl start wd
 	systemctl start af
 	[[ -f $ASW_TRIGGER && `cat $ASW_TRIGGER` -eq 1 ]] && asw restart
+
+	#resume 3rd party hujnia
+	if [[ -f $RO_TRIGGER ]]; then
+		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=1/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=1" >> $RIG_CFG
+		rm $NV_STOP_TRIGGER
+	fi
+	[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
 	return 0
 }
 

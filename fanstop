@@ -1,0 +1,70 @@
+#!/bin/bash
+. colors
+while [ -n "$1" ]; do
+	option=$1
+	shift
+	[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+	value=$1
+	if [[ $option == '--brand' || $option == '-b' ]]; then
+		if [[ $value == "AMD" || $value == "amd" || $value == "A" ]]; then
+			brand='amd'
+		elif [[ $value == "NVIDIA" || $value == "nvidia" || $value == "N" ]]; then
+			brand='nvidia'
+		else
+			echo -e "Uncorrect value ${RED}$value${WHITE} for argument $option" && exit 1
+		fi
+	elif [[ $option == '--bus' ]]; then
+		#eval "$option=$value"
+		bus=$value
+	elif [[ $option == '--time' || $option == '-t' ]]; then
+		time=$value
+	fi
+
+	shift
+done
+
+[[ ! $brand || ! $bus ]] && echo -e "Not enough arguments" && exit 1
+[[ ! $time ]] && time=10
+
+if [[ $brand == 'amd' ]]; then
+	coreAddr=`amd-info | grep "0000:$bus" | sed "s/.*\(\/sys\/class\/drm.*device\).*/\1/"`
+	[[ ! $coreAddr ]] && echo "Wrong bus or amd-info error" && exit 1
+	fanAddr=`ls -d $coreAddr/hwmon/hwmon[0-9]*`
+	pwmEnable=`cat $fanAddr/pwm1_enable`
+	pwm1=`cat $fanAddr/pwm1`
+	#echo "$fanAddr $pwmEnable $pwm1"
+	
+	[[ $pwmEnable -ne 1 ]] && echo 1 >  $fanAddr/pwm1_enable
+	stopTime=$(echo "`date +%s` + $time" | bc -l)
+
+	echo -en ">Stopping $brand fan on bus $bus "
+	while [[ `date +%s` -le $stopTime ]]; do
+		echo 5 > $fanAddr/pwm1
+		echo -n '.'
+		sleep 0.3
+	done
+
+	#Restore old settings	
+	[[ $pwmEnable -ne 1 ]] && echo $pwmEnable >  $fanAddr/pwm1_enable
+	echo $pwm1 > $fanAddr/pwm1
+elif [[ $brand == 'nvidia' ]]; then
+	nvidiaSmi=`nvidia-smi --query-gpu=gpu_bus_id,index,fan.speed --format=csv,noheader,nounits | grep 0000:$bus`
+	[[ ! $nvidiaSmi ]] && echo "Wrong bus or nvidia-smi error" && exit 1
+	index=`awk -F ', ' '{print $2}' <<< $nvidiaSmi`
+	fan=`awk -F ', ' '{print $3}' <<< $nvidiaSmi`
+	#echo "$index $fan"
+	export DISPLAY=:0
+	nvidia-settings  -a [gpu:$index]/GPUFanControlState=1 >/dev/null 2>&1
+	stopTime=$(echo "`date +%s` + $time" | bc -l)
+
+	echo -en ">Stopping $brand fan on bus $bus "
+	while [[ `date +%s` -le $stopTime ]]; do
+		nvidia-settings -a [fan:$index]/GPUTargetFanSpeed=0 >/dev/null 2>&1
+		echo -n '.'
+		sleep 0.3
+	done
+
+	nvidia-settings -a [fan:$index]/GPUTargetFanSpeed=$fan >/dev/null 2>&1
+fi
+
+echo -e " Done"

@@ -225,7 +225,7 @@ case $1 in
 		miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
 		#ok, we got it
 
-		local stats_template=`echo "{\"command\":\"summary+devs\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
+		local stats_template=`echo "{\"command\":\"summary+devs+devdetails\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
 		miner_ver=`echo $stats_template | jq -r '.summary.STATUS[0].Description' | sed 's/TeamRedMiner //'`
 		miner_online_raw=`echo $stats_template | jq -r '.summary.SUMMARY[0].Elapsed'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
@@ -237,6 +237,8 @@ case $1 in
 		miner_fan=(`echo $stats_template | jq '.devs.DEVS[]."Fan Percent"'`)
 		miner_share=(`echo $stats_template | jq '.devs.DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
+		miner_busid=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//'`)
+
 		if [[ "phi2 ethash" == *$miner_algo* ]]; then
 			local x=1000
 		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
@@ -477,11 +479,13 @@ case $1 in
 		miner_online=(`echo $stats_template | jq -r '.start_time'`)
 		miner_temp=(`echo $stats_template | jq -r '.miner.devices[].temperature'`)
 		miner_fan=(`echo $stats_template | jq -r '.miner.devices[].fan'`)
-		miner_power=(`echo $stats_template | jq -r '.miner.devices[].power'`) # | sed 's/;/\n/g'`)
+		#miner_power=(`echo $stats_template | jq -r '.miner.devices[].power'`) # | sed 's/;/\n/g'`)
+		miner_busid=(`echo $stats_template | jq -r '.miner.devices[].pci_bus_id'`)
 		miner_hr_raw=(`echo $stats_template | jq -r '.miner.devices[].hashrate_raw'`)
 		miner_total_hr=0
+		
 		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
-			[[ $miner_dual_algo == "ethash" ]] && delimiter=1000 || delimiter=1
+			[[ $miner_dual_algo == "ethash" || $miner_algo == 'ethash' ]] && delimiter=1000 || delimiter=1
 			miner_hr[i]=`echo "scale=2; ${miner_hr_raw[i]} / $delimiter" | bc -l`
 			miner_total_hr=`echo "$miner_total_hr + ${miner_hr[$i]}" | bc -l`
 		done
@@ -621,8 +625,6 @@ case $1 in
 		miner_hr_raw=`echo $stats_template | jq '.gpu_hashrate[]'` # | jq 'del(total)'`
 		miner_hr=(`echo $miner_hr_raw | jq -r 'del(.total)[]'`)
 		miner_total_hr=`echo $stats_template | jq -r '.gpu_hashrate[].total'`
-		
-		#echo $miner_hr_raw | jq '.'
 
 		miner_total_share=`echo $stats_template | jq -r '.shares.accepted'`
 		miner_total_badshare=`echo $stats_template | jq -r '.shares.rejected'`
@@ -631,108 +633,7 @@ case $1 in
 esac
 
 ##################################################################
-#making json array of some miner stats
-
-if [[ ! -z $miner_temp ]]; then #if miner temperature stats exist
-	miner_temp_json='{}' #nullify json
-	for ((i=0; i < ${#miner_temp[@]}; i++)); do
-		miner_temp_json=$(jq -n --arg data "$miner_temp_json" \
-			--arg key "$i" \
-			--arg value "${miner_temp[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_fan ]]; then #if miner fan stats exist
-	miner_fan_json='{}' #nullify json
-	for ((i=0; i < ${#miner_fan[@]}; i++)); do
-		miner_fan_json=$(jq -n --arg data "$miner_fan_json" \
-			--arg key "$i" \
-			--arg value "${miner_fan[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
-	miner_hr_json='{}' #nullify json
-	for ((i=0; i < ${#miner_hr[@]}; i++)); do
-		miner_hr_json=$(jq -n --arg data "$miner_hr_json" \
-			--arg key "$i" \
-			--arg value "${miner_hr[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_threads_hr ]]; then #if miner dual hr stats exist
-	miner_threads_hr_json='{}' #nullify json
-	for ((i=0; i < ${#miner_threads_hr[@]}; i++)); do
-		miner_threads_hr_json=$(jq -n --arg data "$miner_threads_hr_json" \
-			--arg key "$i" \
-			--arg value "${miner_threads_hr[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_busid ]]; then #if miner busid stats exist
-	miner_busid_json='{}' #nullify json
-	for ((i=0; i < ${#miner_busid[@]}; i++)); do
-		miner_busid_json=$(jq -n --arg data "$miner_busid_json" \
-			--arg key "$i" \
-			--arg value "${miner_busid[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_power ]]; then #if miner power stats exist
-	miner_power_json='{}' #nullify json
-	for ((i=0; i < ${#miner_power[@]}; i++)); do
-		miner_power_json=$(jq -n --arg data "$miner_power_json" \
-			--arg key "$i" \
-			--arg value "${miner_power[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_share ]]; then #if miner share stats exist
-	miner_share_json='{}' #nullify json
-	for ((i=0; i < ${#miner_share[@]}; i++)); do
-		miner_share_json=$(jq -n --arg data "$miner_share_json" \
-			--arg key "$i" \
-			--arg value "${miner_share[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_invshare ]]; then #if miner invalid share stats exist
-	miner_invshare_json='{}' #nullify json
-	for ((i=0; i < ${#miner_invshare[@]}; i++)); do
-		miner_invshare_json=$(jq -n --arg data "$miner_invshare_json" \
-			--arg key "$i" \
-			--arg value "${miner_invshare[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_badshare ]]; then #if miner badshare stats exist
-	miner_badshare_json='{}' #nullify json
-	for ((i=0; i < ${#miner_badshare[@]}; i++)); do
-		miner_badshare_json=$(jq -n --arg data "$miner_badshare_json" \
-			--arg key "$i" \
-			--arg value "${miner_badshare[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
-if [[ ! -z $miner_dual_hr ]]; then #if miner dual hr stats exist
-	miner_dual_hr_json='{}' #nullify json
-	for ((i=0; i < ${#miner_dual_hr[@]}; i++)); do
-		miner_dual_hr_json=$(jq -n --arg data "$miner_dual_hr_json" \
-			--arg key "$i" \
-			--arg value "${miner_dual_hr[$i]}" \
-			'$data | fromjson + { ($key) : ($value)}')
-	done
-fi
-
+#making json
 miner_json=$(jq -n "{\"miner\": \"$1\"}")
 
 if [[ $miner_algo ]]; then
@@ -748,15 +649,31 @@ if [[ $miner_algo ]]; then
 	miner_json=`jq ". + {\"miner_algo\": \"$miner_algo\"}" <<< "$miner_json"`
 fi
 
-if [[ $miner_dual_algo ]]; then
-	miner_dual_algo=`echo $miner_dual_algo | tr '[:upper:]' '[:lower:]'`
-fi
-
 [[ $miner_online ]] && 			miner_json=`jq ". + {\"miner_online\": \"$miner_online\"}" <<< "$miner_json"`
 [[ $miner_total_hr ]] && 		miner_json=`jq ". + {\"miner_total_hr\": \"$miner_total_hr\"}" <<< "$miner_json"`
 [[ $miner_total_share ]] && 	miner_json=`jq ". + {\"miner_total_share\": \"$miner_total_share\"}" <<< "$miner_json"`
 [[ $miner_total_badshare ]] && 	miner_json=`jq ". + {\"miner_total_badshare\": \"$miner_total_badshare\"}" <<< "$miner_json"`
 [[ $miner_ver ]] && 			miner_json=`jq ". + {\"miner_ver\": \"$miner_ver\"}" <<< "$miner_json"`
+
+for option in miner_busid miner_hr miner_temp miner_fan miner_power miner_share miner_invshare miner_badshare miner_threads_hr; do
+	eval "[[ -z \$$option ]] && continue"
+	eval "local count=\${#$option[@]}"
+	local json='{}'
+	
+	for ((i=0; i < $count; i++)); do
+		eval "local value=\"\${$option[\$i]}\""
+		[[ ! $value ]] && continue
+		#[[ "miner_temp miner_fan" == *$option* && $value -eq 0 ]] && continue
+		[[ "miner_fan" == *$option* && $value == *"Unknown Error"*  ]] && value=555
+		local json=$(jq -n --arg data "$json" \
+			--arg key "$i" \
+			--arg value "$value" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+	#[[ $json ]] && miner_json=`jq ". + {\"$option\": \"$json\"}" <<< "$miner_json"`
+	eval "${option}_json=\"\$json\""
+done
+
 [[ $miner_temp_json ]] && 		miner_json=`jq ". + {\"miner_temp\": $miner_temp_json}" <<< "$miner_json"`
 [[ $miner_fan_json ]] && 		miner_json=`jq ". + {\"miner_fan\": $miner_fan_json}" <<< "$miner_json"`
 [[ $miner_hr_json ]] && 		miner_json=`jq ". + {\"miner_hr\": $miner_hr_json}" <<< "$miner_json"`
@@ -766,6 +683,21 @@ fi
 [[ $miner_badshare_json ]] && 	miner_json=`jq ". + {\"miner_badshare\": $miner_badshare_json}" <<< "$miner_json"`
 [[ $miner_invshare_json ]] && 	miner_json=`jq ". + {\"miner_invshare\": $miner_invshare_json}" <<< "$miner_json"`
 [[ $miner_busid_json ]] && 		miner_json=`jq ". + {\"miner_busid\": $miner_busid_json}" <<< "$miner_json"`
+
+
+if [[ ! -z $miner_dual_hr ]]; then #if miner dual hr stats exist
+	miner_dual_hr_json='{}' #nullify json
+	for ((i=0; i < ${#miner_dual_hr[@]}; i++)); do
+		miner_dual_hr_json=$(jq -n --arg data "$miner_dual_hr_json" \
+			--arg key "$i" \
+			--arg value "${miner_dual_hr[$i]}" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+fi
+
+if [[ $miner_dual_algo ]]; then
+	miner_dual_algo=`echo $miner_dual_algo | tr '[:upper:]' '[:lower:]'`
+fi
 
 if [[ $miner_dual_hr ]]; then
 	dual_json=$(
@@ -834,158 +766,65 @@ done
 for (( i=0; i < ${#core_addr[@]}; i++ )); do
 	#echo "Card $i, core addr ${core_addr[$i]}"
 	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
-		fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
-		#local rig_gpu_fan_raw[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
-		local rig_gpu_fan_raw[$i]=`cat "${fan_addr[$i]}/pwm1"`
-		local rig_gpu_fan_raw[$i]=`echo "scale=0; ${rig_gpu_fan_raw[$i]}*100/255" | bc -l`
-		local temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
-		local rig_gpu_temp_raw[$i]=`expr ${temp_raw[$i]} / 1000` #temp format is like 65000
-		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
-		local power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
+		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
+		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]*\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
 		local pp_dpm_sclk=`cat ${core_addr[$i]}/pp_dpm_sclk | grep \*`
 		local pp_dpm_mclk=`cat ${core_addr[$i]}/pp_dpm_mclk | grep \*`
-		local core_clock[$i]=`echo $pp_dpm_sclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
-		local core_state[$i]=`echo $pp_dpm_sclk | sed  "s/\([0-9]*\):.*/\1/"`
-		local mem_clock[$i]=`echo $pp_dpm_mclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
-		local mem_state[$i]=`echo $pp_dpm_mclk| sed  "s/\([0-9]*\):.*/\1/"`
+
+		local Fan[$i]=`cat "${fan_addr[$i]}/pwm1"`
+		local Fan[$i]=`echo "scale=0; ${Fan[$i]}*100/255" | bc -l`
+		local Temp[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
+		local Temp[$i]=`expr ${Temp[$i]} / 1000` #temp format is like 65000
+		local Power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
+
+		local CoreClock[$i]=`echo $pp_dpm_sclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
+		local CoreState[$i]=`echo $pp_dpm_sclk | sed  "s/\([0-9]*\):.*/\1/"`
+		local MemClock[$i]=`echo $pp_dpm_mclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
+		local MemState[$i]=`echo $pp_dpm_mclk| sed  "s/\([0-9]*\):.*/\1/"`
 		
-		[[ -f "${core_addr[$i]}/gpu_busy_percent" ]] && local rig_gpu_utilisation[$i]=`cat "${core_addr[$i]}/gpu_busy_percent"`
+		[[ -f "${core_addr[$i]}/gpu_busy_percent" ]] && local Utilisation[$i]=`cat "${core_addr[$i]}/gpu_busy_percent"`
 	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
 		#BAD nvidia-smi call:
 		#NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
 		if [[ ! -z $nvidia_smi && $nvidia_smi != *"NVIDIA-SMI"* ]]; then
 			local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
-		    local rig_gpu_temp_raw[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
-			local rig_gpu_fan_raw[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
-			[[ ${fan_raw[$i]} == *"Unknown Error"* ]] && rig_gpu_fan_raw[$i]=555
 			local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`
-			local core_clock[$i]=`awk -F ', ' '{print $10}' <<< $nvidiainfo`
-			local mem_clock[$i]=`awk -F ', ' '{print $11}' <<< $nvidiainfo`
-			[[ ! -z power_raw[$i] && power_raw[$i] != *"Not Supported"* ]] && local power[$i]=`echo "scale=0; ${power_raw[$i]}/1" | bc -l`
-			local rig_gpu_utilisation[$i]=`awk -F ', ' '{print $13}' <<< $nvidiainfo`
+
+		    local Temp[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
+			local Fan[$i]=`awk -F ', ' '{print $4}' <<< $nvidiainfo`
+			[[ ${Fan[$i]} == *"Unknown Error"* ]] && Fan[$i]=555
+			[[ ! -z power_raw[$i] && power_raw[$i] != *"Not Supported"* ]] && local Power[$i]=`echo "scale=0; ${power_raw[$i]}/1" | bc -l`
+			local CoreClock[$i]=`awk -F ', ' '{print $10}' <<< $nvidiainfo`
+			local MemClock[$i]=`awk -F ', ' '{print $11}' <<< $nvidiainfo`
+			local Utilisation[$i]=`awk -F ', ' '{print $13}' <<< $nvidiainfo`
 		fi
 	fi
 done
 
+Ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
+
 ##################################################################
-#making json array of temp
-local rig_gpu_temp_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	local rig_gpu_temp_json=$(jq -n --arg data "$rig_gpu_temp_json" \
-        	--arg key "$i" \
-        	--arg value "${rig_gpu_temp_raw[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
+for option in Temp Fan Power CoreClock CoreState MemClock MemState Utilisation Ip; do
+	local json='{}'
+	for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+		eval "value=\"\${$option[\$i]}\""
+		[[ ! $value ]] && continue
+		local json=$(jq -n --arg data "$json" \
+			--arg key "$i" \
+			--arg value "$value" \
+			'$data | fromjson + { ($key) : ($value)}')
+	done
+	eval "json$option=\"\$json\""
 done
-##################################################################
-#making json array of fan
-local rig_gpu_fan_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	local rig_gpu_fan_json=$(jq -n --arg data "$rig_gpu_fan_json" \
-        	--arg key "$i" \
-        	--arg value "${rig_gpu_fan_raw[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
-#making json array of HR
-local gpu_hr_json='{}' #nullify json
-for ((i=0; i < ${#gpu_hr[@]}; i++)); do
-	local gpu_hr_json=$(jq -n --arg data "$gpu_hr_json" \
-        	--arg key "$i" \
-        	--arg value "${gpu_hr[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
-local gpu_share_json='{}' #nullify json
-for ((i=0; i < ${#gpu_share[@]}; i++)); do
-	local gpu_share_json=$(jq -n --arg data "$gpu_share_json" \
-                --arg key "$i" \
-                --arg value "${gpu_share[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
-local gpu_badshare_json='{}' #nullify json
-for ((i=0; i < ${#gpu_badshare[@]}; i++)); do
-	local gpu_badshare_json=$(jq -n --arg data "$gpu_badshare_json" \
-       	--arg key "$i" \
-       	--arg value "${gpu_badshare[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
-local power_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-        local power_json=$(jq -n --arg data "$power_json" \
-        --arg key "$i" \
-        --arg value "${power[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
-local core_clock_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${core_clock[$i]} ]]; then
-        local core_clock_json=$(jq -n --arg data "$core_clock_json" \
-        --arg key "$i" \
-        --arg value "${core_clock[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-	fi
-done
-##################################################################
-local core_state_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${core_state[$i]} ]]; then
-        local core_state_json=$(jq -n --arg data "$core_state_json" \
-        --arg key "$i" \
-        --arg value "${core_state[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-	fi
-done
-##################################################################
-local mem_clock_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${mem_clock[$i]} ]]; then
-        local mem_clock_json=$(jq -n --arg data "$mem_clock_json" \
-        --arg key "$i" \
-        --arg value "${mem_clock[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-	fi
-done
-##################################################################
-local mem_state_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${mem_state[$i]} ]]; then
-        local mem_state_json=$(jq -n --arg data "$mem_state_json" \
-        --arg key "$i" \
-        --arg value "${mem_state[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-	fi
-done
-##################################################################
-local utilisation_json='{}' #nullify json
-for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
-	if [[ ! -z ${rig_gpu_utilisation[$i]} ]]; then
-        local utilisation_json=$(jq -n --arg data "$utilisation_json" \
-        --arg key "$i" \
-        --arg value "${rig_gpu_utilisation[$i]}" \
-                '$data | fromjson + { ($key) : ($value)}')
-	fi
-done
-##################################################################
-ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
-ip_json='{}'
-for ((i=0; i < ${#ip[@]}; i++)); do
-	ip_json=$(jq -n --arg data "$ip_json" \
-		--arg key "$i" \
-		--arg value "${ip[$i]}" \
-		'$data | fromjson + { ($key) : ($value)}')
-done
-##################################################################
+
 if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
 	cpu_temp=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
 	if [[ ! -z $cpu_temp ]]; then
 		sum_cpu_temp=0
+		local maxCpuTemp
 		for ((i=0; i < ${#cpu_temp[@]}; i++)); do
-			sum_cpu_temp=`echo "scale=0; $sum_cpu_temp + ${cpu_temp[$i]}" | bc -l`
+			[[ ! $maxCpuTemp || `echo "${cpu_temp[$i]} > $maxCpuTemp" | bc -l` -eq 1 ]] && maxCpuTemp=${cpu_temp[$i]}
 		done
-		avg_cpu_temp=`echo "scale=0; $sum_cpu_temp/${#cpu_temp[@]}" | bc -l`
 	fi
 fi
 ##################################################################
@@ -997,11 +836,16 @@ local request=$(
 	--arg password "$PASSWD" \
 	--arg refresh "$(date +%s)" \
 	--arg online "$up" \
-	--argjson ip "$ip_json" \
-	--argjson gpu_temp "$rig_gpu_temp_json" \
-	--argjson gpu_fan "$rig_gpu_fan_json" \
-	--argjson gpu_power "$power_json" \
 	--arg cpu_avg "`uptime | awk -F': ' '{print $2}' | sed 's/\, /X/g' | sed 's/\,/\./g' | sed 's/X/\, /g'`" \
+	--argjson ip "$jsonIp" \
+	--argjson gpu_temp "$jsonTemp" \
+	--argjson gpu_fan "$jsonFan" \
+	--argjson gpu_power "$jsonPower" \
+	--argjson mem_clock "$jsonMemClock" \
+	--argjson mem_state "$jsonMemState" \
+	--argjson core_clock "$jsonCoreClock" \
+	--argjson core_state "$jsonCoreState" \
+	--argjson utilisation "$jsonUtilisation" \
 	--argjson miner1 "$miner1_stats" \
 	--argjson miner2 "$miner2_stats" \
 	'{	
@@ -1011,25 +855,22 @@ local request=$(
 			$password,
 			$refresh,
 			$online,
+			$cpu_avg,
 			$ip,
 			$gpu_temp,
 			$gpu_fan,
 			$gpu_power,
-			$cpu_avg,
+			$mem_clock,
+			$mem_state,
+			$core_clock,
+			$core_state,
+			$utilisation,
 			$miner1,
 			$miner2
 		}
 	}'
 
 )
-
-[[ $mem_clock_json != '{}' ]] && request=`jq ".stats += {\"mem_clock\": $mem_clock_json}" <<< "$request"`
-[[ $mem_state_json != '{}' ]] && request=`jq ".stats += {\"mem_state\": $mem_state_json}" <<< "$request"`
-
-[[ $core_clock_json != '{}' ]] && request=`jq ".stats += {\"core_clock\": $core_clock_json}" <<< "$request"`
-[[ $core_state_json != '{}' ]] && request=`jq ".stats += {\"core_state\": $core_state_json}" <<< "$request"`
-
-[[ $utilisation != '{}' ]] && request=`jq ".stats += {\"utilisation\": $utilisation_json}" <<< "$request"`
 
 if [[ $LOGS != "OFF" ]]; then #in 99% cases LOGS="OFF" only on USB flash drive
 	hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`

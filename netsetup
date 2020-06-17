@@ -35,15 +35,6 @@ function manual_setup()
 	[[ -f $NETWORK_CFG ]] && . $NETWORK_CFG
 	tip="(type ${GREEN}\"\"${WHITE} for empty value)"
 
-#	echo -e "Do you want to set up static IP for LAN manually?"
-#	[[ ! -z $STATIC_IP_LAN ]] && var="$STATIC_IP_LAN" || var="auto IP"
-#	var="[${CYAN}$var${WHITE}]"
-#	echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
-#	read answer
-#	if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
-#		echo -e "Enter ${CYAN}static IP/netmask${WHITE}, e.g. 192.168.88.105/24 $tip"
-#		read STATIC_IP_LAN
-#	fi
 	var=$STATIC_IP_LAN && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
 	echo -e "Enter ${CYAN}static IP/netmask${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
 	echo -e "e.g. 192.168.88.105/24"
@@ -53,16 +44,6 @@ function manual_setup()
 	echo -e "Enter ${CYAN}LAN gateway${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
 	echo -e "e.g. 192.168.88.1"
 	read answer && [[ ! -z $answer ]] && GATEWAY4_LAN=$answer
-
-#	echo -e "Do you want to set up gateway for LAN manually?"
-#	[[ ! -z $GATEWAY4_LAN ]] && var="$GATEWAY4_LAN" || var="no gateway"
-#	var="[${CYAN}$var${WHITE}]"
-#	echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
-#	read answer
-#	if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
-#		echo -e "Enter ${CYAN}gateway${WHITE}, e.g. 192.168.88.1 $tip"
-#		read GATEWAY4_LAN
-#	fi
 
 	#WiFi settings
 	echo -e "Do you want to set up WiFi manually?"
@@ -76,7 +57,7 @@ function manual_setup()
 
 	echo -en "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
 	read answer
-	if [[ $answer == "y" ]]; then
+	if [[ $answer == "y" || $answer == "Y" || $answer == "yes" || $answer == "Yes" ]]; then
 		var=$SSID && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
 		echo -e "Enter ${CYAN}SSID${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
 		read answer && [[ ! -z $answer ]] && SSID=$answer
@@ -94,17 +75,6 @@ function manual_setup()
 		echo -e "Enter ${CYAN}WiFi gateway${WHITE} / type ${GREEN}ENTER${WHITE} for $var $tip"
 		echo -e "e.g. 192.168.88.1"
 		read answer && [[ ! -z $answer ]] && GATEWAY4_WIFI=$answer
-
-#		var=$GATEWAY4_WIFI && [[ ! $var ]] && var="empty value" || var="\"${CYAN}$var${WHITE}\""
-#		echo -e "Do you want to set up gateway for WiFi?"
-#		[[ ! -z $GATEWAY4_WIFI ]] && var="$GATEWAY4_WIFI" || var="no gateway"
-#		var="[${CYAN}$var${WHITE}]"
-#		echo -e "${CYAN}Yes${WHITE}/${RED}No${WHITE}/${GREEN}Current (ENTER)${WHITE} for $var"
-#		read answer
-#		if [[ $answer == "Y" || $answer == "y" || $answer == "Yes" || $answer == "yes" ]]; then
-#			echo -e "Enter ${CYAN}gateway${WHITE}, e.g. 192.168.88.1 $tip"
-#			read GATEWAY4_LAN
-#		fi
 	fi
 
 	if [[ ! -z $STATIC_IP_LAN || ! -z $SSID || ! -z $WIFI_PASSWORD ]]; then

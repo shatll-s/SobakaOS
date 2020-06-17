@@ -8,6 +8,10 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 . $RIG_CFG
 export DISPLAY=":0"
 
+for arg in $@; do
+	[[ $arg == '--initial' ]] && INITIAL=1
+done
+
 ###########################################################################################
 #get first stats from system and miner, send to host, receive answer with comands 		  #
 ###########################################################################################
@@ -268,7 +272,7 @@ while [[ $try -lt 5 ]]; do
 		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
 			echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
 		
-		#echo $response | jq '.'
+		echo $response | jq '.'
 		
 		if [[ $answer == "Data received" ]]; then
 			#name
@@ -300,16 +304,17 @@ while [[ $try -lt 5 ]]; do
 			#remotessh
 			command_argument=$(echo $response | jq ".remotessh" --raw-output)
 			dog-command remotessh "$command_argument"
-
-			#manifests
-			command_argument=$(echo $response | jq ".batch1" --raw-output)
-			dog-command batch1 "$command_argument" --hello
-			command_argument=$(echo $response | jq ".batch2" --raw-output)
-			dog-command batch2 "$command_argument" --hello
-
-			[ -t 1 ] && echo -e "${GREEN}>Initial settings (batches, AutoFan, AutoSwitch, NVIDIA & AMD OC) received and applied${WHITE}" ||
-				echo $(date --rfc-3339=seconds)" Initial settings (batches, NVIDIA & AMD OC) received and applied"
-
+			
+			if [[ ! -z $INITIAL ]]; then
+				echo -e "${GREEN}>This is initial run, applying batches ${WHITE}"
+				#manifests
+				command_argument=$(echo $response | jq ".batch1" --raw-output)
+				dog-command batch1 "$command_argument" --hello
+				command_argument=$(echo $response | jq ".batch2" --raw-output)
+				dog-command batch2 "$command_argument" --hello
+			fi
+			
+			echo -e "${GREEN}>Initial settings (AutoFan, AutoSwitch, NVIDIA & AMD OC) received and applied${WHITE}"
 			exit 0
 		fi
 	else

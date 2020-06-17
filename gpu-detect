@@ -3,7 +3,7 @@
 
 case $1 in
 	all)
-		lspci | lspci | grep -Ec "VGA|3D controller"
+		lspci | grep -Ec "VGA|3D controller"
 	;;
 	list)
 		NVIDIASMI_FILE=/tmp/nvidiagpudetect
