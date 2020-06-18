@@ -9,7 +9,8 @@ if [[ `lsusb | grep -E '0483:5740|0483:a26d' | wc -l` -gt 0 ]]; then
 		[[ "$DEVNAME" == "bus/"* ]] && continue
 		eval "$(udevadm info -q property --export -p $syspath | grep -E 'ID_VENDOR_ID|DEVNAME|ID_MODEL_ID|ID_SERIAL')" 
 		#There are some bug DEVNAME and MODEL_ID
-		[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $ID_VENDOR_ID != "0483" || $DEVNAME == "/dev/sg0" || $DEVNAME == *"hiddev"* || $DEVNAME == *"hidraw"* ]] && continue
+		[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $DEVNAME != "/dev/ttyACM0" ]] && continue
+		#[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $ID_VENDOR_ID != "0483" || $DEVNAME == "/dev/sg0" || $DEVNAME == *"hiddev"* || $DEVNAME == *"hidraw"* ]] && continue
 		echo -e "${GREEN}>Detected open-dev watchdog ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
 		PORT=$DEVNAME
 	done

@@ -98,7 +98,7 @@ while true; do
 		
 		if [[ ! -z $batch ]]; then
 			strings=`wc $logfile | awk '{print $1}'`
-			[[ $strings -gt 1000 ]] && echo `$(tail -n 1000 $logfile` > $logfile
+			[[ $strings -gt 1000 ]] && echo `tail -n 1000 $logfile` > $logfile
 		else
 			[[ -f $logfile ]] && rm $logfile
 		fi
