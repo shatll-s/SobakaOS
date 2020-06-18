@@ -11,12 +11,12 @@ if [[ `lsusb | grep -E '0483:5740|0483:a26d' | wc -l` -gt 0 ]]; then
 		#There are some bug DEVNAME and MODEL_ID
 		[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $DEVNAME != "/dev/ttyACM0" ]] && continue
 		#[[ ! ($ID_MODEL_ID == "5740" || $ID_MODEL_ID == "a26d") || $ID_VENDOR_ID != "0483" || $DEVNAME == "/dev/sg0" || $DEVNAME == *"hiddev"* || $DEVNAME == *"hidraw"* ]] && continue
-		echo -e "${GREEN}>Detected open-dev watchdog ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
+		echo -e "${GREEN}> Detected open-dev watchdog ${CYAN}${DEVNAME} ${GREEN}(${ID_SERIAL})${WHITE}"
 		PORT=$DEVNAME
 	done
 fi
 
-[[ -z $PORT ]] && echo -e "${RED}>There is no open-dev watchdog in system, exiting${WHITE}" && exit 1
+[[ -z $PORT ]] && echo -e "${RED}> There is no open-dev watchdog in system, exiting${WHITE}" && exit 1
 #[[ $PORT == "/dev/sg0" ]] && echo -e "${RED}>Detected wrong port (${PORT}), exiting${WHITE}" && exit 1
 
 function watchdog_query() {
@@ -42,7 +42,7 @@ case $1 in
 	initial)
 		MINER_PID=$(screen -ls | grep "wd-opendev" | sed 's/\s\([0-9]*\)..*/\1/')
 		[[ ! -z "$MINER_PID" ]] && echo ">Killing old screens" && kill $MINER_PID
-		echo -e "${GREEN}>Opening screen ${CYAN}wd-opendev${GREEN} with endless ping${WHITE}"
+		echo -e "${GREEN}> Opening screen ${CYAN}wd-opendev${GREEN} with endless ping${WHITE}"
 		screen -dmS "wd-opendev" bash -c "wd-opendev ping"
 	;;
 	show)

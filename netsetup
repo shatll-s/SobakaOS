@@ -102,7 +102,7 @@ function setup()
 	[[ -f $NETWORK_CFG ]] && . $NETWORK_CFG
 	
 	#lan section
-	echo -e $BROWN"================================================================"$WHITE
+	[[ -t 1 ]] && echo -e "${BROWN}================================================================${WHITE}"
 	#Check LAN settings start	
 	if [[ ! -z $STATIC_IP_LAN || ! -z $GATEWAY4_LAN ]]; then
 		echo -e "Trying to apply next LAN settings:"
@@ -165,7 +165,7 @@ function setup()
 	echo "@${wifi_iface[@]}@">> $LOG
 	#wifi section
 	if [[ ${#wifi_iface[@]} -gt 0 ]]; then
-		echo -e $BROWN"================================================================"$WHITE
+		[[ -t 1 ]] && echo -e "${BROWN}================================================================${WHITE}"
 		if [[ ! -z $SSID && ! -z $WIFI_PASSWORD ]]; then
 			echo -e "Trying to apply next WiFi settings:"
 			echo -e "${YELLOW}SSID: ${CYAN}$SSID${WHITE}"

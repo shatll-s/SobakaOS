@@ -1,0 +1,132 @@
+#!/bin/bash
+#[ -t 1 ] && . colors
+. colors
+. /etc/environment
+export PATH
+
+RIG_CFG="/dog/cfg/rig.cfg"
+TMP_FILE="/tmp/wd_la_hardcopy"
+#exec &>>$LOG
+
+SLEEP=5 #seconds to sleep over iteration
+
+OK_MESSAGE_REDUCE=$(( 1 * 60 / $SLEEP )) #e.g. only every 12th message will be displayed to reduce log
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+LOGO=${BROWN}$LOGO${WHITE}
+
+function get_log () {
+	[[ -f $TMP_FILE ]] && rm -f $TMP_FILE
+	screen -S "wd-la" -X hardcopy $TMP_FILE
+	local exitcode=$?
+	[[ $exitcode -eq 0 ]] && local return=`cat $TMP_FILE | sed 's/\"//g'` || local return=`screen -ls`
+	echo "$return"
+}
+
+function checkLA () {
+	maxLA=$1
+	lastLA=`uptime | sed 's/.*load average: \([.0-9]*\).*/\1/'`
+
+	if [[ -z $lastgood ]]; then
+		lastgood=`date +%s`
+		echo -e "${GREEN}LA check start"
+	fi
+	[[ -z $ok_count ]]&& ok_count=0
+	local now=`date +%s`
+
+	if [[ `echo "if($lastLA<$maxLA) print 1" | bc -l` -eq 1 ]]; then #LA < max LA
+		lastgood=`date +%s`
+
+		#reduce messages
+		[[ $ok_count == 0 ]] && echo -e "${GREEN}OK${WHITE}\t${CYAN}Load Average${WHITE} $lastLA < $maxLA"
+		((ok_count++))
+		[[ $ok_count -ge $OK_MESSAGE_REDUCE ]] && ok_count=0
+	else
+		local elapsed=$(($now - $lastgood))
+		
+		if [[ ! -z $WD_LA_REBOOT ]]; then
+			local reboot_timeout=`echo $WD_REBOOT 60 | awk '{print $1 * $2}'`
+		else
+			local reboot_timeout=60
+		fi
+
+		echo -en "${RED}WARNING${WHITE}\t${CYAN}Load Average${WHITE} $lastLA > $maxLA for $elapsed seconds\t"
+		echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE})"
+
+		
+		if [[ $elapsed -ge $reboot_timeout ]]; then
+			msg "WD_LA: High value ($lastLA), rebooting" danger "`get_log `"
+			echo -e "${RED}Rebooting after $reboot_timeout seconds${WHITE}"
+			nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
+		fi
+
+		ok_count=0
+	fi
+}
+
+function start {
+	echo -e "$LOGO"
+	ok_count=0
+
+	while true; do
+		if [[ ! -f $RIG_CFG ]]; then
+			echo -e "${RED}No config file ${RIG_CFG}${WHITE}" 
+		else
+			. $RIG_CFG
+		fi
+		
+		if [[ ! -z $WD_LA_ENABLED && $WD_LA_ENABLED -eq 0 ]]; then
+			echo -e "${YELLOW}LA Watchdog not enabled${WHITE}"
+			#unset lastgood_1 lastgood_2 ok_count_1 ok_count_2
+			sleep $SLEEP
+			continue
+		fi
+
+		if [[ ! $WD_LA_MAX ]]; then
+			echo -e "${YELLOW}Maximum LA is not defined${WHITE}"
+			coreCount=`sudo dmidecode -t Processor | grep  "Core Count" | sed -e "s/.*\([0-9]\{1,2\}\).*/\1/"`
+			if [[ ! -z $coreCount ]]; then
+				WD_LA_MAX=`echo "scale=0; $coreCount * 3 + 2" | bc -l`
+				echo -e "You have $coreCount cores. Maximum LA will be $WD_LA_MAX"
+			else
+				echo -e "${YELLOW}Can\t determine core count, so will take Maximum LA 8${WHITE}"
+			fi
+			#echo $coreCount
+		fi
+		checkLA $WD_LA_MAX
+
+		sleep $SLEEP
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d wd-la
+		screen -r wd-la
+	;;
+	start)
+		start
+	;;
+	stop)
+		screen-kill wd-la
+		echo "LA Watchdog stopped"
+	;;
+	restart)
+		screen-kill "wd-la"
+		screen -c "/dog/service/screenrc" -dmS "wd-la" -Logfile "/dog/log/wd-la.log" bash -c "/dog/wd-la start"
+		echo "LA Watchdog restarted"
+	;;
+	screen)
+		screen-kill wd-la
+		screen -c "/dog/service/screenrc" -dmS "wd-la" -Logfile "/dog/log/wd-la.log" bash -c "/dog/wd-la start"
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart${WHITE}"
+	;;
+esac

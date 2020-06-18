@@ -1,0 +1,12 @@
+[Unit]
+Description=OSdog LA Watchdog Service
+After=boot.service
+#Requires=sobaka.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/dog/wd-la screen
+
+[Install]
+WantedBy=multi-user.target

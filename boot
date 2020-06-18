@@ -6,11 +6,12 @@ RIG_CFG="/dog/cfg/rig.cfg"
 FLASH_CFG="/dog-flash/rig.cfg"
 NVIDIASMI_FILE=/tmp/nvidiagpudetect
 AMDMEMINFO_FILE=/tmp/amdmeminfo
-
 exec &>>$LOG
 
 cp /dog/service/environment /etc/environment
 . /etc/environment
+. colors
+
 export PATH=$PATH
 export LC_ALL="en_US.UTF-8"
 echo "$(date --rfc-3339=seconds) $0 started."
@@ -51,19 +52,29 @@ fi
 disksize=`fdisk -l /dev/sda | grep "Disk /dev/sda:" | sed "s#Disk /dev/sda: \([0-9.]*\) GiB.*#\1#"`
 echo "Disk size: $disksize Gb"
 if [[ `echo "if ($disksize < 17) print 1" | bc -l` -eq 1 ]]; then
-	. colors
-	echo -e "######################################################################################\nIt seems this is flash drive\n######################################################################################\n"
+	#Message about flash
+	msg="${YELLOW}"
+	msg+="`fix-string '#' 80 '#'`\n"
+	msg+="#"`fix-string "      It seems this is flash drive      " 78 "space" "symmetrically"`"#\n"
+	msg+="#"`fix-string " May be you need to run command logs-off to extend flash life " 78 "space" "symmetrically"`"#\n"
+	msg+=`fix-string "#" 80 "#"`
+	msg+="${WHITE}"
+	echo -e "$msg" > /dev/tty1
+	#echo -e "$msg"
 	. $RIG_CFG
 	if [[ -z $LOGS ]]; then
 		logs-off
 		echo "LOGS=\"OFF\"" >> $RIG_CFG
-		sreboot
+		#sreboot
 	fi
 else
 	echo "It seems this is not flash drive"
 fi
 
-if [[ `gpu-detect AMD` -gt 0 ]]; then
+#SERVICE_MODE for future updates
+if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -ne 1 ]]; then
+	echo -e "${GREEN}> Including AMD drivers${WHITE}"
+	modprobe amdgpu
 	sleep 2
 	echo "Saving Power Play tables:"
 	for ppfile in /sys/class/drm/card*/device/pp_table ; do
@@ -76,6 +87,8 @@ if [[ `gpu-detect AMD` -gt 0 ]]; then
 
 	amdmeminfo -q -s > $AMDMEMINFO_FILE
 fi
+
+[[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -ne 1 ]] && echo -e "${GREEN}> Including NVIDIA drivers${WHITE}" && modprobe nvidia_drm
 
 if [[ ! -f /dog/log/firstrun.log ]]; then
 	tech_info > /dog/log/firstrun.log

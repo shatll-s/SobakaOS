@@ -269,10 +269,10 @@ while [[ $try -lt 5 ]]; do
 		#echo $response | jq '.'
 		answer=$(echo $response | jq -r '.hello_answer')
 		#answer=$(echo $response) #just for debug
-		[ -t 1 ] && echo -e "${GREEN}>First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
+		[ -t 1 ] && echo -e "${GREEN}> First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
 			echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
 		
-		echo $response | jq '.'
+		#  echo $response | jq '.'
 		
 		if [[ $answer == "Data received" ]]; then
 			#name
@@ -314,11 +314,11 @@ while [[ $try -lt 5 ]]; do
 				dog-command batch2 "$command_argument" --hello
 			fi
 			
-			echo -e "${GREEN}>Initial settings (AutoFan, AutoSwitch, NVIDIA & AMD OC) received and applied${WHITE}"
+			echo -e "${GREEN}> Initial settings (AutoFan, AutoSwitch, NVIDIA & AMD OC) received and applied${WHITE}"
 			exit 0
 		fi
 	else
-	[ -t 1 ] && echo -e "${RED}>Error while sending first stats${WHITE}" ||
+	[ -t 1 ] && echo -e "${RED}> Error while sending first stats${WHITE}" ||
 		echo $(date --rfc-3339=seconds)" Error while sending first stats"
 	fi
 	sleep 5
@@ -329,5 +329,5 @@ done
 
 }
 
-echo -e "${GREEN}>Trying to say \"hello\" to server ${WHITE}"
+echo -e "${GREEN}> Trying to say \"hello\" to server ${WHITE}"
 firststats

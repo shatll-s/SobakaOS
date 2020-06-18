@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#if [[ ! -z $1 ]]; then
+str=$1
+[[ ! -z $2 ]] && need="$2" || need=21
+[[ ! -z $3 ]] && filler="$3"
+[[ $filler == 'space' || ! $filler ]] && filler="" && filler+=" "
+[[ ! -z $4 ]] && symmetrically=1
+length=`echo "$1" | wc -c`
+output=${str:0:$need-1}
+if [[ $symmetrically -ne 1 ]]; then
+	for (( y=$length; y < $need; y++ )); do
+		output+="$filler"
+	done
+else
+	let "need2 = need - 1"
+	while [[ $length -lt $need ]]; do
+		output="${filler}${output}"
+		[[ $length -lt $need2 ]] && output+="$filler"
+		length=`echo "$output" | wc -c`
+	done
+fi
+echo "$output"
+#fi
+
