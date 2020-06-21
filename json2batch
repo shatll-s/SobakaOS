@@ -6,7 +6,7 @@ AUTOSWITCH_TMP="/tmp/autoswitch"
 [[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/dog/cfg/batch.cfg"
 . $VARIABLES_CFG
 API_DIR="/run/dog/apiports/"
-[[ ! -d $API_DIR ]] && sudo mkdir -p $API_DIR
+#[[ ! -d $API_DIR ]] && sudo mkdir -p $API_DIR
 name=$(cat /etc/hostname)
 manifest=`cat $1`
 

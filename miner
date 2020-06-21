@@ -1,4 +1,5 @@
 #!/bin/bash
+BATCH_CFG="/dog/cfg/batch.cfg"
 
 n=1
 command=$1
@@ -13,12 +14,27 @@ case $command in
 		screen-kill miner$n
 		echo "Miner screen killed, waiting to restart"
 	;;
+	pause)
+		if [[ -f $BATCH_CFG ]]; then
+			sed -i "/.*batch$n=.*/d" $BATCH_CFG
+			sed -i "/.*miner$n=.*/d" $BATCH_CFG
+			sed -i "/.*port$n=.*/d" $BATCH_CFG
+			sed -i "/.*aswports$n=.*/d" $BATCH_CFG
+			echo -e "batch$n=\"\"\nminer$n=\"\"\nport$n=\"\"" >> $BATCH_CFG
+		fi
+		screen-kill miner$n
+	;;
+	resume)
+		json2batch /tmp/batch$n
+		exitcode=$?
+		[[ $exitcode -eq 0 ]] && echo "Wait some time to resume miner (about 10 seconds)" && echo "Something goes wrong"
+	;;
 	list)
 		screen -ls
 	;;
 	*)
 		bname=`basename $0`
-		echo "Usage: $bname [2] show|restart|list"
+		echo "Usage: $bname [2] show|restart|list|resume|pause"
 		echo "You can stop miner completely using site"
 	;;
 esac

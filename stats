@@ -817,16 +817,17 @@ for option in Temp Fan Power CoreClock CoreState MemClock MemState Utilisation I
 	eval "json$option=\"\$json\""
 done
 
+##################################################################
 if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
 	cpu_temp=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
 	if [[ ! -z $cpu_temp ]]; then
-		sum_cpu_temp=0
 		local maxCpuTemp
 		for ((i=0; i < ${#cpu_temp[@]}; i++)); do
 			[[ ! $maxCpuTemp || `echo "${cpu_temp[$i]} > $maxCpuTemp" | bc -l` -eq 1 ]] && maxCpuTemp=${cpu_temp[$i]}
 		done
 	fi
 fi
+
 ##################################################################
 [[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}' 
 [[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
@@ -880,6 +881,8 @@ fi
 [[ ! -z $THERMO_RODOS ]] && request=`jq ".stats.temp += {\"RODOS_TEMP\": \""$(rodos --temp $THERMO_RODOS)"\"}" <<< "$request"`
 
 echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
+echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/stats #save stats for watchdogs
+[[ ! -z $SHOW ]] && exit 0
 #get server answer
 local response=$(echo $request | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
@@ -928,17 +931,18 @@ echo -e $BROWN"================================================================"
 export DISPLAY=":0"
 export "PATH=$PATH:/dog:/dog/bin:/dog/sbin"
 export CUDA_DEVICE_ORDER
-. $RIG_CFG
+. $RIG_CFGa
 . $BATCH_CFG
 up_time=$(uptime -s)
 up=$(date --date "$up_time" +%s)
 msg_count=0
 
-if [[ -z $1 ]]; then
+if [[ -z $1 || $1 == 'show' ]]; then
+	[[ $1 == 'show' ]] && SHOW=1
 	while true; do
 		[[ -f $RIG_CFG ]] && . $RIG_CFG || echo "No config file. Can\`t connect to host"  >> $LOG
 		[[ -f $BATCH_CFG ]] && . $BATCH_CFG
-		sleep 10
+		[[ ! $SHOW ]] && sleep 10
 		stats
 		if [[ ${THIRDPARTY_RIGONLINE} -eq 1 ]]; then
 			[[ `screen-check 3dparty_rigonline` -eq 0 ]] && screen -dmS 3dparty_rigonline rigonlineru
@@ -946,6 +950,7 @@ if [[ -z $1 ]]; then
 			[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
 		fi
 		echo "$(tail -n 200 $LOG)" > $LOG #only 200 strings in log
+		[[ ! -z $SHOW ]] && exit 0
 	done
 else
 	echo `miner_stats $1 $2 $3` #port=$2 batch="$3"

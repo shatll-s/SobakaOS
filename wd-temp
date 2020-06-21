@@ -1,0 +1,194 @@
+#!/bin/bash
+#OSdog Temp Watchdog v 0.1. Visit os.dog
+. /etc/environment #PATH
+. colors
+
+RIG_CFG="/dog/cfg/rig.cfg"
+SCREEN_CFG="/dog/service/screenrc"
+LOG="/dog/log/wd-temp.log"
+STATS="/run/dog/stats"
+LF='
+'
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+delay=10
+maxRefresh=20 #if stats are olden, something is wrong
+defaultCritTemp=80
+defaultResumeTemp=48
+defaultAction='pause'
+LOCKFILE='/run/dog/wd-temp.lock'
+
+
+function showMsg () {
+	status=$1
+	text=$2
+	if [[ $status == "ok" ]]; then
+		status="${GREEN}OK${WHITE}"
+	elif [[ $status == "warning" || $status == "warn" ]]; then
+		status="${RED}WARN${WHITE}"
+	elif [[ $status == "info" ]]; then
+		status="${BLUE}INFO${WHITE}"
+	fi
+	echo -e "`date`\t${status}\t${text}"
+}
+
+function start () {
+	start_time=`date +%s`
+	
+	echo -e "${BROWN}$LOGO${GREEN}"
+	$LINE
+	
+	while true; do
+		unset WD_TEMP_ENABLED WD_TEMP_MAX WD_TEMP_ACTION highCount maxTemp message #if something is changed?
+		#Some verifications at beginning
+		if [[ ! -f $RIG_CFG ]]; then
+			echo -e "${RED}No config file ${RIG_CFG}${WHITE}"
+			sleep $delay
+			continue
+		fi
+		. $RIG_CFG
+
+		if [[ ! WD_TEMP_ENABLED || WD_TEMP_ENABLED -eq 0 ]]; then
+			if [[ $firstTimeTrigger1 -ne 1 ]]; then
+				echo -n "Temperature Watchdog is not enabled"
+				firstTimeTrigger1=1
+			else
+				echo -n "."
+			fi
+			#echo "Temperature Watchdog is not enabled"
+			sleep $delay
+			continue
+		elif [[ $firstTimeTrigger1 -eq 1 ]]; then
+			firstTimeTrigger1=0
+			firstTimeTrigger2=0
+			firstTimeTrigger3=0
+			firstTimeTrigger4=0
+			echo "" #To switch line
+		fi
+
+		if [[ ! $WD_TEMP_CRIT || $WD_TEMP_CRIT -gt 95 || $WD_TEMP_CRIT -lt 50 ]]; then
+			[[ $firstTimeTrigger2 -ne 1 ]] && firstTimeTrigger2=1 && echo -e "Something wrong with Crit Temp, using default value ${CYAN}${defaultCritTemp}${WHITE}"
+			WD_TEMP_CRIT=$defaultMaxTemp
+		elif [[ firstTimeTrigger2 -ne 0 ]]; then
+			firstTimeTrigger2=0
+		fi
+
+		if [[ ! $WD_TEMP_ACTION || 'pause reboot shutdown' != *"$WD_TEMP_ACTION"* ]]; then
+			[[ $firstTimeTrigger3 -ne 1 ]] && firstTimeTrigger3=1 && echo -e "Wrong Action is set, using default value ${CYAN}${defaultAction}${WHITE}"
+			WD_TEMP_ACTION=$defaultAction
+		elif [[ firstTimeTrigger3 -ne 0 ]]; then
+			firstTimeTrigger3=0
+		fi
+
+		if [[ $WD_TEMP_RESUME == 'pause' && ! $WD_TEMP_RESUME= ]]; then
+			[[ $firstTimeTrigger4 -ne 1 ]] && firstTimeTrigger4=1 && echo -e "Something wrong with Resume Temp, using default value ${CYAN}${defaultResumeTemp}${WHITE}"
+			WD_TEMP_RESUME==$defaultResumeTemp
+		elif [[ firstTimeTrigger4 -ne 0 ]]; then
+			firstTimeTrigger4=0
+		fi
+
+		if [[ ! -f $STATS ]]; then
+			echo -e "${RED}No stats file ${STATS}${WHITE}"
+			sleep $delay
+			continue
+		fi
+
+		local lastUpdate=`stat -c %Y $STATS`
+		local now=`date +%s`
+		local refresh=$(($now - $lastUpdate))
+		[[ $refresh -gt $maxRefresh ]] && echo -e "${RED}Stats are too old${WHITE}" && sleep $delay && continue
+		
+		local stats=`cat $STATS`
+		local temp=`echo $stats | jq -r '.gpu_temp[]'`
+		[[ ! $temp || $temp == 'null' ]] && echo -e "${RED}Something wrong, no temperatures are available${WHITE}" && sleep $delay && continue
+		#It seems everything is good
+
+		#Show stats sometimes, like hr in miner
+		if [[ ! $statsCounter || $statsCounter -ge 10 ]]; then
+			statsCounter=0
+			local statsMsg="${CYAN}${PURELINE}\nCrit temp: ${RED}$WD_TEMP_CRIT${CYAN}\tAction: ${GREEN}$WD_TEMP_ACTION"
+			[[ $WD_TEMP_ACTION == 'pause' ]] && statsMsg+="\t${CYAN}Resume temp: ${GREEN}$WD_TEMP_RESUME"
+			statsMsg+="\n${CYAN}${PURELINE}${WHITE}"	
+			echo -e $statsMsg
+
+		else
+			(( statsCounter++ ))
+		fi
+		
+		local tempArray=(`echo $temp | jq '.'`)
+		for ((i=0; i < ${#tempArray[@]}; i++)); do
+			if [[ ${tempArray[$i]} -ge $WD_TEMP_MAX ]]; then
+				[[ ! $highCount ]] && local highCount=1 || (( highCount++ ))
+				showMsg warning "High temp ${tempArray[$i]} on GPU $i"
+
+			fi
+			[[ ! $maxTemp || ${tempArray[$i]} -gt $maxTemp ]] && local maxTemp=${tempArray[$i]}
+		done
+		
+		if [[ $highCount -gt 0 ]]; then
+			local message="High temp on $highCount GPU(s). Action: ${WD_TEMP_ACTION}" 
+			showMsg info "$message"
+			if [[ ! -f $LOCKFILE ]]; then
+				touch $LOCKFILE
+				[[ $WD_TEMP_NOTIFICATIONS -eq 1 ]] && msg "Temp WD: ${maxTemp}°C $WD_TEMP_ACTION" warning "`date -R`${LF}${message}" > /dev/null 2>&1
+			fi
+			case $WD_TEMP_ACTION in
+				pause)
+					miner pause
+					miner 2 pause
+					systemctl stop wd
+				;;
+				reboot)
+					nohup bash -c "sreboot" > /tmp/nohup.log 2>&1
+				;;
+				shutdown)
+					nohup bash -c "sreboot shutdown" > /tmp/nohup.log 2>&1
+				;;
+			esac
+		else
+			showMsg ok "Max temp: ${maxTemp}°C"
+			if [[ $WD_TEMP_ACTION == 'pause' && -f $LOCKFILE && $maxTemp -le $WD_TEMP_RESUME ]]; then
+				local message="Highest temp is ${maxTemp}°C. Action: resume"
+				showMsg info "$message"
+				[[ `screen-check miner1` -eq 0 ]] && miner resume > /dev/null 2>&1
+				[[ `screen-check miner2` -eq 0 ]] && miner 2 resume > /dev/null 2>&1
+				[[ $WD_TEMP_NOTIFICATIONS -eq 1 ]] && msg "Temp WD: resume" success "`date -R`${LF}${message}" > /dev/null 2>&1
+				systemctl restart wd
+				rm $LOCKFILE
+			fi
+		fi
+
+		sleep $delay
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d wd-temp
+		screen -r wd-temp
+	;;
+	log)
+		[[ ! $2 ]] && n=200 || n=$2
+		tail -n $n $LOG
+	;;
+	stop)
+		/dog/screen-kill wd-temp
+		echo "$(date --rfc-3339=seconds) Autofan stopped"
+	;;
+	start-cli)
+		start
+	;;
+	start|restart)
+		/dog/screen-kill wd-temp
+		screen -c $SCREEN_CFG -dmS "wd-temp" -Logfile $LOG bash -c "/dog/wd-temp start-cli"
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart|log|start-cli${WHITE}"
+	;;
+esac

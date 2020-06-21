@@ -12,6 +12,7 @@ cp /dog/service/environment /etc/environment
 . /etc/environment
 . colors
 
+mkdir -p /run/dog/apiports/ #Create dir for stats & data
 export PATH=$PATH
 export LC_ALL="en_US.UTF-8"
 echo "$(date --rfc-3339=seconds) $0 started."
@@ -100,6 +101,7 @@ netsetup -f
 /dog/sbin/rodos --initial
 hello --initial
 . $RIG_CFG
+
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
 fi

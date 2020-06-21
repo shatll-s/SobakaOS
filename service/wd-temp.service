@@ -1,0 +1,11 @@
+[Unit]
+Description=OSdog Temperature Watchdog Service
+After=mining.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/dog/wd-temp start
+
+[Install]
+WantedBy=multi-user.target

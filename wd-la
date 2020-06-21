@@ -5,7 +5,8 @@
 export PATH
 
 RIG_CFG="/dog/cfg/rig.cfg"
-TMP_FILE="/tmp/wd_la_hardcopy"
+SCREEN_CFG="/dog/service/screenrc"
+LOG="/dog/log/wd-la.log"
 #exec &>>$LOG
 
 SLEEP=5 #seconds to sleep over iteration
@@ -20,21 +21,14 @@ LOGO="
 "
 LOGO=${BROWN}$LOGO${WHITE}
 
-function get_log () {
-	[[ -f $TMP_FILE ]] && rm -f $TMP_FILE
-	screen -S "wd-la" -X hardcopy $TMP_FILE
-	local exitcode=$?
-	[[ $exitcode -eq 0 ]] && local return=`cat $TMP_FILE | sed 's/\"//g'` || local return=`screen -ls`
-	echo "$return"
-}
-
 function checkLA () {
 	maxLA=$1
 	lastLA=`uptime | sed 's/.*load average: \([.0-9]*\).*/\1/'`
 
 	if [[ -z $lastgood ]]; then
 		lastgood=`date +%s`
-		echo -e "${GREEN}LA check start"
+		echo -e "${GREEN}LA check start${WHITE}"
+		$LINE
 	fi
 	[[ -z $ok_count ]]&& ok_count=0
 	local now=`date +%s`
@@ -57,11 +51,12 @@ function checkLA () {
 
 		echo -en "${RED}WARNING${WHITE}\t${CYAN}Load Average${WHITE} $lastLA > $maxLA for $elapsed seconds\t"
 		echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE})"
-
-		
+	
 		if [[ $elapsed -ge $reboot_timeout ]]; then
-			msg "WD_LA: High value ($lastLA), rebooting" danger "`get_log `"
-			echo -e "${RED}Rebooting after $reboot_timeout seconds${WHITE}"
+			#[ $msg_sent -ne 1 ]] && msg "WD_LA: High value ($lastLA), rebooting" danger "`tail -n 200 $LOG `"
+			#msg_sent=1
+			msg "WD_LA: High value ($lastLA), rebooting" danger "`tail -n 200 $LOG `"
+			echo -e "${RED}Rebooting after $elapsed seconds${WHITE}"
 			nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
 		fi
 
@@ -109,24 +104,24 @@ case $1 in
 		screen -d wd-la
 		screen -r wd-la
 	;;
-	start)
+	start-cli)
 		start
+	;;
+	log)
+		[[ ! $2 ]] && n=200 || n=$2
+		tail -n $n $LOG
 	;;
 	stop)
 		screen-kill wd-la
 		echo "LA Watchdog stopped"
 	;;
-	restart)
+	start|restart)
 		screen-kill "wd-la"
-		screen -c "/dog/service/screenrc" -dmS "wd-la" -Logfile "/dog/log/wd-la.log" bash -c "/dog/wd-la start"
-		echo "LA Watchdog restarted"
-	;;
-	screen)
-		screen-kill wd-la
-		screen -c "/dog/service/screenrc" -dmS "wd-la" -Logfile "/dog/log/wd-la.log" bash -c "/dog/wd-la start"
+		screen -c $SCREEN_CFG -dmS "wd-la" -Logfile $LOG bash -c "/dog/wd-la start-cli"
+		echo "LA Watchdog (re)started"
 	;;
 	*)
 		bname=`basename $0`
-		echo -e "Usage: ${CYAN}$bname show|start|stop|restart${WHITE}"
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart|log|start-cli${WHITE}"
 	;;
 esac

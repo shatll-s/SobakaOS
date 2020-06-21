@@ -312,6 +312,9 @@ while [[ $try -lt 5 ]]; do
 				dog-command batch1 "$command_argument" --hello
 				command_argument=$(echo $response | jq ".batch2" --raw-output)
 				dog-command batch2 "$command_argument" --hello
+			else
+				echo $response | jq ".batch1" > /tmp/batch1
+				echo $response | jq ".batch2" > /tmp/batch2
 			fi
 			
 			echo -e "${GREEN}> Initial settings (AutoFan, AutoSwitch, NVIDIA & AMD OC) received and applied${WHITE}"

@@ -127,11 +127,12 @@ function start {
 
 	while true; do
 		if [[ ! -f $RIG_CFG || ! -f $BATCH_CFG ]]; then
-			echo -e "${RED}No config file $RIG_CFG or $BATCH_CFG${WHITE}" 
-		else
-			. $RIG_CFG
-			. $BATCH_CFG
+			echo -e "${RED}No config file $RIG_CFG or $BATCH_CFG${WHITE}"
+			sleep $SLEEP
+			continue
 		fi
+		. $RIG_CFG
+		. $BATCH_CFG
 		
 		if [[ -z $WD_ENABLED || $WD_ENABLED != 1 ]]; then
 			echo -e "${YELLOW}Watchdog not enabled${WHITE}"

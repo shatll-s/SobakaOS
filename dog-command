@@ -532,6 +532,7 @@ case $1 in
 		esac
 	;;
 	settings)
+		#echo $2 > /tmp/settings #just for development
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
 		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
@@ -542,10 +543,11 @@ case $1 in
 		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
 
 
-		#WD section
-		[[ `cat $RIG_CFG | grep -c "##### WD SECTION"` -gt 0 ]] && sed -i "/.*##### WD SECTION.*/d" $RIG_CFG
-		echo "##### WD SECTION #####" >> $RIG_CFG
+		########################      Hashrate WD SECTION      ########################
 		if [[ `echo $2 | jq '.wd'` != '""' && `echo $2 | jq '.wd'` != 'null' ]]; then
+			[[ `cat $RIG_CFG | grep -c "Hashrate WD SECTION"` -gt 0 ]] && sed -i "/.*Hashrate WD SECTION.*/d" $RIG_CFG
+			echo -e "`fix-string '      Hashrate WD SECTION      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+
 			WD_RESTART=3	#default
 			WD_REBOOT=5		#default
 			for option in wd_enabled wd_restart wd_reboot wd_hr; do
@@ -559,11 +561,26 @@ case $1 in
 					echo "WD_HR='"`echo $2 | jq '.wd.wd_hr'`"'" >> $RIG_CFG
 				fi
 			done
-			echo "##### WD SECTION END #####" >> $RIG_CFG
-			echo "$WD_ENABLED@$WD_RESTART@$WD_REBOOT@$WD_HR"
-		
+			echo -e "`fix-string '      Hashrate WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
 		fi
-		#WD section end
+		######################      Hashrate WD SECTION END      ######################
+
+		#######################      Temperature WD SECTION      ######################
+		if [[ `echo $2 | jq '.wd_temp'` != '""' && `echo $2 | jq '.wd_temp'` != 'null' ]]; then
+			[[ `cat $RIG_CFG | grep -c "Temperature WD SECTION"` -gt 0 ]] && sed -i "/.*Temperature WD SECTION.*/d" $RIG_CFG
+			echo -e "`fix-string '      Temperature WD SECTION      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+
+			for option in wd_temp_enabled wd_temp_crit wd_temp_resume wd_temp_action wd_temp_notifications; do
+				[[ `cat $RIG_CFG | grep -c "${option^^}="` -gt 0 ]] && sed -i "/.*${option^^}=.*/d" $RIG_CFG
+
+				if [[ `echo $2 | jq ".wd_temp.$option"` != null ]]; then				
+					option_value="`echo $2 | jq -r \".wd_temp.$option\"`"
+					echo "${option^^}=\"$option_value\"" >> $RIG_CFG 
+				fi
+			done
+			echo -e "`fix-string '      Temperature WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+		fi
+		#####################      Temperature WD SECTION END      ####################
 
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"

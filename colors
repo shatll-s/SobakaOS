@@ -20,6 +20,7 @@ UNDERLINE="\e[4m"
 ITALIC="\e[3m"
 STANDART='\e[0m'
 
+PURELINE="================================================================"
 LINE="echo -e $BROWN================================================================$WHITE"
 
 #echo -e $BLINK"There"$WHITE" are $n "$RED"AMD"$LIGHTRED" GPU"$YELLOW" detected"$WHITE
