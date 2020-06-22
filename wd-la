@@ -89,7 +89,8 @@ function start {
 				WD_LA_MAX=`echo "scale=0; $coreCount * 3 + 2" | bc -l`
 				echo -e "You have $coreCount cores. Maximum LA will be $WD_LA_MAX"
 			else
-				echo -e "${YELLOW}Can\t determine core count, so will take Maximum LA 8${WHITE}"
+				WD_LA_MAX=8
+				echo -e "${YELLOW}Can not determine core count, so will take Maximum LA 8${WHITE}"
 			fi
 			#echo $coreCount
 		fi

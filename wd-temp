@@ -44,7 +44,7 @@ function start () {
 	$LINE
 	
 	while true; do
-		unset WD_TEMP_ENABLED WD_TEMP_MAX WD_TEMP_ACTION highCount maxTemp message #if something is changed?
+		unset WD_TEMP_ENABLED WD_TEMP_CRIT WD_TEMP_ACTION highCount maxTemp message #if something is changed?
 		#Some verifications at beginning
 		if [[ ! -f $RIG_CFG ]]; then
 			echo -e "${RED}No config file ${RIG_CFG}${WHITE}"
@@ -122,14 +122,14 @@ function start () {
 		
 		local tempArray=(`echo $temp | jq '.'`)
 		for ((i=0; i < ${#tempArray[@]}; i++)); do
-			if [[ ${tempArray[$i]} -ge $WD_TEMP_MAX ]]; then
+			if [[ ${tempArray[$i]} -ge $WD_TEMP_CRIT ]]; then
 				[[ ! $highCount ]] && local highCount=1 || (( highCount++ ))
-				showMsg warning "High temp ${tempArray[$i]} on GPU $i"
+				showMsg warning "High temp ${tempArray[$i]} > $WD_TEMP_CRIT on GPU $i"
 
 			fi
 			[[ ! $maxTemp || ${tempArray[$i]} -gt $maxTemp ]] && local maxTemp=${tempArray[$i]}
 		done
-		
+
 		if [[ $highCount -gt 0 ]]; then
 			local message="High temp on $highCount GPU(s). Action: ${WD_TEMP_ACTION}" 
 			showMsg info "$message"

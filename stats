@@ -819,11 +819,13 @@ done
 
 ##################################################################
 if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
-	cpu_temp=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	cpuTempIntel=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	cpuTempAMD=(`sensors -u | grep "k10temp-pci" -A3 | grep "_input" | sed "s/.*_input: //"`)
+	cpu_temp=(`echo ${cpuTempIntel[@]} ${cpuTempAMD[@]}`)
 	if [[ ! -z $cpu_temp ]]; then
 		local maxCpuTemp
 		for ((i=0; i < ${#cpu_temp[@]}; i++)); do
-			[[ ! $maxCpuTemp || `echo "${cpu_temp[$i]} > $maxCpuTemp" | bc -l` -eq 1 ]] && maxCpuTemp=${cpu_temp[$i]}
+			[[ ! $maxCpuTemp || `echo "${cpu_temp[$i]} > $maxCpuTemp" | bc -l` -eq 1 ]] && local maxCpuTemp=`echo "scale=0; ${cpu_temp[$i]}/1" | bc -l`
 		done
 	fi
 fi
@@ -877,7 +879,7 @@ if [[ $LOGS != "OFF" ]]; then #in 99% cases LOGS="OFF" only on USB flash drive
 	hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`
 	[[ ! -z $hddtemp ]] && request=`jq ".stats.temp += {\"HDD_TEMP\": \"$hddtemp\"}" <<< "$request"`
 fi
-[[ ! -z $avg_cpu_temp ]] && request=`jq ".stats.temp += {\"CPU_TEMP\": \"$avg_cpu_temp\"}" <<< "$request"`
+[[ ! -z $maxCpuTemp ]] && request=`jq ".stats.temp += {\"CPU_TEMP\": \"$maxCpuTemp\"}" <<< "$request"`
 [[ ! -z $THERMO_RODOS ]] && request=`jq ".stats.temp += {\"RODOS_TEMP\": \""$(rodos --temp $THERMO_RODOS)"\"}" <<< "$request"`
 
 echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
@@ -931,7 +933,7 @@ echo -e $BROWN"================================================================"
 export DISPLAY=":0"
 export "PATH=$PATH:/dog:/dog/bin:/dog/sbin"
 export CUDA_DEVICE_ORDER
-. $RIG_CFGa
+. $RIG_CFG
 . $BATCH_CFG
 up_time=$(uptime -s)
 up=$(date --date "$up_time" +%s)
