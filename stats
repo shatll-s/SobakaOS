@@ -639,10 +639,13 @@ miner_json=$(jq -n "{\"miner\": \"$1\"}")
 if [[ $miner_algo ]]; then
 	miner_algo=`echo $miner_algo | tr '[:upper:]' '[:lower:]'`
 	
-	if [[ $miner_algo == *"equihash"* ]];then
+	if [[ $miner_algo == *"equihash"* ]]; then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s#[,/]#.#g; s/beam-pow//"`
 		[[ $miner_algo == *"150.5.3"* ]] && miner_algo="beamhashii"
-	elif [[ $miner_algo == *"cuckaroo"* ]];then
+		[[ $miner_algo == *"144.5s"* ]] && miner_algo="beamhash3"
+	elif [[ $miner_algo == "beamhash iii" || $miner_algo == "beamhashiii" ]]; then
+		miner_algo="beamhash3"
+	elif [[ $miner_algo == *"cuckaroo"* ]]; then
 		miner_algo=`echo $miner_algo | sed "s/\s//g; s/grin//"`
 	fi
 

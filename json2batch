@@ -6,14 +6,23 @@ AUTOSWITCH_TMP="/tmp/autoswitch"
 [[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/dog/cfg/batch.cfg"
 . $VARIABLES_CFG
 API_DIR="/run/dog/apiports/"
-#[[ ! -d $API_DIR ]] && sudo mkdir -p $API_DIR
 name=$(cat /etc/hostname)
-manifest=`cat $1`
+[[ ! -z $1 ]] && manifest=`cat $1` || echo "Not enough arguments"
+pool="daggerhashimoto.eu-new.nicehash.com:3353"
+pool="eu.anayhash.net:3333"
+	partners=("anyhash.net" "ethermine.org")
+	for option in ${partners[@]}; do
+		[[ ! -z $pool && "$pool" == *"$option"* ]] && pass="$pass@" && break
+		#echo "$option ? $pool"
+	done
 
 function convert_algo () { #for nicehash
 	local input_algo=${1^^}
 	case $input_algo in
-		BEAMHASHII|BEAMHASH)
+		BEAMHASHIII|BEAMHASH)
+			local output_algo="BEAMV3"
+		;;
+		BEAMHASHII)
 			local output_algo="BEAMV2"
 		;;
 		ETHASH)
@@ -67,6 +76,7 @@ function convert_algo () { #for nicehash
 
 function get_variables () {	
 	#[[ `echo $manifest | jq ".miner"` != null ]]	&& miner=`echo $manifest | jq -r ".miner"`
+	
 	local manifest="$1"
 	for option in miner coin wallet pass pool algo fork brand dual_wallet dual_pool dual_pass epools_type; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
@@ -113,6 +123,12 @@ function get_variables () {
 			eval "$option=\"$option_value\""
 		fi
 	done
+
+	partners=("anyhash.net")
+	for option in ${partners[@]}; do
+		[[ ! -z $pool && "$pool" == *"$option"* ]] && pass="$pass@" && break
+	done
+
 }
 
 function get_free_port () {
@@ -327,9 +343,14 @@ function make_batch () {
 		;;
 		lolminer)
 			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
-			[[ ! -z $algo ]]&& minerexec+=" --coin $algo"
-			[[ ! -z $pool_without_port ]]&& minerexec+=" --pool $pool_without_port"
-			[[ ! -z $port ]]&& minerexec+=" --port $port"
+			#[[ ! -z $algo ]]&& minerexec+=" --coin $algo" 
+			#[[ ! -z $pool_without_port ]]&& minerexec+=" --pool $pool_without_port"
+			#[[ ! -z $port ]]&& minerexec+=" --port $port"
+			#old versions
+
+			[[ ! -z $algo ]]&& minerexec+=" --algo $algo" #old
+			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
+			[[ $addition != *"--tls"* && `echo $pool | grep -c "nicehash"` -eq 1 ]] && minerexec+=" --tls off" #NiceHash
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 			minerexec+=" --apiport $API_port"
