@@ -1,0 +1,260 @@
+#!/bin/bash
+#OSdog Temp Watchdog v 0.1. Visit os.dog
+. /etc/environment #PATH
+. colors
+
+CFG="/dog/cfg/mb-af.cfg"
+SCREEN_CFG="/dog/service/screenrc"
+LOG="/dog/log/mb-af.log"
+STATS="/run/dog/stats"
+LF='
+'
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+delay=10
+maxRefresh=20 #if stats are olden, something is wrong
+
+function testFan () {
+	fan=$1
+	echo -e "${GREEN}${fan}${WHITE}"
+	oldState=`cat ${fan}_enable`
+	result=`echo 1 > ${fan}_enable`
+	
+	[[ $result ]] && echo "Can not manual control $fan ($result}" && return
+	
+	echo "Enabled manual fan control"
+	oldValue=`cat $fan`
+	echo "Old value for was $oldValue"
+
+	echo -en "Now set fan to 0 for $sleepTime seconds   "
+	echo 0 > $fan
+	time=0
+	while [[ $time -lt $sleepTime ]]; do
+		echo -n '.'
+		sleep 1
+		((time++))	
+	done
+
+	echo -en "\nNow set fan to MAX for $sleepTime seconds "
+	echo 255 > $fan
+	time=0
+	while [[ $time -lt $sleepTime ]]; do
+		echo -n '.'
+		sleep 1
+		((time++))	
+	done
+	echo -e "\nReturn fan to $oldValue"
+	[[ ! -z $oldValue ]] && echo $oldValue > ${fan}
+	[[ ! -z $oldState ]] && echo $oldState > ${fan}_enable
+	$LINE
+}
+
+function testFans () {
+	sleepTime=15
+
+	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
+	for coreAddr in ${coreAddrRaw[@]}; do
+		if [[ ! -z `cat $coreAddr/name` ]]; then
+			[[ "`cat $coreAddr/name`" == *"nct67"* ]] && mbAddr=$coreAddr && break
+		fi
+	done
+
+	[[ ! $mbAddr ]] && echo -e "${RED}Can not found right address${WHITE}\nTry to run ${CYAN}mb-af setup${WHITE}, reboot and try again${WHITE}" 
+	echo -e "${GREEN}Found address $mbAddr${WHITE}"
+
+	fanAddr=(`find $mbAddr/pwm[0-9]`)
+	echo "Found ${#fanAddr[@]} fan controllers"
+	$LINE
+	
+	if [[ ! -z $1 ]]; then
+		testFan ${fanAddr[$1]}
+	else
+		for fan in ${fanAddr[@]}; do
+			testFan $fan
+		done
+	fi
+}
+
+function showMsg () {
+	text=$1
+	echo -e "`date`\t${text}"
+}
+
+function start () {
+	start_time=`date +%s`
+	echo -e "${BROWN}$LOGO${GREEN}"
+	$LINE
+	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
+	for coreAddr in ${coreAddrRaw[@]}; do
+		[[ ! -z `cat $coreAddr/name` && "nct6776" == *"`cat $coreAddr/name`"* ]] && mbAddr=$coreAddr && break
+	done
+	
+	while true; do
+		cfg=`cat $CFG`
+		for option in enabled tt hyst fanmin fanmax fan_shift delay pwm; do
+			if [[ `echo $cfg | jq ".$option"` != null ]]; then
+				option_value="`echo $cfg | jq -r \".$option\"`" #double slash, because eval open it
+				eval "local $option=\"$option_value\""
+				#echo "local $option=\"$option_value\""
+			fi
+		done
+		
+		if [[ $enabled -ne 1 ]]; then
+			if [[ $msg_trigger != 1 ]]; then
+				echo -n "Autofan is not enabled, waiting."
+				msg_trigger=1
+			else
+				echo -n "."
+			fi
+			sleep 10
+		else
+			[[ $msg_trigger == 1 ]] && msg_trigger=0 && echo ""
+			local fanAddr=(`find $mbAddr/pwm${pwm}`)
+			
+			[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
+			crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
+		fi
+
+		if [[ ! -f $STATS ]]; then
+			echo -e "${RED}No stats file ${STATS}${WHITE}"
+			sleep $delay
+			continue
+		fi
+
+		local lastUpdate=`stat -c %Y $STATS`
+		local now=`date +%s`
+		local refresh=$(($now - $lastUpdate))
+		[[ $refresh -gt $maxRefresh ]] && echo -e "${RED}Stats are too old${WHITE}" && sleep $delay && continue
+		
+		local stats=`cat $STATS`
+		local temp=`echo $stats | jq -r '.gpu_temp[]'`
+		[[ ! $temp || $temp == 'null' ]] && echo -e "${RED}Something wrong, no temperatures are available${WHITE}" && sleep $delay && continue
+		#It seems everything is good
+
+		#Show stats sometimes, like hr in miner
+		if [[ ! $statsCounter || $statsCounter -ge 10 ]]; then
+			statsCounter=0
+			local statsMsg="${CYAN}${PURELINE}\n${GREEN}Target temp: ${CYAN}$tt${GREEN}, hyst: ${CYAN}$hyst${CYAN}, fan ${BLUE}$fanmin${GREEN}/${RED}$fanmax${GREEN}, shift ${CYAN}$fan_shift${GREEN}, delay ${CYAN}$delay${GREEN}, pwm ${CYAN}$pwm${WHITE}"
+			statsMsg+="\n${CYAN}${PURELINE}${WHITE}"	
+			echo -e $statsMsg
+		else
+			(( statsCounter++ ))
+		fi
+		
+		local tempArray=(`echo $temp | jq '.'`)
+		for ((i=0; i < ${#tempArray[@]}; i++)); do
+			[[ ! $maxTemp || ${tempArray[$i]} -gt $maxTemp ]] && local maxTemp=${tempArray[$i]}
+		done
+		
+		local fanRaw=`cat $fanAddr`
+		local fan=`echo "scale=2; $fanRaw/2.55" | bc -l` #fan power is beetween 0 and 255
+		
+		if (( $maxTemp - $hyst > $tt )); then #high temp
+			local tempColor=$RED
+			if [[ `echo "if ($fan > $fanmax) print 1" | bc -l` -eq 1 ]]; then
+				local newFan=$fanmax
+				local fanColor=$RED
+				local type="down"
+				local action+="${CYAN}$down $newFan${WHITE}"
+			elif [[ `echo "if ($fan < $fanmax) print 1" | bc -l` -eq 1 ]]; then
+				if [[ $maxTemp -ge $crit_temp ]]; then
+					local newFan=$fanmax
+				elif (( $maxTemp - $crit_hyst > $tt )); then
+					local newFan=$(($fan + $crit_fan_shift))
+				else
+					local newFan=$(($fan + $fan_shift))
+				fi
+				[[ $newFan -gt $fanmax ]] && newFan=$fanmax
+				local type="up"
+				local action="${CYAN}$up ${newFan}${WHITE}"
+			else
+				local fanColor=$RED
+				local action="${RED}Max %${WHITE}"
+			fi
+		elif (( $maxTemp + $hyst < $tt )); then #low temp
+			local tempColor=$BLUE
+			if [[ `echo "if ($fan < $fanmin) print 1" | bc -l` -eq 1 ]];then
+				local fanColor=$BLUE
+				local newFan=$fanmin
+				local type="up"
+				local action="${CYAN}$up ${newFan}${WHITE}"
+			elif [[ `echo "if ($fan > $fanmin) print 1" | bc -l` -eq 1 ]];then
+				if (( $maxTemp + $crit_hyst < $tt )); then
+					local newFan=$(($maxTemp - $crit_fan_shift))
+				else
+					local newFan=$(($maxTemp - $fan_shift))
+				fi
+				local type="down"
+				[[ $newFan -lt $fanmin ]] && newFan=$fanmin
+				local action="${CYAN}$down ${newFan}${WHITE}"
+			else
+				local fanColor=$BLUE
+				local action+="${BLUE}Min %${WHITE}" 
+			fi
+		fi
+		local message="Max Temp ${tempColor}${maxTemp}${WHITE}°C, fan ${fanColor}${fan}${WHITE}% $action"
+		#echo -en "$string"
+		showMsg "$message"
+		if [[ ! -z $newFan ]]; then #Set fan if something changed
+			echo 1 > ${fanAddr}_enable
+			local adoptedFan=`echo "scale=0; $newFan * 255 / 100" | bc -l`
+			echo $adoptedFan
+
+			if [[ $type == "up" && `echo "if ($adoptedFan <= $fan * 2.55) print 1" | bc -l` -eq 1 ]]; then
+				let adoptedFan=$adoptedFan+4
+			elif [[ $type == "down" && `echo "if ($adoptedFan >= $fan * 2.55) print 1" | bc -l` -eq 1 ]]; then
+				let adoptedFan=$adoptedFan-4
+			fi
+
+			if [[ $adoptedFan -gt 255 ]]; then
+				adoptedFan=255
+			elif [[ $adoptedFan -lt 0 ]]; then
+				adoptedFan=0
+			fi
+			echo $adoptedFan
+			echo $adoptedFan > $fanAddr
+		fi
+		
+		unset maxTemp tempColor fanColor action message newFan type
+		sleep $delay
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d mb-af
+		screen -r mb-af
+	;;
+	log)
+		[[ ! $2 ]] && n=200 || n=$2
+		tail -n $n $LOG
+	;;
+	stop)
+		/dog/screen-kill mb-af
+		echo "$(date --rfc-3339=seconds) MotherBoard Autofan stopped"
+	;;
+	start-cli)
+		start
+	;;
+	start|restart)
+		/dog/screen-kill mb-af
+		screen -c $SCREEN_CFG -dmS "mb-af" -Logfile $LOG bash -c "/dog/mb-af start-cli"
+	;;
+	test)
+		testFans $2
+	;;
+	setup)
+		apt-get -q=2 install lm-sensors
+		yes | sensors-detect
+		/etc/init.d/kmod start
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart|log|start-cli|test|setup${WHITE}"
+	;;
+esac

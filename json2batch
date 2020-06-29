@@ -19,7 +19,7 @@ pool="eu.anayhash.net:3333"
 function convert_algo () { #for nicehash
 	local input_algo=${1^^}
 	case $input_algo in
-		BEAMHASHIII|BEAMHASH)
+		144,5S|BEAMHASHIII|BEAMHASH)
 			local output_algo="BEAMV3"
 		;;
 		BEAMHASHII)

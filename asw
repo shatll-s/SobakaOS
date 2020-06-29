@@ -21,7 +21,7 @@ function set_active () {
 	local json=`echo $1 | jq 'del (.autoswitch[].active)'`
 	local best_algo="$2"
 	for (( i=0; i < `echo $json | jq '.autoswitch | length'`; i++ )); do
-		if [[ `echo $json | jq -r ".autoswitch[$i].algo"` == $best_algo ]]; then
+		if [[ `echo $json | jq -r ".autoswitch[$i].algo"` == ${best_algo^^} ]]; then
 			local miner=`echo $json | jq -r ".autoswitch[$i].miner"`
 			local port=`echo $json | jq -r ".autoswitch[$i].port"`	
 			local batch=`echo $json | jq -r ".autoswitch[$i].batch"`
@@ -39,26 +39,27 @@ function set_active () {
 			echo "miner1=\"$miner\"" >> $BATCH_CFG			
 			json=`jq ".autoswitch[$i] += {\"active\": 1}" <<< "$json"`
 			echo "$json" > $AUTOSWITCH_TMP
+			local trigger=1
 			break
 		fi
 	done
-	echo "> Switching to $best_algo"
+	[[ ! -z $trigger ]] && echo "> Switching to $best_algo" || echo "> Error occured while switching to $best_algo"
+	unset trigger
 }
 
 function get_new_nicehash_stats () {
 	local api="https://api2.nicehash.com/main/api/v2/public/simplemultialgo/info/"
 	nh_stats=$(echo `curl -s $api` | jq '.miningAlgorithms[]')
-	#echo $nh_stats | jq '.'
 	echo -e "Algo                 Price       Hr      Units    BTC/day     USD/day"
 	echo -e "---------------------------------------------------------------------"
 	for (( i=0; i < ${#algo[@]}; i++ )); do
-		available=`echo $as_tmp | jq -r ".autoswitch[] | select (.algo == \"${algo[$i]}\")"`
+		available=`echo $as_tmp | jq -r ".autoswitch[] | select (.algo == \"${algo[$i]^^}\")"`
 		divider[$i]=`echo $algo_dividers | jq -r ".${algo[$i]}"`
 		divider[$i]=`echo "scale=0; ${divider[$i]} / 10" | bc -l` #new nicehash bug
 		unit[$i]=`echo $units | jq -r ".${algo[$i]}"`
 		[[ -z ${divider[$i]} || ${divider[i]} == null ]] && divider[i]=1
-		#echo "divider "${divider[$i]}
-		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]}\") | .paying"`
+		price[$i]=`echo $nh_stats | jq -r ". | select (.algorithm == \"${algo[$i]^^}\") | .paying"`
+		
 		if [[ `echo ${price[$i]} | grep e-` ]]; then
 			price[$i]=`echo ${price[$i]} | sed "s/e-.*//"`
 			float=`echo ${price[$i]} | sed "s/.*e-\([0-9]*\)/\1/"`
@@ -177,7 +178,7 @@ function main () {
 	
 	bitaps_api=`curl -s https://api.bitaps.com/market/v1/ticker/btcusd`
 	btcusd=`echo $bitaps_api | jq '.data.last'`
-	[[ -z $btcusd ]] && echo "BitAPS API is not available, using default BTC price " && btcusd=12000
+	[[ -z $btcusd ]] && echo "BitAPS API is not available, using default BTC price " && btcusd=10000
 	
 	as_tmp=`cat $AUTOSWITCH_TMP`
 	
@@ -196,7 +197,6 @@ function main () {
 	if [[ ! -z $max_profit_i ]]; then
 		best_algo=${algo[$max_profit_i]}
 		string="${CYAN}${best_algo}${WHITE} is the best algo now"
-		#echo -e "$string"
 		active_algo=`echo $as_tmp | jq -r ".autoswitch[] | select (.active == 1) | .algo"`
 		#echo $as_tmp | jq '.'
 		#echo $as_cfg | jq '.'
@@ -234,7 +234,7 @@ function main () {
 				string+=", switching to it"
 				[[ $1 != 'check' ]] && set_active "$as_tmp" "$best_algo"
 				msg="$(date --rfc-3339=seconds) Switch to ${best_algo} with ${profit_btc[$max_profit_i]} BTC/day, ${profit_usd[$max_profit_i]} USD/day"
-				echo $as_cfg | jq '.'
+				#echo $as_cfg | jq '.'
 				if [[ `echo $as_cfg | jq ".amd_oc"` != null ]]; then
 					if [[ ! -z `echo $as_cfg | jq ".amd_oc.$best_algo"` && `echo $as_cfg | jq ".amd_oc.$best_algo"` != null ]]; then
 						msg+="\nWe have AMD OC settings for this algo.\n"
@@ -259,7 +259,7 @@ function main () {
 		echo "Error occured while getting max profit. Dev info: max_profit_i @${max_profit_i}@, max_profit @${max_profit}@"
 	fi
 	$LINE
-	echo ""
+	#echo ""
 	unset max_profit max_profit_i best_algo algo active_algo as_tmp key price profit_btc profit_usd nh_stats divider i string delta
 }
 

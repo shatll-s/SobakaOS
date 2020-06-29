@@ -18,19 +18,23 @@ function setup () {
 	getdata "$cfg"
 	sed -i "/.*REMOTESSH.*/d" $RIG_CFG
 	local config="#REMOTESSH\nREMOTESSH_USE=\"${USE}\"\n"
-	config+="REMOTESSH_SERVER=\"${SERVER}\"\n"
-	config+="REMOTESSH_PORT=\"${PORT}\"\n"
-	config+="REMOTESSH_LOGIN=\"${LOGIN}\"\n"
-	config+="REMOTESSH_USE_VNC=\"${USE_VNC}\"\n"
-	config+="REMOTESSH_PORT_VNC=\"${PORT_VNC}\""
-	echo -e "$config" >> $RIG_CFG
-	mkdir -p "/dog/cfg/.ssh/"
-	chmod 0700 "/dog/cfg/.ssh/"
-	echo "$PRIVATE_KEY" > $KEY
-	chmod 0400 $KEY
+	if [[ $USE -eq 1 || $USE_VNC -eq 1 ]]; then
+		config+="REMOTESSH_SERVER=\"${SERVER}\"\n"
+		config+="REMOTESSH_PORT=\"${PORT}\"\n"
+		config+="REMOTESSH_LOGIN=\"${LOGIN}\"\n"
+		config+="REMOTESSH_USE_VNC=\"${USE_VNC}\"\n"
+		config+="REMOTESSH_PORT_VNC=\"${PORT_VNC}\""
+		echo -e "$config" >> $RIG_CFG
+		mkdir -p "/dog/cfg/.ssh/"
+		chmod 0700 "/dog/cfg/.ssh/"
+		echo "$PRIVATE_KEY" > $KEY
+		chmod 0400 $KEY
+		echo "> Private key is written to $KEY"
+	else
+		rm -f $KEY
+	fi
+	echo "> Settings are written to $RIG_CFG"
 	
-	echo "Settings are written to $RIG_CFG"
-	echo "Private key is written to $KEY"
 
 	apt-get -q=2 install autossh
 	#[[ $USE -eq 1 ]] && systemctl start remotessh || systemctl stop remotessh
@@ -50,7 +54,7 @@ function make_command () {
 while [ -n "$1" ]; do
 	case "$1" in
 		--config)
-			echo -n "Found --config option"
+			echo -n "> Found --config option"
 			shift
 			cfg=$1
 			
