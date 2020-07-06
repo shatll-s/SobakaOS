@@ -119,7 +119,7 @@ while read string; do
 	#echo $args
 	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
 	[[ ! -z ${POWER_LIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${POWER_LIMIT[$i]}
-	[[ $(($i + 1)) < $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
+	[[ $i -lt $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
 
 	((i++))
 done < <(/dog/gpu-detect NVIDIA list)

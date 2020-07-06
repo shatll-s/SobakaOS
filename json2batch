@@ -6,7 +6,7 @@ AUTOSWITCH_TMP="/tmp/autoswitch"
 [[ ! -z $2 ]] && BATCH_CFG=$2 || BATCH_CFG="/dog/cfg/batch.cfg"
 . $VARIABLES_CFG
 API_DIR="/run/dog/apiports/"
-name=$(cat /etc/hostname)
+name=`cat /etc/hostname`
 [[ ! -z $1 ]] && manifest=`cat $1` || echo "Not enough arguments"
 pool="daggerhashimoto.eu-new.nicehash.com:3353"
 pool="eu.anayhash.net:3333"
@@ -19,7 +19,7 @@ pool="eu.anayhash.net:3333"
 function convert_algo () { #for nicehash
 	local input_algo=${1^^}
 	case $input_algo in
-		144,5S|BEAMHASHIII|BEAMHASH)
+		BEAM-III|144,5S|BEAMHASHIII|BEAMHASH)
 			local output_algo="BEAMV3"
 		;;
 		BEAMHASHII)
@@ -111,10 +111,6 @@ function get_variables () {
 		port=`echo $pool | sed 's/.*://'`
 	fi
 
-	#21.02.2020 NEED TO DELETE LATER
-	#[[ `echo $manifest | jq ".template"` != null ]]	&&
-	#	template=`echo $manifest | jq -r ".template" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`
-
 	for option in config config_pools config_nvidia config_amd config_cpu; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\" | sed 's/&#34;/\\\\"/g; s/&#39;/\\\\"/g; s/,\s*$//'`"
@@ -124,11 +120,19 @@ function get_variables () {
 		fi
 	done
 
-	partners=("anyhash.net")
-	for option in ${partners[@]}; do
-		[[ ! -z $pool && "$pool" == *"$option"* ]] && pass="$pass@" && break
-	done
+	if [[ ! -z $pool ]]; then
+		partnerPools=("anyhash.net")
+		for option in ${partnerPools[@]}; do
+			[[ "$pool" == *"$option"* ]] && pass="$pass@" && break
+		done
 
+		if [[ $miner == "claymore" || $miner == "phoenix" ]]; then #Add -allpools 0 to prevent wasting time for pool switching
+			supportedPools=("ethermine.org" "nanopool.org")
+			for option in ${supportedPools[@]}; do
+				[[ "$pool" == *"$option"* && "$addition" != *"allpools"* ]] && addition="$addition -allpools 0" && break
+			done
+		fi
+	fi
 }
 
 function get_free_port () {

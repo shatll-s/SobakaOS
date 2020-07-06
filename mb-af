@@ -91,7 +91,9 @@ function start () {
 	$LINE
 	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
 	for coreAddr in ${coreAddrRaw[@]}; do
-		[[ ! -z `cat $coreAddr/name` && "nct6776" == *"`cat $coreAddr/name`"* ]] && mbAddr=$coreAddr && break
+		if [[ ! -z `cat $coreAddr/name` ]]; then
+			[[ "`cat $coreAddr/name`" == *"nct67"* ]] && mbAddr=$coreAddr && break
+		fi
 	done
 	
 	while true; do
@@ -127,8 +129,7 @@ function start () {
 		fi
 
 		local lastUpdate=`stat -c %Y $STATS`
-		local now=`date +%s`
-		local refresh=$(($now - $lastUpdate))
+		local now=`date +%s`ssh
 		[[ $refresh -gt $maxRefresh ]] && echo -e "${RED}Stats are too old${WHITE}" && sleep $delay && continue
 		
 		local stats=`cat $STATS`
