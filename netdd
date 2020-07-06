@@ -347,6 +347,8 @@ function write {
 		mount ${LOOPDEV} tmpDog-flash
 		if [[ $? -eq 0 ]]; then
 			cp -R old-config/* tmpDog-flash
+			[[ -f old-config/rig.cfg ]] && echo -e "${BROWN}Applying next config:${WHITE}" && cat old-config/rig.cfg && echo -e "${BROWN}=====================${WHITE}"
+			
 			sync
 
 			dd if=/new_conf.img of=/dev/${root_dev}1 bs=1M

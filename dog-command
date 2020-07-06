@@ -165,6 +165,10 @@ case $1 in
 			[[ $disable_services -eq 1 ]] && services_stop
 			if [[ $bus != 'all' ]]; then
 				adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
+				while read string; do
+						[[ `echo $string | awk '{print $2}'` == $bus ]] && adapter=`echo $string | awk '{print $1}'` && break
+				done < <(atiflash -i)
+
 				result=$(atiflash -p $adapter -f "/tmp/$file")
 				exitcode=$?
 			else
