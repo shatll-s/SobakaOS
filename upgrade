@@ -12,20 +12,20 @@ function upgrade_deb () {
 	local ver=`apt-cache policy $debname | grep Installed | sed 's/Installed://; s/\s*//'`
 
 	if [[ ! -z $ver && `echo "$ver >= $latest_ver" | bc` -eq 1  ]]; then
-		echo -e "${GREEN}>Package $debname ($ver) is up-to-date${WHITE}"
+		echo -e "${GREEN}> Package $debname ($ver) is up-to-date${WHITE}"
 	else
-		echo -e "${CYAN}>Package $debname ($ver) needs to be updated${WHITE}"
+		echo -e "${CYAN}> Package $debname ($ver) needs to be updated${WHITE}"
 		
 		local download_link=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/$debname-latest.deb"
 		wget -q $download_link
 		local exitcode=$?
 		[[ $exitcode -ne 0 ]] && echo -e "${RED}>Error occured while downloading dog-libs package${WHITE}" && return
 
-		echo -e "${GREEN}>Package $debname downloaded${WHITE}"
+		echo -e "${GREEN}> Package $debname downloaded${WHITE}"
 		dpkg -i "$debname-latest.deb"
 		local exitcode=$?
-		[[ $exitcode -eq 0 ]] && echo -e "${GREEN}>Package $debname successfully installed${WHITE}" ||
-			echo -e "${RED}>Error occured while installing $debname${WHITE}"
+		[[ $exitcode -eq 0 ]] && echo -e "${GREEN}> Package $debname successfully installed${WHITE}" ||
+			echo -e "${RED}> Error occured while installing $debname${WHITE}"
 		rm "$debname-latest.deb"
 	fi
 }
@@ -49,11 +49,11 @@ DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/dog-$VER.deb"
 wget -q $DOWNLOAD
 [[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)" && exit 1
 
-echo -e "${GREEN}>Upgrade files downloaded${WHITE}"
+echo -e "${GREEN}> Upgrade files downloaded${WHITE}"
 dpkg -i --force-confold "dog-$VER.deb"
 rm $tmp_dir/dog-$VER.deb
 
-echo -e "${CYAN}>Getting latest version of packages${WHITE}"
+echo -e "${CYAN}> Getting latest version of packages${WHITE}"
 versions_url="https://os.dog/downloads/deb_versions.txt"
 versions=`curl -sLk $versions_url`
 [[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}"
@@ -73,7 +73,7 @@ done < /dog/service/crontab.root
 
 if [[ -f $crontab_remove ]]; then
 	while read string; do
-		echo ">Looking to remove some strings from crontab..."
+		echo "> Looking to remove some strings from crontab..."
 		slashed_string=`echo "$string" | sed -e 's/\([[\/.*]\|\]\)/\\\\\1/g'`
 		sed -i "/$slashed_string/d" $crontab
 	done < $crontab_remove
@@ -82,4 +82,4 @@ fi
 systemctl restart cron
 
 [[ -f $RIG_CFG ]] && hello
-echo -e "${CYAN}>Reboot is recommended after upgrade${WHITE}"
+echo -e "${CYAN}> Reboot is recommended after upgrade${WHITE}"
