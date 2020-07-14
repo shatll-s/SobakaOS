@@ -450,6 +450,54 @@ case $1 in
 		miner_total_hr=`echo $stats_template | jq -r '.hashrate.total[0]'`
 		miner_threads_hr=(`echo $stats_template | jq -r '.hashrate.threads[][0]'`)
 	;;
+	xpm_amd)
+		local maxDelay=120
+		local MINER_LOG="/dog/log/xpm_amd.log"
+		local log=`cat $MINER_LOG | tr -d '\0'`
+		local minername="xpmclient"
+		let freshness=`date +%s`-`stat --format='%Y' $MINER_LOG`
+		if [[ "$freshness" -lt "$maxDelay" ]]; then
+			local miner_ver=`echo $batch | sed 's#.*/dog/miners/xpm_amd/\([.0-9a-zA-Z]*\)/.*#\1#'`
+			local miner_algo='prime'
+			local miner_online_raw=`ps -C $minername -o etimes= | awk '{print $1}'`
+			[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+			
+			local offset=6
+			local miner_total_hr=0
+			local gpuCount=`gpu-detect AMD`
+			for (( i=0; i < $gpuCount; i++ )); do
+				local gpuNum=`cat $MINER_LOG | sed -n 4,25p | grep INFO | grep "device $i" | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" | cut -d "|" -f 2 | awk '{print $6}'`
+				#echo "gpuNum $gpuNum"
+				if [[ ! -z $gpuNum ]]; then
+					local miner_hr[$i]=`cat $MINER_LOG | tail -100 | grep INFO | grep "GPU $gpuNum" | tail -1 | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" | cut -d "|" -f 2 | awk '{print $8}' | cut -d "=" -f 2 | cut -d "/" -f 1`
+					local miner_total_hr=`echo "$miner_total_hr + ${miner_hr[$i]}" | bc -l`
+				else
+					miner_hr[$i]=0
+				fi
+		  	done
+
+			local miner_total_share=0
+			local miner_total_badshare=0
+			local sharesLine=`cat $MINER_LOG | tail -100 | grep '(ST/INV/DUP)' | tail -1 | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" | cut -d ':' -f 4 `
+			for line in $sharesLine; do
+				if [[ $line =~ "x" ]]; then 
+					miner_total_share=$(($miner_total_share + ${line%%x}))
+				else
+					local rejected=`echo $line | cut -d "/" -f 2 | cut -d "/" -f 1`
+					[[ ! -z $rejected ]] && miner_total_badshare=$(($miner_total_badshare + $rejected))
+				fi
+			done <<< "$sharesLine"
+
+			#for (( i=0; i < `gpu-detect all`; i++ )); do
+			#	local hr=`cat $MINER_LOG | grep -a "GPU" | tail -n 1 | awk -v offset="$offset" '{ printf $offset"\n" }'`
+			#	if [[ ! -z $hr ]]; then
+			#		local miner_hr[$i]=$hr
+			#		miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+			#	fi
+		    #  	let offset+=4
+		    #done
+		fi
+	;;
 	wildrig_multi)
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port` #nanominer
 		miner_ver=`echo $stats_template | jq -r '.version'`

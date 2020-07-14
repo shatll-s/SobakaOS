@@ -16,6 +16,10 @@ cd $SCRIPT_PATH
 mydir=`pwd`
 myself="$mydir/$SCRIPT_NAME"
 
+#config partition options
+skip=2048
+count=45056
+
 LATEST_URL="https://os.dog/downloads/iso/dog-1.39.zip"
 
 # download timeout
@@ -163,7 +167,7 @@ function prepare {
 	echo -e "${YELLOW}     OS.dog Image Installation${WHITE}"
 	echo -e "${CYAN}***********************************${WHITE}"
 	echo
-	echo -e "${WHITE}$url${WHITE}"
+	echo -e "${GREEN}$url${WHITE}"
 	echo "Total RAM=$mem Mb"
 	echo
 	[[ $mem -lt 3600 ]] && echo -e "${YELLOW}4 GB RAM is required, exiting${WHITE}" && exit 1
@@ -267,7 +271,6 @@ function prepare {
 		mount -n -o remount,ro $MOUNTS > /dev/null 2>&1 || echo "Remounting $MOUNTS failed"
 	done
 
-
 	#create temp root
 	echo -e "\n${CYAN}> Creating temporary root filesystem${WHITE}"
 	mkdir -p $TMPDIR/{proc,sys,run,dev,usr,var,oldroot,bin,sbin,lib,tmp,usr/lib,usr/share,usr/lib/x86_64-linux-gnu,lib/lsb}
@@ -311,8 +314,27 @@ function prepare {
 # Writing to disk
 function write {
 	cd /
-	[[ -z $archname || ! -f $archname ]] && echo -e "${RED}> OS.dog image not found, exiting${WHITE}" && return 1
 
+	#Copy config partition
+	if [[ -f old-config/rig.cfg ]]; then
+		echo -e "\n${CYAN}> Copying os.dog config to file system${WHITE}"
+		unzip -p $archname | dd of=newConf.img skip=$skip count=$count
+		LOOPDEV=$(losetup --find --show newConf.img)
+		partprobe ${LOOPDEV}
+
+		mkdir tmpdogcfg
+		mount ${LOOPDEV} tmpdogcfg
+		if [[ $? -eq 0 ]]; then
+			cp -R old-config/* tmpdogcfg
+			echo -e "Copying config to image"
+			echo -e "${GREEN}Config was successfilly copied and will be written on ${LIGHTPURPLE}$root_dev${WHITE}${GREEN} after writing image${WHITE}"
+			ddTrigger=1
+			sync			
+		else
+			echo -e "${RED}Config was not written file system${WHITE}"
+		fi
+	fi
+	
 	echo -e "\n${CYAN}> Writing OS.dog filesystem to ${LIGHTPURPLE}$root_dev${WHITE}"
 	echo -e "Please wait, this can take long"
 	echo -e "To prevent damage to your disk device\ndo not turn off your computer until the end of the process.\n"
@@ -329,29 +351,21 @@ function write {
 	fi 
 	[[ $exitcode -ne 0 ]] && echo -e "${RED}Write image failed, exiting${WHITE}" && return 1
 
-	# Fix GPT table if needed
+	# Fix GPT table
 	sgdisk -e /dev/$root_dev > /dev/null 2>&1
 	sgdisk -C /dev/$root_dev > /dev/null 2>&1
 	partprobe /dev/$root_dev > /dev/null 2>&1
 
-	# Rewrite config partition
-	if [[ -f old-config/rig.cfg ]]; then
+	#Rewrite config partition
+	if [[ $ddTrigger -eq 1 ]]; then
 		echo -e "\n${CYAN}> Writing os.dog config to ${LIGHTPURPLE}$root_dev${WHITE}"
+		dd if=/newConf.img of=/dev/${root_dev}1 bs=1M
 
-		dd if=/dev/${root_dev}1 of=new_conf.img bs=1M
-
-		LOOPDEV=$(losetup --find --show new_conf.img)
-		partprobe ${LOOPDEV}
-
-		mkdir tmpDog-flash
-		mount ${LOOPDEV} tmpDog-flash
-		if [[ $? -eq 0 ]]; then
-			cp -R old-config/* tmpDog-flash
-			[[ -f old-config/rig.cfg ]] && echo -e "${BROWN}Applying next config:${WHITE}" && cat old-config/rig.cfg && echo -e "${BROWN}=====================${WHITE}"
-			
-			sync
-
-			dd if=/new_conf.img of=/dev/${root_dev}1 bs=1M
+		if [[ $? -eq 0 && -f old-config/rig.cfg ]]; then
+			echo -e "${BROWN}Applying next config:${WHITE}"
+			echo -e "${BROWN}=====================${WHITE}"
+			cat old-config/rig.cfg
+			echo -e "${BROWN}=====================${WHITE}"
 		else
 			echo -e "${RED}Config was not written to ${LIGHTPURPLE}$root_dev${WHITE}"
 		fi
@@ -370,6 +384,7 @@ function write {
 	echo 1 > /proc/sys/kernel/sysrq
 	echo b > /proc/sysrq-trigger
 }
+
 
 
 

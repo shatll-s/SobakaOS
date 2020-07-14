@@ -8,13 +8,6 @@ AUTOSWITCH_TMP="/tmp/autoswitch"
 API_DIR="/run/dog/apiports/"
 name=`cat /etc/hostname`
 [[ ! -z $1 ]] && manifest=`cat $1` || echo "Not enough arguments"
-pool="daggerhashimoto.eu-new.nicehash.com:3353"
-pool="eu.anayhash.net:3333"
-	partners=("anyhash.net" "ethermine.org")
-	for option in ${partners[@]}; do
-		[[ ! -z $pool && "$pool" == *"$option"* ]] && pass="$pass@" && break
-		#echo "$option ? $pool"
-	done
 
 function convert_algo () { #for nicehash
 	local input_algo=${1^^}
@@ -109,6 +102,7 @@ function get_variables () {
 	if [[ ! -z $pool ]]; then
 		pool_without_port=`echo $pool | sed 's/\:[0-9][0-9]*$//'`
 		port=`echo $pool | sed 's/.*://'`
+		[[ $port =~ ^[0-9].+[0-9]$ ]] && netmanager open $port
 	fi
 
 	for option in config config_pools config_nvidia config_amd config_cpu; do
@@ -121,12 +115,7 @@ function get_variables () {
 	done
 
 	if [[ ! -z $pool ]]; then
-		partnerPools=("anyhash.net")
-		for option in ${partnerPools[@]}; do
-			[[ "$pool" == *"$option"* ]] && pass="$pass@" && break
-		done
-
-		if [[ $miner == "claymore" || $miner == "phoenix" ]]; then #Add -allpools 0 to prevent wasting time for pool switching
+		if [[ $miner == "claymore" ]]; then #Add -allpools 0 to prevent wasting time for pool switching #|| $miner == "phoenix"
 			supportedPools=("ethermine.org" "nanopool.org")
 			for option in ${supportedPools[@]}; do
 				[[ "$pool" == *"$option"* && "$addition" != *"allpools"* ]] && addition="$addition -allpools 0" && break
@@ -164,6 +153,7 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -ewal $template"
 			[[ ! -z $pass ]]	&& minerexec+=" -epsw $pass"
 			[[ ! -z $dcri ]]	&& minerexec+=" -dcri $dcri"
+			rm -f "$miner_dir/epools.txt"
 			if [[ ! -z $epools ]]; then
 				if [[ $epools_type == 2 ]]; then
 					for ((i=0; i < ${#epools_arr[@]}; i++)); do
@@ -204,7 +194,7 @@ function make_batch () {
 		phoenix)
 			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
 			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
-
+			rm -f "$miner_dir/epools.txt"
 			if [[ ! -z $epools ]]; then
 				if [[ $epools_type == 2 ]]; then
 					for ((i=0; i < ${#epools_arr[@]}; i++)); do
@@ -387,6 +377,29 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api-port $API_port"
+		;;
+		xpm_amd)
+			[[ -f "${miner_dir}config.txt" ]] && rm "${miner_dir}config.txt"
+			configFile=`cat "${miner_dir}configDefault.txt"` #it will be json based on default, but with user changes
+			#cp "${miner_dir}configDefault.txt" "${miner_dir}config.txt" #it will be json based on default, but with user changes
+			#echo "$configFile"
+			#echo "==="
+			[[ ! -z $pool_without_port ]] && configFile=`echo "$configFile" | sed "/^server.*$/d"` && configFile+="\nserver=\"$pool_without_port\";"
+			[[ ! -z $port ]] && configFile=`echo "$configFile" | sed "/^port.*$/d"` && configFile+="\nport=\"$port\";"
+			[[ ! -z $template ]] && configFile=`echo "$configFile" | sed "/^address.*$/d"` && configFile+="\naddress=\"$template\";"
+			if [[ ! -z $config ]]; then
+				configTr=`echo -e "$config" | sed -e 's/^{//; s/}$//; s/\s//g'` # s/\s/)@(/g #remove all spaces
+				configStrings=(`echo $configTr`)
+				for string in "${configStrings[@]}"; do
+					option=`echo $string | sed 's/=.*//'`
+					#configFile=`echo "$configFile" | sed "s/^$option.*$/$string/"`
+					configFile=`echo "$configFile" | sed "/^$option.*$/d"`
+					configFile+="\n$string"
+				done
+				#echo "$configFile"
+				#echo -e "${config[0]}"
+			fi
+			echo -e "$configFile" > "${miner_dir}config.txt"
 		;;
 		z_enemy)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"

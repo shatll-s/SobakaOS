@@ -1,0 +1,11 @@
+[Unit]
+Description=NetPacketManager
+After=multi-user.target
+
+[Service]
+Type=simple
+EnvironmentFile=/dog/cfg/rig.cfg
+ExecStart=/dog/sbin/netmngr $NETMANAGER_ARGS
+
+#[Install]
+#WantedBy=multi-user.target
