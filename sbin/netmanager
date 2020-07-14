@@ -3,28 +3,28 @@
 RIG_CFG="/dog/cfg/rig.cfg"
 
 function stop () {
-	if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
+	#if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
 		systemctl stop netmngr
 		pid=`ps -A | grep netmngr | awk '{print $1}'`
 		[[ ! -z $pid ]] && kill -9 "$pid"
-	else
-		:
-		#echo "Net manager is not supported"
-	fi
+	#else
+	#	:
+	#	#echo "Net manager is not supported"
+	#fi
 }
 
 function start () {
-	if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
+	#if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
 		systemctl stop netmngr
 		pid=`ps -A | grep netmngr | awk '{print $1}'`
 		[[ ! -z $pid ]] && kill -9 "$pid"
 
 		. $RIG_CFG
 		[[ ! $NETMANAGER_DISABLE ]] && systemctl start netmngr
-	else
-		:
+	#else
+	#	:
 		#echo "Net manager is not supported"
-	fi
+	#fi
 }
 
 case $1 in

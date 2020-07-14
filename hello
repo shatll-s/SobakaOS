@@ -307,7 +307,7 @@ while [[ $try -lt 5 ]]; do
 			
 			if [[ ! -z $INITIAL ]]; then
 				echo -e "${GREEN}> This is initial run, applying batches ${WHITE}"
-				netmanager starts
+				netmanager start
 				#manifests
 				command_argument=$(echo $response | jq ".batch1" --raw-output)
 				dog-command batch1 "$command_argument" --hello
