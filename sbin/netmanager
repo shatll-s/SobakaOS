@@ -6,7 +6,7 @@ function stop () {
 	#if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
 		systemctl stop netmngr
 		pid=`ps -A | grep netmngr | awk '{print $1}'`
-		[[ ! -z $pid ]] && kill -9 "$pid"
+		[[ ! -z $pid ]] && kill -9 $pid
 	#else
 	#	:
 	#	#echo "Net manager is not supported"
@@ -17,7 +17,7 @@ function start () {
 	#if [[ `systemctl list-units --type=service | grep netmngr` ]]; then
 		systemctl stop netmngr
 		pid=`ps -A | grep netmngr | awk '{print $1}'`
-		[[ ! -z $pid ]] && kill -9 "$pid"
+		[[ ! -z $pid ]] && kill -9 $pid
 
 		. $RIG_CFG
 		[[ ! $NETMANAGER_DISABLE ]] && systemctl start netmngr

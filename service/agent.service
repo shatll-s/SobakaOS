@@ -1,7 +1,7 @@
 [Unit]
 Description=OSdog agent (send stats, receive commands)
 After=network-online.target
-After=boot.service
+#After=boot.service
 
 [Service]
 Type=simple

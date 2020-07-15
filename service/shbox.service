@@ -1,0 +1,8 @@
+[Unit]
+Description=ShellInABox in os.dog
+
+[Service]
+Type=simple
+EnvironmentFile=/dog/cfg/rig.cfg
+WorkingDirectory=/tmp
+ExecStart=/dog/sbin/shellinaboxd $SHIAB_ARGS -p 4201 --css=/dog/sbin/shellinabox.style.css

@@ -106,6 +106,8 @@ if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
 fi
 
+shbox start 
+
 if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
 	if [[ `gpu-detect AMD` -lt 8 ]]; then
 		echo "> Starting OSdog Xserver"
