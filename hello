@@ -257,7 +257,7 @@ local request=$(
 [[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 
 #echo $request | jq '.' 
-
+echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/statsHello #save stats for watchdogs
 try=0
 
 while [[ $try -lt 5 ]]; do

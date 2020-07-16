@@ -1,11 +1,11 @@
 [Unit]
-Description=OSdog Temperature Watchdog
+Description=OSdog GPU Load Watchdog
 After=mining.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=1
-ExecStart=/dog/wd-temp start
+ExecStart=/dog/wd-load start
 
 [Install]
 WantedBy=multi-user.target

@@ -191,7 +191,7 @@ case $1 in
 			[[ $exitcode -ne 0 ]] && msg "BIOS flash error" warning "`date -R`${LF}Error occured while stopping services" && exit 1
 
 			if [[ $bus != 'all' ]]; then
-				adapter=`nvflash --list | grep "B:$bus" | sed "s/^<\([0-9]*\).*/\1/"`
+				adapter=`nvflash --list | grep "B:${bus^^}" | sed "s/^<\([0-9]*\).*/\1/"`
 				[[ ! $adapter ]] && msg "BIOS flash error" warning "`date -R`${LF}Error occured (wrong $bus bus number)" && exit 1
 				result=$(nvidia-tool flash $adapter $file "$add")
 				exitcode=$?
@@ -586,6 +586,24 @@ case $1 in
 			echo -e "`fix-string '      Temperature WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
 		fi
 		#####################      Temperature WD SECTION END      ####################
+
+		#######################          Load WD SECTION         ######################
+		if [[ `echo $2 | jq '.wd_load'` != '""' && `echo $2 | jq '.wd_load'` != 'null' ]]; then
+			prefix="WD_LOAD_"
+			[[ `cat $RIG_CFG | grep -c "Load WD SECTION"` -gt 0 ]] && sed -i "/.*Load WD SECTION.*/d" $RIG_CFG
+			echo -e "`fix-string '      Load WD SECTION      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+
+			for option in enabled min restart reboot; do
+				[[ `cat $RIG_CFG | grep -c "${prefix}${option^^}="` -gt 0 ]] && sed -i "/.*${prefix}${option^^}=.*/d" $RIG_CFG
+
+				if [[ `echo $2 | jq ".wd_load.$option"` != null ]]; then				
+					option_value="`echo $2 | jq -r \".wd_load.$option\"`"
+					echo "${prefix}${option^^}=\"$option_value\"" >> $RIG_CFG 
+				fi
+			done
+			echo -e "`fix-string '      Load WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+		fi
+		#####################          Load WD SECTION END         ####################
 
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"

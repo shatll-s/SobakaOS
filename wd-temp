@@ -178,7 +178,7 @@ case $1 in
 	;;
 	stop)
 		/dog/screen-kill wd-temp
-		echo "$(date --rfc-3339=seconds) Autofan stopped"
+		echo "$(date --rfc-3339=seconds) Temperature Watchdog stopped"
 	;;
 	start-cli)
 		start

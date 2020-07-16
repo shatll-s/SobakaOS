@@ -33,7 +33,8 @@ function getminer () {
 	file="$miner@$ver.tar.gz"	
 	link=`echo $HOST | sed "s/message\.php/downloads\/miners\/$file/"`
 	cd /tmp
-	wget -q $link -O $file
+	[ -t 1 ] && wget $link -O $file || wget -q $link -O $file
+	
 	if [[ $? -ne 0 ]]; then
 		echo -e "${RED}No file ${GREEN}$link${RED} on server. Exiting...${WHITE}"
 		msg "Miner download" warning "$(date --rfc-3339=seconds)\nError occured while downloading <b>$miner $ver</b>.<br>No file on server."

@@ -1,0 +1,268 @@
+#!/bin/bash
+#OSdog Load Watchdog v 0.1. Visit os.dog
+. /etc/environment #PATH
+. colors
+
+RIG_CFG="/dog/cfg/rig.cfg"
+BATCH_CFG="/dog/cfg/batch.cfg"
+SCREEN_CFG="/dog/service/screenrc"
+LOG="/dog/log/wd-temp.log"
+STATS="/run/dog/stats"
+STATS_HELLO="/run/dog/statsHello"
+LF='
+'
+LOGO="
+                .--~~,__
+   :-....,-------\`~~\`._.'
+    \`-,,,  ,_      ;'~U'
+     _,-' ,'\`-__; \'--.
+    (_/'~~      ''''(;
+"
+delay=10
+maxRefresh=20 #if stats are older, something is wrong
+defaultMinLoad=80
+defaultRebootTime=5
+defaultRestartTime=3
+
+function get_log () {
+	[[ -f $TMP_FILE ]] && rm -f $TMP_FILE
+	screen -S $1 -X hardcopy $TMP_FILE
+	local exitcode=$?
+	[[ $exitcode -eq 0 ]] && local return=`cat $TMP_FILE | sed 's/\"//g'` || local return=`screen -ls`
+	echo "$return"
+}
+
+function start () {
+	start_time=`date +%s`
+	lastGood=$start_time
+	critTime=0
+	echo -e "${BROWN}$LOGO${GREEN}"
+		
+	while true; do
+		unset WD_LOAD_ENABLED WD_LOAD_CRIT WD_LOAD_REBOOT WD_LOAD_RESTART minCount minLoad message msgText trigger #if something is changed?
+		#Some verifications at beginning
+		if [[ ! -f $RIG_CFG ]]; then
+			echo -e "${RED}No config file ${RIG_CFG}${WHITE}"
+			sleep $delay
+			continue
+		fi
+		. $RIG_CFG
+
+		if [[ ! WD_LOAD_ENABLED || WD_LOAD_ENABLED -eq 0 ]]; then
+			if [[ $firstTimeTrigger1 -ne 1 ]]; then
+				echo -n "Load Watchdog is not enabled"
+				firstTimeTrigger1=1
+			else
+				echo -n "."
+			fi
+			#echo "Load Watchdog is not enabled"
+			sleep $delay
+			continue
+		elif [[ $firstTimeTrigger1 -eq 1 ]]; then
+			firstTimeTrigger1=0
+			firstTimeTrigger2=0
+			firstTimeTrigger3=0
+			firstTimeTrigger4=0
+			echo "" #To switch line
+		fi
+
+		if [[ ! $WD_LOAD_MIN || $WD_LOAD_MIN -gt 99 || $WD_LOAD_MIN -lt 5 ]]; then
+			[[ $firstTimeTrigger2 -ne 1 ]] && firstTimeTrigger2=1 && echo -e "Something wrong with Min Load value, using default value ${CYAN}${defaultMinLoad}${WHITE}"
+			WD_LOAD_CRIT=$defaultMinLoad
+		elif [[ firstTimeTrigger2 -ne 0 ]]; then
+			firstTimeTrigger2=0
+		fi
+
+		if [[ ! $WD_LOAD_REBOOT || $WD_LOAD_REBOOT -gt 99 || $WD_LOAD_REBOOT -lt 1 ]]; then
+			[[ $firstTimeTrigger3 -ne 1 ]] && firstTimeTrigger3=1 && echo -e "Something wrong with Reboot time, using default value ${CYAN}${defaultRebootTime}${WHITE}"
+			WD_LOAD_REBOOT=$defaultRebootTime
+		elif [[ firstTimeTrigger3 -ne 0 ]]; then
+			firstTimeTrigger3=0
+		fi
+
+		if [[ ! $WD_LOAD_RESTART || $WD_LOAD_RESTART -gt 99 || $WD_LOAD_RESTART -lt 1 ]]; then
+			[[ $firstTimeTrigger4 -ne 1 ]] && firstTimeTrigger4=1 && echo -e "Something wrong with Restart time, using default value ${CYAN}${defaultRestartTime}${WHITE}"
+			WD_LOAD_RESTART=$defaultRestartTime
+		elif [[ firstTimeTrigger4 -ne 0 ]]; then
+			firstTimeTrigger4=0
+		fi
+
+		if [[ ! -f $STATS ]]; then
+			echo -e "${RED}No stats file ${STATS}${WHITE}"
+			sleep $delay
+			continue
+		fi
+
+		local lastUpdate=`stat -c %Y $STATS`
+		local now=`date +%s`
+		local refresh=$(($now - $lastUpdate))
+		[[ $refresh -gt $maxRefresh ]] && echo -e "${RED}Stats are too old${WHITE}" && sleep $delay && continue
+		local stats=`cat $STATS`
+		local load=(`echo $stats | jq -r '.utilisation[]'`)
+		if [[ -f $STATS_HELLO ]]; then
+			local statsHello=`cat $STATS_HELLO`
+			local busidRaw=(`echo $statsHello | jq -r '.gpu_busid[]'`)
+			local brandRaw=(`echo $statsHello | jq -r '.gpu_brand[]'`)
+			local name_json=`echo $statsHello | jq '.gpu_name'`
+
+			local y=0
+			for ((i=0; i < ${#brandRaw[@]}; i++)); do
+				if [[ ${brandRaw[$i]} == "N" || ${brandRaw[$i]} == "A" ]]; then
+					brand[$y]=${brandRaw[$i]}
+					busid[$y]=${busidRaw[$i]}
+					name[$y]=`echo $name_json | jq -r ".[\"$i\"]"`
+					(( y++ ))
+				fi
+			done	
+		else
+			echo -e "${RED}There are no initial stats in $STATS_HELLO${WHITE}" #&& sleep $delay && continue
+		fi
+
+		[[ ! $load || $load == 'null' ]] && echo -e "${RED}Something wrong, no load values are available${WHITE}" && sleep $delay && continue
+		#It seems everything is good
+
+		#Show stats sometimes, like hr in miner
+		if [[ ! $statsCounter || $statsCounter -ge 10 ]]; then
+			statsCounter=0
+			local statsMsg="${CYAN}${PURELINE2}\nCrit Load: ${RED}$WD_LOAD_CRIT${CYAN}\tRestart: ${GREEN}${WD_LOAD_RESTART}${CYAN}\tReboot: ${GREEN}${WD_LOAD_REBOOT}${WHITE}"			
+			statsMsg+="\n${CYAN}${PURELINE2}${WHITE}"	
+			echo -e $statsMsg
+
+		else
+			(( statsCounter++ ))
+		fi
+		echo -e "${BROWN}${PURELINE2}"
+		echo -e "BusID   GPU\t\t\tLoad\t`date -R`"
+		echo -e "${PURELINE2}${WHITE}"
+
+		local minCount=0
+		local minLoad=100
+		for ((i=0; i < ${#busid[@]}; i++)); do
+			local gpuStat="${busid[$i]}:00.0 "
+			if [[ ${brand[$i]} == "A" ]]; then
+				gpuStat+="$LIGHTRED"
+			elif [[ ${brand[$i]} == "N" ]]; then
+				gpuStat+="$LIGHTGREEN"
+			else
+				gpuStat+="$BROWN"
+			fi
+			if [[ ! -z ${name[$i]} && ${name[$i]} != 'null' ]]; then
+				gpuStat+="${name[$i]}"
+				local length=`echo "${name[$i]}" | wc -c`
+				if [[ $length -lt 9 ]]; then
+					gpuStat+="\t\t"
+				elif [[ $length -lt 16 ]]; then
+					gpuStat+="\t"
+				fi
+				#if "Get the length of this line in Bash" | wc -c
+			else
+				gpuStat+="\t\t"
+			fi
+			gpuStat+="$WHITE\t"
+			if [[ ! -z ${load[$i]} ]]; then
+				if [[ ${load[$i]} -le $WD_LOAD_CRIT ]]; then
+					trigger=1
+					gpuStat+="${RED}${load[$i]}%${WHITE}"
+					(( minCount++ ))
+					[[ ${load[$i]} -lt $minLoad ]] && minLoad=${load[$i]}
+				else
+					gpuStat+="${load[$i]}%"
+				fi
+			else
+				gpuStat+="n/a"
+			fi
+			echo -e "$gpuStat"
+		done
+
+		if [[ ! -z $trigger && $trigger -eq 1 ]]; then
+			local elapsed=$(($now - $lastGood))
+			local message="Low ($minLoad%) load on $minCount GPU for $elapsed seconds"
+			if [[ -f $BATCH_CFG ]]; then
+				. $BATCH_CFG
+				if [[ ! -z $miner1 || ! -z $miner2 ]]; then
+					
+					#echo -e "$message" #no need - message with warning will be later
+
+					if [[ ! -z $WD_LOAD_REBOOT ]]; then
+						local reboot_timeout=`echo $WD_LOAD_REBOOT 60 | awk '{print $1 * $2}'`
+					else
+						local reboot_timeout="n/a"
+					fi
+					
+					if [[ ! -z $WD_LOAD_RESTART ]]; then
+						local miner_restart_timeout=`echo $WD_LOAD_RESTART 60 | awk '{print $1 * $2}'`
+					else
+						local miner_restart_timeout="n/a"
+					fi
+					echo -en "${RED}WARNING${WHITE}\t$message\t"
+					echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE} | restart ${GREEN}${miner_restart_timeout}s${WHITE})"
+
+					if [[ ! -z $WD_LOAD_REBOOT ]]; then
+						if [[ $elapsed -ge $reboot_timeout ]]; then
+							
+							msg "WD_LOAD Reboot: $message" danger "$msgText"
+							echo -e "${RED}Rebooting after $WD_LOAD_REBOOT minutes${WHITE}"
+							nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
+						fi
+					else
+						echo "Miner restart is not allowed"
+					fi
+
+					if [[ ! -z $WD_LOAD_RESTART ]]; then
+						[[ ! $miner_restart_count ]] && miner_restart_count=0
+						local restart_time=`echo "$miner_restart_count + 1" | bc -l`
+						local miner_restart_timeout2=`echo "$miner_restart_timeout * $restart_time" | bc -l`
+						
+						if [[ $elapsed -ge $miner_restart_timeout2 ]]; then
+							local msgText="If there are active miners, short log will be available here"
+							[[ `screen_check miner1` -gt 0 ]] && msgText+="\n`get_log miner1`"
+							[[ `screen_check miner2` -gt 0 ]] && msgText+="\n`get_log miner2`"
+							msg "WD_LOAD Restart: $message" warning "$(date --rfc-3339=seconds) Restarting after $miner_restart_timeout2 seconds for $restart_time time\n$msgText"
+							echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $miner_restart_timeout2 seconds for $restart_time time${WHITE}"
+							(( miner_restart_count++ ))
+							screen-kill miner1
+							screem-kill miner2
+						fi
+					else
+						echo "Rig reboot is not allowed"
+					fi
+				else
+					echo -e "$message, but no active miner. Ignoring" #no need - message with warning will be later
+				fi
+			else
+				echo -e "$message, but no batch file. Ignoring" #no need - message with warning will be later
+			fi
+		else
+			critTime=0
+			lastGood=$now
+		fi
+
+		sleep $delay
+	done
+}
+
+case $1 in
+	show|"")
+		screen -d wd-load
+		screen -r wd-load
+	;;
+	log)
+		[[ ! $2 ]] && n=200 || n=$2
+		tail -n $n $LOG
+	;;
+	stop)
+		/dog/screen-kill wd-temp
+		echo "$(date --rfc-3339=seconds) Load Watchdog stopped"
+	;;
+	start-cli)
+		start
+	;;
+	start|restart)
+		/dog/screen-kill wd-load
+		screen -c $SCREEN_CFG -dmS "wd-load" -Logfile $LOG bash -c "/dog/wd-load start-cli"
+	;;
+	*)
+		bname=`basename $0`
+		echo -e "Usage: ${CYAN}$bname show|start|stop|restart|log|start-cli${WHITE}"
+	;;
+esac
