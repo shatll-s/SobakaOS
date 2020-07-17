@@ -335,6 +335,15 @@ function make_batch () {
 			mkdir -p /dog/miners/nanominer
 			echo -e "$config" > /dog/miners/nanominer/config.ini
 		;;
+		noncerpro_cuda)
+			#[[ ! -z $template ]]&& minerexec+=" --address $template"
+			[[ ! -z $wallet ]]&& minerexec+=" --address='$wallet'"
+			[[ ! -z $name ]]&& minerexec+=" --name=$name"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" --server=$pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" --port=$port"
+
+			minerexec+=" --o=$API_port"
+		;;
 		lolminer)
 			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
 			#[[ ! -z $algo ]]&& minerexec+=" --coin $algo" 
@@ -489,7 +498,7 @@ function make_batch () {
 				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
 				minerexec+=" -o $pool"
 			fi
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $template ]]&& minerexec+=" -u \"$template\""
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api_listen=$API_port --bus_reorder --watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;

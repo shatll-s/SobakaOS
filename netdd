@@ -20,7 +20,7 @@ myself="$mydir/$SCRIPT_NAME"
 skip=2048
 count=45056
 
-LATEST_URL="https://os.dog/downloads/iso/dog-1.39.zip"
+LATEST_URL="https://os.dog/downloads/iso/dog-1.45.zip"
 
 # download timeout
 TIMEOUT=20
@@ -235,6 +235,7 @@ function prepare {
 		systemctl stop mining 2>&1
 		systemctl stop wd 2>&1
 		systemctl stop wd-la 2>&1
+		systemctl stop wd-load 2>&1
 		systemctl stop wd-temp 2>&1
 		systemctl stop af 2>&1
 		systemctl stop mb-af 2>&1

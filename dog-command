@@ -537,7 +537,7 @@ case $1 in
 		esac
 	;;
 	settings)
-		#echo $2 > /tmp/settings #just for development
+		echo $2 > /tmp/settings #just for development
 		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
 		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
 		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
@@ -586,6 +586,25 @@ case $1 in
 			echo -e "`fix-string '      Temperature WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
 		fi
 		#####################      Temperature WD SECTION END      ####################
+
+		#######################          LA WD SECTION         ######################
+		if [[ `echo $2 | jq '.wd_la'` != '""' && `echo $2 | jq '.wd_la'` != 'null' ]]; then
+			prefix="WD_LA_"
+			[[ `cat $RIG_CFG | grep -c "LA WD SECTION"` -gt 0 ]] && sed -i "/.*LA WD SECTION.*/d" $RIG_CFG
+			echo -e "`fix-string '      LA WD SECTION      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+
+			sed -i "/^${prefix}.*=.*/d" $RIG_CFG
+			for option in enabled max reboot; do
+				#[[ `cat $RIG_CFG | grep -c "${prefix}${option^^}="` -gt 0 ]] && sed -i "/.*${prefix}${option^^}=.*/d" $RIG_CFG
+
+				if [[ `echo $2 | jq ".wd_la.$option"` != null ]]; then				
+					option_value="`echo $2 | jq -r \".wd_la.$option\"`"
+					echo "${prefix}${option^^}=\"$option_value\"" >> $RIG_CFG 
+				fi
+			done
+			echo -e "`fix-string '      LA WD SECTION END      ' 80 '#' 'symmetrically'`" >> $RIG_CFG
+		fi
+		#####################          LA WD SECTION END         ####################
 
 		#######################          Load WD SECTION         ######################
 		if [[ `echo $2 | jq '.wd_load'` != '""' && `echo $2 | jq '.wd_load'` != 'null' ]]; then
