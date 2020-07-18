@@ -39,7 +39,9 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		#local gpu_name[$i]="code@"$(cat ${core_addr[$i]}/uevent | grep "PCI_ID" | sed 's/PCI_ID\=//')"@"$(cat ${core_addr[$i]}/uevent | grep "PCI_SUBSYS_ID" | sed 's/PCI_SUBSYS_ID\=//')
 		local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
 		local gpu_vendor[$i]=`cat ${core_addr[$i]}/subsystem_vendor | tr '[:lower:]' '[:upper:]'` 
-		local gpu_mem[$i]=`dmesg | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0: VRAM:\s.*" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`"b"
+		#local gpu_mem[$i]=`dmesg | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0: VRAM:\s.*" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`"b"
+		local gpu_mem[$i]=`dmesg | grep ".*VRAM.*used" | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`"b"
+
 		local gpu_info[$i]=${gpu_mem[$i]}", "$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $5 }')
 		if [[ -z ${gpu_info[$i]} ]]; then
 			amdmeminfo -q -s > $AMDMEMINFO_FILE
@@ -194,7 +196,8 @@ fi
 ##################################################################
 
 driver_amd=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
-driver_nvidia=$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
+driver_nvidia=`dpkg -l | grep nvidia | awk '{print $3}' | sed 's/\([.0-9]*\).*/\1/'`
+#$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
 
 sysinfo=$(
 	jq -n \
