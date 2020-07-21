@@ -196,8 +196,7 @@ fi
 ##################################################################
 
 driver_amd=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
-driver_nvidia=`dpkg -l | grep nvidia | awk '{print $3}' | sed 's/\([.0-9]*\).*/\1/'`
-#$(nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/')
+driver_nvidia=`modinfo nvidia -F version`
 
 sysinfo=$(
 	jq -n \

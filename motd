@@ -3,7 +3,7 @@
 . /etc/environment
 export PATH
 . colors
-. /dog/cfg/rig.cfg
+[[ -f /dog/cfg/rig.cfg ]] && . /dog/cfg/rig.cfg || echo -e "${RED}No configuration file. You need to use command ${CYAN}newdog${WHITE}"
 
 LOGO="
                 .--~~,__

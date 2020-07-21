@@ -6,7 +6,7 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE="/tmp/.amd-oc.lock"
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak_type fan enhanced; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak_type fan enhanced alt; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -82,6 +82,8 @@ echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
 echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
 echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
+echo -en ${CYAN}"Alt. Memory OC:${WHITE} "
+[[ $ALT -eq 1 ]] && echo "Yes" || echo "No"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 echo -en ${CYAN}"Memory Tweak:${WHITE}\t"
 if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
@@ -168,11 +170,6 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 						$script -i $card --core-state $vega_state --core-clock $vega_clock | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 						#echo "$vega_state = $vega_clock"
 					done
-					#$script -i $card --core-state 4 --core-clock $((${CORE_CLOCK[$y]}-30)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					#$script -i $card --core-state 5 --core-clock $((${CORE_CLOCK[$y]}-20)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					#$script -i $card --core-state 6 --core-clock $((${CORE_CLOCK[$y]}-10)) | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-					#$script -i $card --core-state 7 --core-clock ${CORE_CLOCK[$y]} | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-
 				else
 					str="$str --core-state ${CORE_STATE[$y]} --core-clock ${CORE_CLOCK[$y]}"
 				fi
@@ -187,21 +184,21 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		#str="$script -i $card"
 
 		if [[ -z ${MEMORY_STATE[$y]} || ${MEMORY_STATE[$y]} == "A" ]]; then
-			#MEMORY_STATE[$y]=`cat "${core_addr[$i]}/pp_dpm_mclk" | grep \* | sed -e 's/*//; s/:.*//'`
-			#ms_trigger=1
 			MEMORY_STATE[$y]=`$script -i $card --show-mem | grep -E "Memory state ([0-9]+):" | tail -n 1 | sed "s/Memory state \([0-9]*\).*/\1/"`
 		fi
-		[[ ${MEMORY_CLOCK[$y]} ]]&&	str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
+		[[ ! -z ${MEMORY_CLOCK[$y]} ]] && str="$str --mem-state ${MEMORY_STATE[$y]} --mem-clock ${MEMORY_CLOCK[$y]}"
+		[[ $ALT -eq 1 && ! -z ${MEMORY_VOLTAGE[$y]} ]] && str="$str --vddci ${MEMORY_VOLTAGE[$y]}" #no need to change --mvdd --mvdd 1000"
 
 		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
 		#29 is "wolfamdctrl -i 5", so it`s useless to do
-
-		if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
-			mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
-			echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
-			echo "$mem_str" > ${core_addr[$i]}/pp_od_clk_voltage
-			echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
-			
+		
+		if [[ $ALT -ne 1 ]]; then 
+			if [[ ! -z ${MEMORY_VOLTAGE[$y]} && ! -z ${MEMORY_STATE[$y]} && ! -z ${MEMORY_CLOCK[$y]} ]]; then
+				mem_str="m ${MEMORY_STATE[$y]} ${MEMORY_CLOCK[$y]} ${MEMORY_VOLTAGE[$y]}"
+				echo "$mem_str > ${core_addr[$i]}/pp_od_clk_voltage"
+				echo "$mem_str" > ${core_addr[$i]}/pp_od_clk_voltage
+				echo "c" > ${core_addr[$i]}/pp_od_clk_voltage
+			fi
 		fi
 
 		if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
@@ -232,9 +229,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			fi
 		fi
 		if [[ ${gpu_name[$i]} == *"Vega"* ]]; then
-			#echo "echo manual > ${core_addr[$i]}/power_dpm_force_performance_level"
 			#echo "manual" > ${core_addr[$i]}/power_dpm_force_performance_level
-			#echo "echo 4 > ${core_addr[$i]}/pp_power_profile_mode"
 			#echo 4 > ${core_addr[$i]}/pp_power_profile_mode
 
 			echo "echo auto > ${core_addr[$i]}/power_dpm_force_performance_level"
