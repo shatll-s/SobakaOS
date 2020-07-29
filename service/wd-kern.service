@@ -1,0 +1,6 @@
+[Unit]
+Description=OSdog Syslog Watchdog
+
+[Service]
+Type=simple
+ExecStart=/dog/wd-kern

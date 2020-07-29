@@ -1,0 +1,56 @@
+#!/bin/bash
+#[ -t 1 ] && . colors
+. colors
+SLEEP=5 #seconds to sleep over iteration
+
+errorMsgAmd=()
+errorMsgAmd+=("last message was failed")
+errorMsgAmd+=("failed to send message")
+errorMsgAmd+=("VM_L2_PROTECTION_FAULT_STATUS")
+
+errorMsgNvidia+=("Graphics Exception")
+
+grepStrAmd=
+grepStrNvidia=
+
+if [[ $1 == "show" ]]; then
+	echo -e "Error messages: ${RED}"
+	for (( i=0; i < ${#errorMsgAmd[@]}; i++ )); do
+		echo "${errorMsgAmd[$i]}"
+	done
+	for (( i=0; i < ${#errorMsgNvidia[@]}; i++ )); do
+		echo "${errorMsgAmd[$i]}"
+	done
+	echo -e "${WHITE}"
+	exit 0
+fi
+
+for (( i=0; i < ${#errorMsgAmd[@]}; i++ )); do
+	[[ ! -z $grepStrAmd ]] && grepStrAmd+="|"
+	grepStrAmd+="${errorMsgAmd[$i]}"
+done
+
+for (( i=0; i < ${#errorMsgNvidia[@]}; i++ )); do
+	[[ ! -z $grepStrNvidia ]] && grepStrNvidia+="|"
+	grepStrNvidia+="${errorMsgNvidia[$i]}"
+done
+
+function main () {
+	while true; do
+		local log=`tail -n 200 /var/log/kern.log`
+		if [[ `echo "$log" | grep -E "$grepStrAmd|$grepStrNvidia"` ]]; then
+			if [[ `echo "$log" | grep -E -c "$grepStrAmd"` -gt 0 ]]; then
+				payload="`echo -en \"${RED}Reboot at${WHITE} \" && date -R && echo '' && echo \"${log}\" | grep -E \"$grepStrAmd\"`"
+				/dog/msg "Reboot: AMD error" danger "$payload"
+				/dog/sbin/sreboot
+			elif [[ `echo "$log" | grep -E -c "$grepStrNvidia"` -gt 5 ]]; then
+				payload="`echo -en \"${RED}Reboot at${WHITE} \" && date -R && echo '' && echo \"${log}\" | grep -E \"$grepStrNvidia\"`"
+				/dog/msg "Reboot: Nvidia error" danger "$payload"
+				/dog/sbin/sreboot
+			fi
+		fi
+		sleep $SLEEP
+	done
+}
+
+main

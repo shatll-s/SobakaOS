@@ -112,7 +112,7 @@ function get {
 	archname=`basename "$url"`
 
 	# stop miner here to free some memory and prevent rig from rebooting on errors
-	[[ $thisDog -eq 1 ]] && systemctl stop mining && systemctl stop wd
+	[[ $thisDog -eq 1 ]] && systemctl stop mining && systemctl stop wd && systemctl stop wd-load
 
 	#Copy|download image to tmpfs
 	echo -e "\n${CYAN}> Downloading image file${WHITE}"

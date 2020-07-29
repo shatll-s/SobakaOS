@@ -151,6 +151,7 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 			if [[ ! -z ${CORE_VOLTAGE[$y]} ]]; then
 				volt_states=(`echo -e $($script -i $card --show-voltage | grep "Voltage state" | sed -e 's/://g; s/.*Voltage state \([0-9]*\)/\1/')`) 
 				for ((z=0; z < ${#volt_states[@]}; z++)); do
+					[[ $z -gt 7 ]] && break
 					$script -i $card --volt-state ${volt_states[$z]} --vddc-table-set ${CORE_VOLTAGE[$y]}
 				done
 			fi

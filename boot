@@ -102,13 +102,15 @@ netsetup -f
 hello --initial
 . $RIG_CFG
 
+[[ $WD_KERN_ENABLED -eq 1 ]] && systemctl start wd-kern
+
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
 fi
 
 shbox start 
 
-if [[ $USE_GRAPHIC == 1 || -z $USE_GRAPHIC ]]; then
+if [[ $USE_GRAPHIC -eq 1 || -z $USE_GRAPHIC ]]; then
 	if [[ `gpu-detect AMD` -lt 8 ]]; then
 		echo "> Starting OSdog Xserver"
 		sudo systemctl start dogx
@@ -121,7 +123,7 @@ else
 	sudo systemctl start dog-console
 fi
 
-if [[ $REMOTESSH_USE == 1 ]]; then
+if [[ $REMOTESSH_USE -eq 1 ]]; then
 	time=0
 	while [[ time -lt 15 ]]; do
 		[[ ! -z `systemctl status vnc | grep active` ]] && break

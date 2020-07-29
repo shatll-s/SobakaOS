@@ -32,3 +32,6 @@ THINLINE2="---------------------------------------------------------------------
 LINE="echo -e $BROWN================================================================$WHITE"
 
 #echo -e $BLINK"There"$WHITE" are $n "$RED"AMD"$LIGHTRED" GPU"$YELLOW" detected"$WHITE
+
+LF='
+'
