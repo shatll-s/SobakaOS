@@ -1,56 +1,136 @@
 #!/bin/bash
 #[ -t 1 ] && . colors
-. colors
-SLEEP=5 #seconds to sleep over iteration
+. /dog/colors
+LOG="/dog/log/errors.log"
+mkdir -p "/dog/log/dmesg"
+dmesgLog="/dog/log/dmesg/"`date +"%Y.%m.%d_%T"`".log"
+SLEEP=3 #seconds to sleep over iteration
+echo "`date -R` Kernel log Watchdog started" >> $LOG
 
-errorMsgAmd=()
-errorMsgAmd+=("last message was failed")
-errorMsgAmd+=("failed to send message")
-errorMsgAmd+=("VM_L2_PROTECTION_FAULT_STATUS")
+errorMsgAmdWarning=()
+errorMsgAmdWarning+=("last message was failed")
+#errorMsgAmdWarning+=("failed to send message")
+errorMsgAmdWarning+=("VM_L2_PROTECTION_FAULT_STATUS")
 
-errorMsgNvidia+=("Graphics Exception")
+errorMsgAmdError=()
+errorMsgAmdError+=("Failed message")
+errorMsgAmdError+=("No response")
 
-grepStrAmd=
-grepStrNvidia=
+errorMsgNvidiaWarning=()
+errorMsgNvidiaWarning+=("Zaglushka")
 
-if [[ $1 == "show" ]]; then
-	echo -e "Error messages: ${RED}"
-	for (( i=0; i < ${#errorMsgAmd[@]}; i++ )); do
-		echo "${errorMsgAmd[$i]}"
+errorMsgNvidiaError=()
+errorMsgNvidiaError+=("Graphics Exception")
+
+grepStrAmdWarning=
+grepStrAmdError=
+grepStrNvidiaWarning=
+grepStrNvidiaError=
+
+function panicReboot () {
+	local title=$1
+	local text=$2
+	local payload="`echo -en \"${RED}Reboot at${WHITE} \" && date -R && echo '' && echo \"${text}\"`"
+
+	echo "`date -R` $title" >> $LOG
+	bash -c "sleep 2 && /dog/sbin/sreboot"&
+	/dog/msg "$title" danger "$payload"
+}
+
+function echo2 () {
+	echo "`date -R` $1" >> $LOG
+	echo "$1"
+}
+
+function showMessages () {
+	echo -e "===  Error messages  ===${RED}"
+	echo -e "${WHITE}---        AMD       ---${RED}"
+	
+	for (( i=0; i < ${#errorMsgAmdError[@]}; i++ )); do
+		echo "${errorMsgAmdError[$i]}"
 	done
-	for (( i=0; i < ${#errorMsgNvidia[@]}; i++ )); do
-		echo "${errorMsgAmd[$i]}"
+	echo -e "${WHITE}---       Nvidia     ---${RED}"
+	for (( i=0; i < ${#errorMsgNvidiaError[@]}; i++ )); do
+		echo "${errorMsgNvidiaError[$i]}"
 	done
+
+	echo -e "${WHITE}=== Warning messages ===${RED}"
+	echo -e "${WHITE}---        AMD       ---${RED}"
+	for (( i=0; i < ${#errorMsgAmdWarning[@]}; i++ )); do
+		echo "${errorMsgAmdWarning[$i]}"
+	done
+	echo -e "${WHITE}---       Nvidia     ---${RED}"
+	for (( i=0; i < ${#errorMsgNvidiaWarning[@]}; i++ )); do
+		echo "${errorMsgNvidiaWarning[$i]}"
+	done
+
 	echo -e "${WHITE}"
+}
+if [[ $1 == "show" ]]; then
+	showMessages
 	exit 0
 fi
 
-for (( i=0; i < ${#errorMsgAmd[@]}; i++ )); do
-	[[ ! -z $grepStrAmd ]] && grepStrAmd+="|"
-	grepStrAmd+="${errorMsgAmd[$i]}"
+for (( i=0; i < ${#errorMsgAmdWarning[@]}; i++ )); do
+	[[ ! -z $grepStrAmdWarning ]] && grepStrAmdWarning+="|"
+	grepStrAmdWarning+="${errorMsgAmdWarning[$i]}"
 done
 
-for (( i=0; i < ${#errorMsgNvidia[@]}; i++ )); do
-	[[ ! -z $grepStrNvidia ]] && grepStrNvidia+="|"
-	grepStrNvidia+="${errorMsgNvidia[$i]}"
+for (( i=0; i < ${#errorMsgAmdError[@]}; i++ )); do
+	[[ ! -z $grepStrAmdError ]] && grepStrAmdError+="|"
+	grepStrAmdError+="${errorMsgAmdError[$i]}"
+done
+
+for (( i=0; i < ${#errorMsgNvidiaWarning[@]}; i++ )); do
+	[[ ! -z $grepStrNvidiaWarning ]] && grepStrNvidiaWarning+="|"
+	grepStrNvidiaWarning+="${errorMsgNvidiaWarning[$i]}"
+done
+
+for (( i=0; i < ${#errorMsgNvidiaError[@]}; i++ )); do
+	[[ ! -z $grepStrNvidiaError ]] && grepStrNvidiaError+="|"
+	grepStrNvidiaError+="${errorMsgNvidiaError[$i]}"
 done
 
 function main () {
 	while true; do
-		local log=`tail -n 200 /var/log/kern.log`
-		if [[ `echo "$log" | grep -E "$grepStrAmd|$grepStrNvidia"` ]]; then
-			if [[ `echo "$log" | grep -E -c "$grepStrAmd"` -gt 0 ]]; then
-				payload="`echo -en \"${RED}Reboot at${WHITE} \" && date -R && echo '' && echo \"${log}\" | grep -E \"$grepStrAmd\"`"
-				/dog/msg "Reboot: AMD error" danger "$payload"
-				/dog/sbin/sreboot
-			elif [[ `echo "$log" | grep -E -c "$grepStrNvidia"` -gt 5 ]]; then
-				payload="`echo -en \"${RED}Reboot at${WHITE} \" && date -R && echo '' && echo \"${log}\" | grep -E \"$grepStrNvidia\"`"
-				/dog/msg "Reboot: Nvidia error" danger "$payload"
-				/dog/sbin/sreboot
+		#local log=`tail -n 200 /var/log/kern.log`
+		#local log=`cat "$dmesgLog"&`
+		local log=`dmesg`
+		if [[ `echo "$log" | grep -E "$grepStrAmdWarning|$grepStrAmdError|$grepStrNvidiaWarning|$errorMsgNvidiaError"` ]]; then
+			echo "Found "`echo "$log" | grep -E -c "$grepStrAmdWarning|$grepStrAmdError|$grepStrNvidiaWarning|$errorMsgNvidiaError"`" strange messages"
+			if [[ `echo "$log" | grep -E -c "$grepStrAmdWarning"` -gt 0 ]]; then
+				echo2 "AMD Warning"
+				panicLog="`echo \"${log}\" | grep -E \"$grepStrAmdWarning\"`"
+				panicReboot "Reboot: AMD critical error" "$panicLog"
+			fi
+			
+			local amdErrorCount=`echo "$log" | grep -E -c "$grepStrAmdError"`
+			if [[ $amdErrorCount -ge 3 ]]; then
+				echo2 "AMD Errors ($amdErrorCount)"
+				panicLog="`echo \"${log}\" | grep -E \"$grepStrAmdError\"`"
+				panicReboot "Reboot: AMD errors" "$panicLog"
+			fi
+
+			if [[ `echo "$log" | grep -E -c "$grepStrNvidiaWarning"` -gt 0 ]]; then
+				echo2 "Nvidia Warning"
+				panicLog="`echo \"${log}\" | grep -E \"$grepStrNvidiaWarning\"`"
+				panicReboot "Reboot: Nvidia critical error" "$panicLog"
+			fi
+
+			local nvidiaErrorCount=`echo "$log" | grep -E -c "$grepStrNvidiaError"`
+			if [[ $nvidiaErrorCount -ge 3 ]]; then
+				echo2 "Nvidia Errors ($nvidiaErrorCount)"
+				panicLog="`echo \"${log}\" | grep -E \"$grepStrNvidiaError\"`"
+				panicReboot "Reboot: Nvidia errors" "$panicLog"
 			fi
 		fi
 		sleep $SLEEP
 	done
 }
 
+showMessages
+#dmesg -w > "$dmesgLog"&
+cat /dev/kmsg > "$dmesgLog"&
 main
+#watch -n 0.2 systemctl status wd-kern
+#dmesg -w

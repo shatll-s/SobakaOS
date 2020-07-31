@@ -237,8 +237,11 @@ case $1 in
 		miner_fan=(`echo $stats_template | jq '.devs.DEVS[]."Fan Percent"'`)
 		miner_share=(`echo $stats_template | jq '.devs.DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
-		miner_busid=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//'`)
-		
+		miner_busid_raw=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//'`)
+		for ((i=0; i < ${#miner_busid_raw[@]}; i++)); do #hex -> dec
+			miner_busid[$i]=`printf "%d" 0x${miner_busid_raw[$i]}`
+		done		
+
 		local scale=0
 		if [[ "phi2 ethash nimiq" == *$miner_algo* ]]; then
 			local x=1000
@@ -988,7 +991,7 @@ if [[ $response ]] ; then #if we get answer (pass is ok, etc)
 			local command_type=$(echo $response | jq ".[$i].command_type" --raw-output)
 			local command_argument=$(echo $response | jq ".[$i].command_argument" --raw-output)
 			local title=$(echo $response | jq ".[$i].title" --raw-output)
-			dog-command "$command_type" "$command_argument" >> $LOG &
+			dog-command "$command_type" "$command_argument" >> $LOG&
 		done
 	fi
 	msg_count=0

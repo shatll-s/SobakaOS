@@ -1,6 +1,6 @@
 #!/bin/bash
 #[ -t 1 ] && . colors
-. colors
+. /dog/colors
 . /etc/environment
 export PATH
 

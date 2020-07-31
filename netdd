@@ -87,7 +87,7 @@ function showHelp {
 function check_packages {
 	[[ $checked -eq 1 ]] && return
 
-	local need_install=(lsof curl wget unzip unzip gdisk)
+	local need_install=(lsof curl wget unzip unzip gdisk libpcre2-8-0)
 	[[ $sshPass -eq 1 ]] && need_install+=(expect)
 	for idx in "${!need_install[@]}"; do
 		dpkg -s "${need_install[$idx]}" > /dev/null 2>&1 && unset 'need_install[idx]'

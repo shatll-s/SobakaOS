@@ -500,7 +500,7 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=$API_port --bus_reorder --watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
+			minerexec+=" --api_listen=$API_port --bus_reorder --watchdog_script" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
 		cryptodredge)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
