@@ -102,7 +102,7 @@ netsetup -f
 hello --initial
 . $RIG_CFG
 
-[[ $WD_KERN_ENABLED -eq 1 ]] && echo "> Starting Kernel Log Watchdog" && systemctl start wd-kern
+[[ $WD_KERN -eq 1 ]] && echo "> Starting Kernel Log Watchdog" && systemctl start wd-kern
 
 if [[ ! -z $NOTIFY_ON_BOOT && $NOTIFY_ON_BOOT == 1 ]]; then
 	msg "Rig booted" info "`uptime`"
