@@ -20,7 +20,7 @@ myself="$mydir/$SCRIPT_NAME"
 skip=2048
 count=45056
 
-LATEST_URL="https://os.dog/downloads/iso/dog-1.45.zip"
+LATEST_URL="https://os.dog/downloads/iso/dog-1.47.zip"
 
 # download timeout
 TIMEOUT=20

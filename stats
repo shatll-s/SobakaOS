@@ -507,15 +507,6 @@ case $1 in
 					[[ ! -z $rejected ]] && miner_total_badshare=$(($miner_total_badshare + $rejected))
 				fi
 			done <<< "$sharesLine"
-
-			#for (( i=0; i < `gpu-detect all`; i++ )); do
-			#	local hr=`cat $MINER_LOG | grep -a "GPU" | tail -n 1 | awk -v offset="$offset" '{ printf $offset"\n" }'`
-			#	if [[ ! -z $hr ]]; then
-			#		local miner_hr[$i]=$hr
-			#		miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
-			#	fi
-		    #  	let offset+=4
-		    #done
 		fi
 	;;
 	wildrig_multi)
@@ -795,13 +786,14 @@ echo $miner_total_hr > /tmp/hr.$1
 
 ##################################################################
 function stats {
+[[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+list=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand != "I")]'` #integrated is not neeeded
+gpuCount=`echo $list | jq '.|length'`
+
 if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
 	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
-	#local nvidia_smi=`timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total --format=csv,noheader,nounits ` #> $NVIDIASMI_FILE >/tmp/ko 2>/dev/null
 	exitcode=$?
-	#echo "@$nvidia_smi@"
-	
-	#echo "exitcode $exitcode"
+
 	if [[ $exitcode -eq 0 ]]; then
 		local timer=0
 		while [[ $timer -le 10 ]]; do
@@ -820,24 +812,33 @@ if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
 	fi
 fi
 
-core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
-for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
-	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
-done
+#core_addr_raw=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
+#for (( i=0; i < ${#core_addr_raw[@]}; i++ )); do
+#	gpu_busid_raw[$i]=$(cat ${core_addr_raw[$i]}/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/')
+#done
+#
+#IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
+#unset IFS
 
-IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
-unset IFS
-
-for (( i=0; i < ${#gpu_busid_raw[@]}; i++ )) do
-	for (( y=0; y < ${#gpu_busid_raw[@]}; y++ )) do
-		[[ ${gpu_busid_sys[$i]} == ${gpu_busid_raw[$y]} ]] && core_addr[$i]=${core_addr_raw[$y]} && break
-	done
-done
-
-for (( i=0; i < ${#core_addr[@]}; i++ )); do
+for (( i=0; i < $gpuCount; i++ )); do
+	local core_addr[$i]=`echo $list | jq -r ".[$i].coreAddr"`
+	if [[ ${core_addr[$i]} == 'null' ]]; then
+		local Fan[$i]=''
+		local Temp[$i]=''
+		local Power[$i]=''
+		local CoreClock[$i]=''
+		local CoreState[$i]=''
+		local MemClock[$i]=''
+		local MemState[$i]=''
+		local Utilisation[$i]=''
+		continue
+	fi
+	local brand=`echo $list | jq -r ".[$i].brand"`
+	local b=`echo $list | jq -r ".[$i].b"`
 	#echo "Card $i, core addr ${core_addr[$i]}"
-	if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then #GPU is AMD
-		local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
+	if [ $brand == 'A' ]; then #GPU is AMD
+		#local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
+		local fan_addr[$i]=`echo $list | jq -r ".[$i].fanAddr"`
 		local kernel_addr[$i]=$(echo ${core_addr[$i]} | sed 's/.*card\([0-9]*\).*/\/sys\/kernel\/debug\/dri\/\1\/amdgpu_pm_info/')
 		local pp_dpm_sclk=`cat ${core_addr[$i]}/pp_dpm_sclk | grep \*`
 		local pp_dpm_mclk=`cat ${core_addr[$i]}/pp_dpm_mclk | grep \*`
@@ -847,18 +848,15 @@ for (( i=0; i < ${#core_addr[@]}; i++ )); do
 		local Temp[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
 		local Temp[$i]=`expr ${Temp[$i]} / 1000` #temp format is like 65000
 		local Power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
-
 		local CoreClock[$i]=`echo $pp_dpm_sclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
 		local CoreState[$i]=`echo $pp_dpm_sclk | sed  "s/\([0-9]*\):.*/\1/"`
 		local MemClock[$i]=`echo $pp_dpm_mclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
 		local MemState[$i]=`echo $pp_dpm_mclk| sed  "s/\([0-9]*\):.*/\1/"`
 		
 		[[ -f "${core_addr[$i]}/gpu_busy_percent" ]] && local Utilisation[$i]=`cat "${core_addr[$i]}/gpu_busy_percent"`
-	elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
-		#BAD nvidia-smi call:
-		#NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
+	elif [ $brand == 'N' ]; then #GPU is NVIDIA
 		if [[ ! -z $nvidia_smi && $nvidia_smi != *"NVIDIA-SMI"* ]]; then
-			local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
+			local nvidiainfo=`echo "$nvidia_smi" | grep -i "$b:00.0"`
 			local power_raw[$i]=`awk -F ', ' '{print $5}' <<< $nvidiainfo`
 
 		    local Temp[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
@@ -877,9 +875,9 @@ Ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/a
 ##################################################################
 for option in Temp Fan Power CoreClock CoreState MemClock MemState Utilisation Ip; do
 	local json='{}'
-	for ((i=0; i < ${#gpu_busid_sys[@]}; i++)); do
+	for ((i=0; i < $gpuCount; i++)); do
 		eval "value=\"\${$option[\$i]}\""
-		[[ ! $value ]] && continue
+		[[ ! $value && $option == 'Ip' ]] && continue
 		local json=$(jq -n --arg data "$json" \
 			--arg key "$i" \
 			--arg value "$value" \

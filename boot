@@ -72,6 +72,8 @@ else
 	echo "It seems this is not flash drive"
 fi
 
+netsetup -f
+
 #SERVICE_MODE for future updates
 if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -ne 1 ]]; then
 	echo -e "${GREEN}> Including AMD drivers${WHITE}"
@@ -94,8 +96,8 @@ fi
 if [[ ! -f /dog/log/firstrun.log ]]; then
 	tech_info > /dog/log/firstrun.log
 fi
-netsetup -f
 
+#gpu-detect listJS > /run/dog/gpuStats #next hello will use it
 /dog/sbin/wd-opendev initial
 /dog/sbin/wd-qinheng initial
 /dog/sbin/rodos --initial

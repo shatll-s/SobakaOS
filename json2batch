@@ -222,7 +222,7 @@ function make_batch () {
 			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport $API_port" || API_port=`echo $addition | sed "s/.*-cdmport [-]*\([0-9]*\).*/\1/"`
 			[[ $addition != *"-hstats"* ]] && minerexec+=" -hstats 0"
 		
-			minerexec+=" -log 1 -logfile /dog/log/phoenix.log"
+			minerexec+=" -log 1 -logfile /dog/log/phoenix.log -logsmaxsize 5"
 		;;
 		ewbf)
 			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')

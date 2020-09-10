@@ -1,6 +1,5 @@
 #!/bin/bash
 
-#returns number of opened screens with argument name
 function screen_check () {
 	[[ $(screen -ls | grep -c "$1")  > 0 ]]&& echo $(screen -ls | grep -c "$1") || echo "0"
 }

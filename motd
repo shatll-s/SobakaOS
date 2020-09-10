@@ -27,7 +27,6 @@ echo -en ${WHITE}
 df -h /
 uptime | sed 's/^\s//'
 $LINE
-
 gpu-detect list
 $LINE
 echo "Some commands:"
@@ -44,7 +43,7 @@ echo -e ${CYAN}"logs-on"${WHITE}"\t\tput logs on disk (don\`t forget to reboot)"
 echo -e ${CYAN}"sreboot"${WHITE}"\t\treboot system"
 
 echo -e ""
-echo -e ${RED}"amd-info"${WHITE}"\tshow AMD core, memory & voltage states"
-echo -e ${GREEN}"nvidia-smi"${WHITE}"\tshow some info about installed NVIDIA GPU"
+echo -e ${LIGHTRED}"amd-info"${WHITE}"\tshow AMD core, memory & voltage states"
+echo -e ${LIGHTGREEN}"nvidia-smi"${WHITE}"\tshow some info about installed NVIDIA GPU"
 echo -e ""
 echo -e ${CYAN}"upgrade --help"${WHITE}"\tshow how to use upgrade/downgrade"
