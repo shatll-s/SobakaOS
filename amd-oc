@@ -123,7 +123,6 @@ for (( i=0; i < $n; i++ )); do
 	#wolfamdctrl -i 0 --mem-state 2 --mem-clock 2000 --core-state 4 --core-clock 1100 --volt-state 4 --vddc-table-set 900
 	#wolfamdctrl -i /sys/class/drm/card5/device --core-state 3 --core-clock 1100 also works
 	
-	
 	if [[ -f $coreAddr/pp_od_clk_voltage ]]; then #grub error is fixed, amdgpu.ppfeaturemask=0xffff7fff used
 		if [[ -f $coreAddr/pp_table ]]; then
 			if [[ -f /tmp/pp_tables/card$card/pp_table ]]; then
@@ -190,6 +189,7 @@ for (( i=0; i < $n; i++ )); do
 		if [[ -z ${MEMORY_STATE[$i]} || ${MEMORY_STATE[$i]} == "A" ]]; then
 			MEMORY_STATE[$i]=`$script -i $card --show-mem | grep -E "Memory state ([0-9]+):" | tail -n 1 | sed "s/Memory state \([0-9]*\).*/\1/"`
 		fi
+
 		if [[ ! -z ${MEMORY_CLOCK[$i]} ]]; then
 			str="$str --mem-state ${MEMORY_STATE[$i]} --mem-clock ${MEMORY_CLOCK[$i]}"
 		fi
@@ -201,9 +201,9 @@ for (( i=0; i < $n; i++ )); do
 		if [[ $ALT -ne 1 ]]; then 
 			if [[ ! -z ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_STATE[$i]} && ! -z ${MEMORY_CLOCK[$i]} ]]; then
 				mem_str="m ${MEMORY_STATE[$i]} ${MEMORY_CLOCK[$i]} ${MEMORY_VOLTAGE[$i]}"
-				echo "$mem_str >$coreAddr/pp_od_clk_voltage"
+				echo "$mem_str > $coreAddr/pp_od_clk_voltage"
 				echo "$mem_str" >$coreAddr/pp_od_clk_voltage
-				echo "c" >$coreAddr/pp_od_clk_voltage
+				echo "c" > $coreAddr/pp_od_clk_voltage
 			fi
 		fi
 
@@ -219,35 +219,35 @@ for (( i=0; i < $n; i++ )); do
 			#echo "manual" >$coreAddr/power_dpm_force_performance_level
 			#echo 4 >$coreAddr/pp_power_profile_mode
 
-			echo "echo auto >$coreAddr/power_dpm_force_performance_level"
-			echo "auto" >$coreAddr/power_dpm_force_performance_level	
+			echo "echo auto > $coreAddr/power_dpm_force_performance_level"
+			echo "auto" > $coreAddr/power_dpm_force_performance_level	
 		else
 			if [[ $ENHANCED -eq 1 && $name != *"Vega"* ]]; then
 				echo auto > $coreAddr/power_dpm_force_performance_level
 				echo -e "${CYAN}Auto${WHITE} Core State selection (because of Enhanced OC)"
 			elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
-				echo auto >$coreAddr/power_dpm_force_performance_level
+				echo auto > $coreAddr/power_dpm_force_performance_level
 				echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
 			else
-				echo manual >$coreAddr/power_dpm_force_performance_level
+				echo manual > $coreAddr/power_dpm_force_performance_level
 				#Core & Memory states selection
 				if [[ $cs_trigger -ne 1 ]]; then #if core state given
 					echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$i]}${WHITE})."
-					echo ${CORE_STATE[$i]} >$coreAddr/pp_dpm_sclk
+					echo ${CORE_STATE[$i]} > $coreAddr/pp_dpm_sclk
 				fi
 
 				if [[ $ms_trigger -ne 1 ]]; then
 					echo -e "${CYAN}Manual${WHITE} Memory State selection (${CYAN}P${MEMORY_STATE[$i]}${WHITE})."
-					echo ${MEMORY_STATE[$i]} >$coreAddr/pp_dpm_mclk
+					echo ${MEMORY_STATE[$i]} > $coreAddr/pp_dpm_mclk
 				fi
 			fi
 		fi
 	else
 		echo "It\`s 5700!"
-		echo "m 1 ${MEMORY_CLOCK[$i]}" >$coreAddr/pp_od_clk_voltage
+		echo "m 1 ${MEMORY_CLOCK[$i]}" > $coreAddr/pp_od_clk_voltage
 
 		if [[ ! -z ${CORE_CLOCK[$i]} ]]; then
-			echo "s 1 ${CORE_CLOCK[$i]}" >$coreAddr/pp_od_clk_voltage
+			echo "s 1 ${CORE_CLOCK[$i]}" > $coreAddr/pp_od_clk_voltage
 
 			if [[ ! -z ${CORE_VOLTAGE[$i]} ]]; then
 				[[ ${CORE_VOLTAGE[$i]} -gt 725 ]] && echo "vc 1 $((${CORE_CLOCK[$i]}-100)) $((${CORE_VOLTAGE[$i]}-25))" > $coreAddr/pp_od_clk_voltage
