@@ -110,9 +110,9 @@ case $1 in
 	;;
 	list)
 		[[ ! -f /run/dog/gpuStats ]] && listJS > /run/dog/gpuStats
+
 		json=`cat /run/dog/gpuStats`
 		count=$(echo $json | jq '.gpu|length')
-		text=
 		for ((i=0; $i < $count; i++)); do
 			name=`echo $json | jq ".gpu[$i].name" --raw-output`
 			bus=`echo $json | jq ".gpu[$i].bus" --raw-output`
@@ -132,11 +132,8 @@ case $1 in
 				color="$YELLOW"
 			fi
 			
-			[[ ! -z $text ]] && text+="\n"
-			text+="${CYAN}$i${WHITE} $bus ${color}${name} ${CYAN}${mem}${WHITE}\t${info}"
+			echo -e "${CYAN}$i${WHITE} $bus ${color}`fix-string \"${name}\" 21`${CYAN}${mem}${WHITE}\t${info}"
 		done
-		
-		echo -e "$text"
 	;;
 	NVIDIA|AMD)
 		[[ -z $2 ]] && lspci | grep -E "VGA|3D controller|Display controller" | grep -c "$1" && exit 0
