@@ -43,7 +43,7 @@ case $1 in
 		MINER_PID=$(screen -ls | grep "wd-opendev" | sed 's/\s\([0-9]*\)..*/\1/')
 		[[ ! -z "$MINER_PID" ]] && echo ">Killing old screens" && kill $MINER_PID
 		echo -e "${GREEN}> Opening screen ${CYAN}wd-opendev${GREEN} with endless ping${WHITE}"
-		screen -dmS "wd-opendev" bash -c "wd-opendev ping"
+		screen -dmS "wd-opendev" bash -c "nice -n +20 wd-opendev ping"
 	;;
 	show)
 		screen -d wd-opendev
