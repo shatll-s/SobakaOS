@@ -88,7 +88,7 @@ case $1 in
 		bus=${2^^}
 		if [[ $bus != 'ALL' ]]; then
 			while read string; do
-					[[ `echo $string | awk '{print $2}'` == $bus ]] && adapter=`echo $string | awk '{print $1}'` && break
+				[[ `echo $string | awk '{print $3}'` == $bus ]] && adapter=`echo $string | awk '{print $1}'` && break
 			done < <(atiflash -i)
 			get_bios $adapter
 		else
@@ -168,7 +168,7 @@ case $1 in
 			if [[ $bus != 'all' ]]; then
 				#adapter=$(atiflash -i | grep $bus | awk '{print $1}' | sed -e 's/$//; s/\n//')
 				while read string; do
-						[[ `echo $string | awk '{print $2}'` == ${bus^^} || `echo $string | awk '{print $2}'` == $bus ]] && adapter=`echo $string | awk '{print $1}'` && break
+						[[ `echo $string | awk '{print $3}'` == ${bus^^} || `echo $string | awk '{print $3}'` == $bus ]] && adapter=`echo $string | awk '{print $1}'` && break
 				done < <(atiflash -i)
 
 				result=$(atiflash -p $adapter -f "/tmp/$file")

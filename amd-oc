@@ -5,12 +5,15 @@ AMDMEMINFO_FILE=/tmp/amdmeminfo
 [[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
 LOCK_FILE="/tmp/.amd-oc.lock"
 [[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+NAVI_VDDCI_MIN=650
+NAVI_VDDCI_MAX=850
+NAVI_MVDD_MIN=1200
+NAVI_MVDD_MAX=1350
 
 listAMD=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "A")]'`
-#echo "$listAMD" | jq '.'
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage memory_tweak_type fan enhanced alt; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage vddci memory_tweak_type fan enhanced alt; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -67,6 +70,7 @@ CORE_VOLTAGE=($CORE_VOLTAGE)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
 MEMORY_VOLTAGE=($MEMORY_VOLTAGE)
+VDDCI=($VDDCI)
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
 
@@ -87,6 +91,7 @@ echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
 echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
 echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
+echo -e ${CYAN}"MemCon Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
 echo -en ${CYAN}"Alt. Memory OC:${WHITE} "
 [[ $ALT -eq 1 ]] && echo "Yes" || echo "No"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
@@ -129,12 +134,13 @@ for (( i=0; i < $n; i++ )); do
 				#echo "Copying Power Play table to restore defaults"
 				#cp /tmp/pp_tables/card$card/pp_table$coreAddr/pp_table
 				#sync
-				echo "Copying Power Play table is temporary DISABLED"
+				#echo "Copying Power Play table is temporary DISABLED"
+				:
 			else
-				echo "Can\`t find saved Power Play table. Try to reboot"
+				echo "Can\`t find saved Power Play table" #. Try to reboot"
 			fi
 		else
-			echo "Can\`t find existing Power Play table. Try to reboot"
+			echo "Can\`t find existing Power Play table" #. Try to reboot"
 		fi
 	else
 		echo "Something is wrong, may be you need to upgrade to work with Power Play tables"
@@ -243,14 +249,39 @@ for (( i=0; i < $n; i++ )); do
 			fi
 		fi
 	else
-		echo "It\`s 5700!"
+		#echo "It\`s 5700!"
+		uppArgs="smc_pptable/FanStopTemp=0 "
+		uppArgs+="smc_pptable/FanStartTemp=0 "
+		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "
+		uppArgs+="smc_pptable/MinVoltageGfx=2800 "
+		if [[ ${VDDCI[$i]} -ge $NAVI_VDDCI_MIN && ${VDDCI[$i]} -le $NAVI_VDDCI_MAX ]]; then
+       		vlt_vddci=$((${VDDCI[$i]} * 4 ))
+			uppArgs+="smcPPTable/MemVddciVoltage/1=${vlt_vddci} "
+			uppArgs+="smcPPTable/MemVddciVoltage/2=${vlt_vddci} "
+			uppArgs+="smcPPTable/MemVddciVoltage/3=${vlt_vddci} "
+   		fi
+	    if [[ ${MEMORY_VOLTAGE[$i]} -ge $NAVI_MVDD_MIN && ${MEMORY_VOLTAGE[$i]} -le $NAVI_MVDD_MAX ]]; then
+			vlt_mvdd=$((${MVDD[$i]} * 4 ))
+			uppArgs+="smcPPTable/MemMvddVoltage/1=${vlt_mvdd} "
+			uppArgs+="smcPPTable/MemMvddVoltage/2=${vlt_mvdd} "
+			uppArgs+="smcPPTable/MemMvddVoltage/3=${vlt_mvdd} "
+    	fi
+		uppArgs+="overdrive_table/max/8=960 "
+		uppArgs+="overdrive_table/min/3=700 "
+		uppArgs+="overdrive_table/min/5=700 "
+		uppArgs+="overdrive_table/min/7=700"
+
+		#echo "upp -p $coreAddr/pp_table set $uppArgs --write"
+		upp -p $coreAddr/pp_table set $uppArgs --write
+
 		echo "m 1 ${MEMORY_CLOCK[$i]}" > $coreAddr/pp_od_clk_voltage
 
 		if [[ ! -z ${CORE_CLOCK[$i]} ]]; then
 			echo "s 1 ${CORE_CLOCK[$i]}" > $coreAddr/pp_od_clk_voltage
 
 			if [[ ! -z ${CORE_VOLTAGE[$i]} ]]; then
-				[[ ${CORE_VOLTAGE[$i]} -gt 725 ]] && echo "vc 1 $((${CORE_CLOCK[$i]}-100)) $((${CORE_VOLTAGE[$i]}-25))" > $coreAddr/pp_od_clk_voltage
+				[[ ${CORE_VOLTAGE[$i]} -gt 725 ]] &&
+					echo "vc 1 $((${CORE_CLOCK[$i]}-100)) $((${CORE_VOLTAGE[$i]}-25))" > $coreAddr/pp_od_clk_voltage
 				echo "vc 2 ${CORE_CLOCK[$i]} ${CORE_VOLTAGE[$i]}" > $coreAddr/pp_od_clk_voltage
 				echo c > $coreAddr/pp_od_clk_voltage
 			fi
