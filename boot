@@ -88,7 +88,7 @@ if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -ne 1 ]]; then
 		cp $ppfile /tmp/pp_tables/card$card/pp_table
 	done
 
-	amdmeminfo -q -s > $AMDMEMINFO_FILE
+	amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 fi
 
 [[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -ne 1 ]] && echo -e "${GREEN}> Including NVIDIA drivers${WHITE}" && modprobe nvidia_drm

@@ -9,6 +9,7 @@ echo "`date -R` Kernel log Watchdog started" >> $LOG
 
 errorMsgAmdWarning=()
 errorMsgAmdWarning+=("last message was failed")
+errorMsgAmdWarning+=("Msg issuing pre-check")
 #errorMsgAmdWarning+=("failed to send message")
 errorMsgAmdWarning+=("VM_L2_PROTECTION_FAULT_STATUS")
 

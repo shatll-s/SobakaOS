@@ -845,8 +845,19 @@ for (( i=0; i < $gpuCount; i++ )); do
 
 		local Fan[$i]=`cat "${fan_addr[$i]}/pwm1"`
 		local Fan[$i]=`echo "scale=0; ${Fan[$i]}*100/255" | bc -l`
-		local Temp[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
-		local Temp[$i]=`expr ${Temp[$i]} / 1000` #temp format is like 65000
+
+		#local Temp[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
+		#local Temp[$i]=`expr ${Temp[$i]} / 1000` #temp format is like 65000
+
+		for (( y=1; y <= 3; y++ )); do
+			if [[ -f "${fan_addr[$i]}/temp${y}_input" ]]; then
+				local tempRaw=`cat "${fan_addr[$i]}/temp${y}_input"`
+				local temp=`echo "scale=0; $tempRaw/1000" | bc -l`
+				[[ $y -eq 1 ]] && local label='' || local label=$y
+				eval "Temp$label[$i]=$temp"
+			fi
+		done
+
 		local Power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
 		local CoreClock[$i]=`echo $pp_dpm_sclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
 		local CoreState[$i]=`echo $pp_dpm_sclk | sed  "s/\([0-9]*\):.*/\1/"`
@@ -869,11 +880,10 @@ for (( i=0; i < $gpuCount; i++ )); do
 		fi
 	fi
 done
-
 Ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
 
 ##################################################################
-for option in Temp Fan Power CoreClock CoreState MemClock MemState Utilisation Ip; do
+for option in Temp Temp2 Temp3 Fan Power CoreClock CoreState MemClock MemState Utilisation Ip; do
 	local json='{}'
 	for ((i=0; i < $gpuCount; i++)); do
 		eval "value=\"\${$option[\$i]}\""
@@ -943,6 +953,10 @@ local request=$(
 	}'
 
 )
+[[ $jsonTemp2 != '{}' ]] && request=`jq ".stats += {\"gpu_temp2\": $jsonTemp2}" <<< "$request"`
+[[ $jsonTemp3 != '{}' ]] && request=`jq ".stats += {\"gpu_temp3\": $jsonTemp3}" <<< "$request"`
+#[[ $plJson != '{}' ]] && request=`jq ".stats += {\"pl\": $plJson}" <<< "$request"`
+#[[ ! -z $jsonTemp3 ]] && request=`jq ".stats += {\"gpu_temp3\": \"$jsonTemp3\"}" <<< "$request"`
 
 if [[ $LOGS != "OFF" ]]; then #in 99% cases LOGS="OFF" only on USB flash drive
 	hddtemp=`hddtemp /dev/sda | awk -F':' '{print $3}' | sed "s/.* \([0-9]*\)°.*/\1/"`

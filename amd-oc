@@ -2,9 +2,13 @@
 . colors
 AMD_CFG="/dog/cfg/amd.cfg"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
-[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s > $AMDMEMINFO_FILE
 LOCK_FILE="/tmp/.amd-oc.lock"
+
+[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 [[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+#cat /run/dog/gpuStats
+#cat $AMDMEMINFO_FILE
+
 NAVI_VDDCI_MIN=650
 NAVI_VDDCI_MAX=850
 NAVI_MVDD_MIN=1200
@@ -13,7 +17,7 @@ NAVI_MVDD_MAX=1350
 listAMD=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "A")]'`
 
 function getdata () {
-	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage vddci memory_tweak_type fan enhanced alt; do
+	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage vddci soc_vdd_max soc_clk_max memory_tweak_type fan enhanced alt; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -62,7 +66,8 @@ else
 		. $AMD_CFG
 	fi
 fi
-
+#SOC_VDD_MAX="800 770 800 770 800 800 770 780 780"
+#SOC_CLK_MAX=950
 #OC arrays
 CORE_CLOCK=($CORE_CLOCK)
 CORE_STATE=($CORE_STATE)
@@ -71,6 +76,8 @@ MEMORY_CLOCK=($MEMORY_CLOCK)
 MEMORY_STATE=($MEMORY_STATE)
 MEMORY_VOLTAGE=($MEMORY_VOLTAGE)
 VDDCI=($VDDCI)
+SOC_VDD_MAX=($SOC_VDD_MAX)
+SOC_CLK_MAX=($SOC_CLK_MAX)
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
 
@@ -81,6 +88,8 @@ for (( i=0; i < $n; ++i )); do
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${MEMORY_STATE[$i]} && ! -z ${MEMORY_STATE[0]} ]]&& MEMORY_STATE[$i]=${MEMORY_STATE[-1]}
 	[[ ! ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_VOLTAGE[0]} ]]&& MEMORY_VOLTAGE[$i]=${MEMORY_VOLTAGE[-1]}
+	[[ ! ${SOC_VDD_MAX[$i]} && ! -z ${SOC_VDD_MAX[0]} ]]&& SOC_VDD_MAX[$i]=${SOC_VDD_MAX[-1]}
+	[[ ! ${SOC_CLK_MAX[$i]} && ! -z ${SOC_CLK_MAX[0]} ]]&& SOC_CLK_MAX[$i]=${SOC_CLK_MAX[-1]}
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
 done
 
@@ -92,6 +101,9 @@ echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
 echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
 echo -e ${CYAN}"MemCon Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
+echo -e ${CYAN}"Max Soc Clock:${WHITE}\t${SOC_CLK_MAX[@]}"
+echo -e ${CYAN}"MaxSoc Voltage:${WHITE}\t${SOC_VDD_MAX[@]}"
+
 echo -en ${CYAN}"Alt. Memory OC:${WHITE} "
 [[ $ALT -eq 1 ]] && echo "Yes" || echo "No"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
@@ -112,6 +124,7 @@ echo -e $BROWN"================================================================"
 
 for (( i=0; i < $n; i++ )); do
 	name=`echo $listAMD | jq -r ".[$i].name"`
+	navi=`echo $listAMD | jq -r ".[$i].navi"`
 	coreAddr=`echo $listAMD | jq -r ".[$i].coreAddr"`
 	
 
@@ -145,9 +158,9 @@ for (( i=0; i < $n; i++ )); do
 	else
 		echo "Something is wrong, may be you need to upgrade to work with Power Play tables"
 	fi
-	[[ $name == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
-
-	if [[ $name != *"5700"* ]]; then
+	
+	if [[ $navi -ne 1 ]]; then
+		[[ $name == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
 		if [[ $ENHANCED -eq 1 && $name != *"Vega"* ]]; then
 			echo -e "${LIGHTRED}Enhanced overclock (for all states)${WHITE}"
 			if [[ ! -z ${CORE_CLOCK[$i]} ]]; then
@@ -248,23 +261,40 @@ for (( i=0; i < $n; i++ )); do
 				fi
 			fi
 		fi
-	else
+	#elif [[ $name == *"5700"* || $name == *"5500"* || $name == *"5600"* ]]; then
+	else #this is NAVI
 		#echo "It\`s 5700!"
+		echo "manual" > $coreAddr/power_dpm_force_performance_level
 		uppArgs="smc_pptable/FanStopTemp=0 "
 		uppArgs+="smc_pptable/FanStartTemp=0 "
 		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "
 		uppArgs+="smc_pptable/MinVoltageGfx=2800 "
+		#uppArgs+="smc_pptable/MinVoltageSoc=2800 "
+		#upp -p /sys/class/drm/card7/device/pp_table dump | grep Soc
+		if [[ ! -z ${SOC_VDD_MAX[$i]} ]]; then
+			if [[ ${SOC_VDD_MAX[$i]} -ge $NAVI_VDDCI_MIN && ${SOC_VDD_MAX[$i]} -le $NAVI_VDDCI_MAX ]]; then
+		   		soc_vdd_max=$((${SOC_VDD_MAX[$i]} * 4 ))
+				uppArgs+="smc_pptable/MaxVoltageSoc=$soc_vdd_max "
+	   		fi
+		fi
+
+		if [[ ! -z ${SOC_CLK_MAX[$i]} ]]; then
+			uppArgs+="smc_pptable/FreqTableSocclk/1=${SOC_CLK_MAX[$i]} "
+			uppArgs+="smc_pptable/FreqTableSocclk/2=${SOC_CLK_MAX[$i]} "
+			uppArgs+="smc_pptable/FreqTableSocclk/3=${SOC_CLK_MAX[$i]} "
+		fi
+
 		if [[ ${VDDCI[$i]} -ge $NAVI_VDDCI_MIN && ${VDDCI[$i]} -le $NAVI_VDDCI_MAX ]]; then
        		vlt_vddci=$((${VDDCI[$i]} * 4 ))
-			uppArgs+="smcPPTable/MemVddciVoltage/1=${vlt_vddci} "
-			uppArgs+="smcPPTable/MemVddciVoltage/2=${vlt_vddci} "
-			uppArgs+="smcPPTable/MemVddciVoltage/3=${vlt_vddci} "
+			uppArgs+="smc_pptable/MemVddciVoltage/1=${vlt_vddci} "
+			uppArgs+="smc_pptable/MemVddciVoltage/2=${vlt_vddci} "
+			uppArgs+="smc_pptable/MemVddciVoltage/3=${vlt_vddci} "
    		fi
 	    if [[ ${MEMORY_VOLTAGE[$i]} -ge $NAVI_MVDD_MIN && ${MEMORY_VOLTAGE[$i]} -le $NAVI_MVDD_MAX ]]; then
 			vlt_mvdd=$((${MVDD[$i]} * 4 ))
-			uppArgs+="smcPPTable/MemMvddVoltage/1=${vlt_mvdd} "
-			uppArgs+="smcPPTable/MemMvddVoltage/2=${vlt_mvdd} "
-			uppArgs+="smcPPTable/MemMvddVoltage/3=${vlt_mvdd} "
+			uppArgs+="smc_pptable/MemMvddVoltage/1=${vlt_mvdd} "
+			uppArgs+="smc_pptable/MemMvddVoltage/2=${vlt_mvdd} "
+			uppArgs+="smc_pptable/MemMvddVoltage/3=${vlt_mvdd} "
     	fi
 		uppArgs+="overdrive_table/max/8=960 "
 		uppArgs+="overdrive_table/min/3=700 "

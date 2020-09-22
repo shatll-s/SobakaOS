@@ -27,6 +27,15 @@ echo -en ${WHITE}
 df -h /
 uptime | sed 's/^\s//'
 $LINE
+
+try=0
+while [[ $try -lt 120 ]]; do
+	[[ -f /run/dog/gpuStats ]] && break
+	echo -n '.'
+	sleep 0.5
+	((try++))	
+done
+
 gpu-detect list
 $LINE
 echo "Some commands:"
