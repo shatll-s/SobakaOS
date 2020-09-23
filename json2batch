@@ -282,9 +282,9 @@ function make_batch () {
 #			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
 #			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
 #		;;
-		cpuminer)
+		cpuminer*)
 			minerexec+=" -o "
-			[[ $template != *://* ]]&& minerexec+="stratum+tcp://"
+			[[ $pool != *://* ]]&& minerexec+="stratum+tcp://"
 			minerexec+="$pool -u $template"
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"

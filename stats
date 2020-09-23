@@ -171,7 +171,7 @@ case $1 in
 		local miner_temp=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 'n;d'`)
 		local miner_fan=(`echo $stats_template | jq -r '.[6]' | sed 's/;/\n/g' | sed 1d | sed 'n;d'`)
 	;;
-	cpuminer)
+	cpuminer*)
 		stats_template=`echo "summary" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`
 		miner_ver=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*VER=\([-a-zA-Z0-9.]*\)\n.*/\1/'`
 		miner_online_raw=`echo -e $stats_template | sed -e 's/;/\n/g; s/.*UPTIME=\([0-9]*\)\n.*/\1/'`
