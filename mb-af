@@ -60,7 +60,7 @@ function testFans () {
 	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
 	for coreAddr in ${coreAddrRaw[@]}; do
 		if [[ ! -z `cat $coreAddr/name` ]]; then
-			[[ "`cat $coreAddr/name`" == *"nct67"* ]] && mbAddr=$coreAddr && break
+			[[ "`cat $coreAddr/name`" == *"nct"* ]] && mbAddr=$coreAddr && break
 		fi
 	done
 
@@ -92,7 +92,7 @@ function start () {
 	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
 	for coreAddr in ${coreAddrRaw[@]}; do
 		if [[ ! -z `cat $coreAddr/name` ]]; then
-			[[ "`cat $coreAddr/name`" == *"nct67"* ]] && mbAddr=$coreAddr && break
+			[[ "`cat $coreAddr/name`" == *"nct"* ]] && mbAddr=$coreAddr && break
 		fi
 	done
 	

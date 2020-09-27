@@ -632,6 +632,12 @@ case $1 in
 		fi
 		#####################          Load WD SECTION END         ####################
 
+		#######################          mb-af SECTION         ######################
+		if [[ `echo $2 | jq '.mb_af'` != '""' && `echo $2 | jq '.mb_af'` != 'null' ]]; then
+			cfg=`echo $2 | jq ".mb_af"`
+			echo "$cfg" > /dog/cfg/mb-af.cfg
+		fi
+		#####################          mb-af SECTION END         ####################		
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \
 			"$(date --rfc-3339=seconds)${LF}Rig settings applied:${LF}$2"
 	;;
