@@ -237,6 +237,12 @@ case $1 in
 		miner_fan=(`echo $stats_template | jq '.devs.DEVS[]."Fan Percent"'`)
 		miner_share=(`echo $stats_template | jq '.devs.DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
+		miner_invshare=(`echo $stats_template | jq '.devs.DEVS[]."Hardware Errors"'`)
+
+		#miner_total_invshare=0
+		#for ((i=0; i < ${#miner_total_invshare[@]}; i++)); do
+		#	miner_total_invshare=$(($miner_total_invshare+${miner_total_invshare[$i]}))
+		#done
 		miner_busid_raw=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//'`)
 		for ((i=0; i < ${#miner_busid_raw[@]}; i++)); do #hex -> dec
 			miner_busid[$i]=`printf "%d" 0x${miner_busid_raw[$i]}`
@@ -898,8 +904,8 @@ done
 
 ##################################################################
 if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
-	cpuTempIntel=(`sensors -u | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
-	cpuTempAMD=(`sensors -u | grep "k10temp-pci" -A3 | grep "_input" | sed "s/.*_input: //"`)
+	cpuTempIntel=(`sensors -u *-isa-* | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	cpuTempAMD=(`sensors -u k10temp-pci-* | grep "k10temp-pci" -A3 | grep "_input" | sed "s/.*_input: //"`)
 	cpu_temp=(`echo ${cpuTempIntel[@]} ${cpuTempAMD[@]}`)
 	if [[ ! -z $cpu_temp ]]; then
 		local maxCpuTemp
