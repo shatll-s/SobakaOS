@@ -291,7 +291,7 @@ for (( i=0; i < $n; i++ )); do
 			uppArgs+="smc_pptable/MemVddciVoltage/3=${vlt_vddci} "
    		fi
 	    if [[ ${MEMORY_VOLTAGE[$i]} -ge $NAVI_MVDD_MIN && ${MEMORY_VOLTAGE[$i]} -le $NAVI_MVDD_MAX ]]; then
-			vlt_mvdd=$((${MVDD[$i]} * 4 ))
+			vlt_mvdd=$((${MEMORY_VOLTAGE[$i]} * 4 ))
 			uppArgs+="smc_pptable/MemMvddVoltage/1=${vlt_mvdd} "
 			uppArgs+="smc_pptable/MemMvddVoltage/2=${vlt_mvdd} "
 			uppArgs+="smc_pptable/MemMvddVoltage/3=${vlt_mvdd} "
