@@ -224,6 +224,6 @@ case $1 in
 		echo -e "  get_bios, bios_ver gpu_id\tGet bios version "
 		echo -e "  save, save_bios gpu_id file\tSave Nvidia GPU bios"
 		echo -e "  update, driver_install\tUpdate Nvidia driver to latest or argument version"
-		echo -e "  \t\t\t\te .g. driver-update nvidia http://ru.download.nvidia.com/XFree86/Linux-x86_64/418.56/NVIDIA-Linux-x86_64-418.56.run"
+		echo -e "  \t\t\t\te .g. nvidia-tool update http://ru.download.nvidia.com/XFree86/Linux-x86_64/418.56/NVIDIA-Linux-x86_64-418.56.run"
 	;;
 esac

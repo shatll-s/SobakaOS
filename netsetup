@@ -245,6 +245,16 @@ function setup()
 case $1 in
 	-f)
 		setup
+		echo -n "> Waiting for network ..."
+		for((i=1; i<50; i++)); do
+			echo -n '.'
+			networkctl list | grep -q routable && break
+			networkctl list | grep -q configuring || break
+			
+			sleep 0.2
+		done
+		echo ""
+		#networkctl list | grep -q routable && echo -e " ${GREEN}OK${WHITE}" || echo -e " ${RED}ERROR${WHITE}"
 	;;
 	-manual|-m)
 		manual_setup

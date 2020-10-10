@@ -2,6 +2,7 @@
 Description=OSdog mining daemon
 #After=display-manager.service
 #Requires=display-manager.service
+Wants=boot.service
 After=boot.service
 #networking.service is not working in 18.04
 

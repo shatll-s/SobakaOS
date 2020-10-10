@@ -540,15 +540,22 @@ case $1 in
 	;;
 	settings)
 		echo $2 > /tmp/settings #just for development
-		[[ `echo $2 | jq ".notify_on_boot"` != null ]]	&& NOTIFY=`echo $2 | jq ".notify_on_boot"` || NOTIFY=0
-		[[ `echo $2 | jq ".use_graphic"` != null ]]	&& USE_GRAPHIC=`echo $2 | jq ".use_graphic"` || USE_GRAPHIC=1
-		[[ `echo $2 | jq ".wd_kern"` != null ]]	&& WD_KERN=`echo $2 | jq -r ".wd_kern"` || WD_KERN=0
+		for option in service_mode use_graphic notify_on_boot wd_kern; do
+		if [[ `echo $2 | jq ".$option"` != null ]]; then
+			option_value="`echo $2 | jq -r \".$option\"`" #double slash, because eval open it
+			eval "${option^^}=$option_value"
+
+			if [[ ! -z `grep "${option^^}=" $RIG_CFG` ]]; then
+				sed -i "s/.*${option^^}=.*/${option^^}=$option_value/g" $RIG_CFG
+			else
+				echo "${option^^}=$option_value" >> $RIG_CFG
+			fi
+		fi
+		done
+		
 		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
 		[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
 
-		[[ ! -z $(grep "NOTIFY_ON_BOOT=" $RIG_CFG) ]]&& sed -i "s/.*NOTIFY_ON_BOOT=.*/NOTIFY_ON_BOOT=$NOTIFY/g" $RIG_CFG || echo "NOTIFY_ON_BOOT=$NOTIFY" >> $RIG_CFG
-		[[ ! -z $(grep "USE_GRAPHIC=" $RIG_CFG) ]]&& sed -i "s/.*USE_GRAPHIC=.*/USE_GRAPHIC=$USE_GRAPHIC/g" $RIG_CFG || echo "USE_GRAPHIC=$USE_GRAPHIC" >> $RIG_CFG
-		[[ ! -z $(grep "WD_KERN=" $RIG_CFG) ]]&& sed -i "s/.*WD_KERN=.*/WD_KERN=$WD_KERN/g" $RIG_CFG || echo "WD_KERN=$WD_KERN" >> $RIG_CFG
 		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
 
 		if [[ $WD_KERN -eq 1 && `systemctl is-active wd-kern` == 'inactive' ]]; then
@@ -556,6 +563,7 @@ case $1 in
 		elif [[ $WD_KERN -eq 0 && `systemctl is-active wd-kern` == 'active' ]]; then
 			systemctl stop wd-kern
 		fi
+
 		########################      Hashrate WD SECTION      ########################
 		if [[ `echo $2 | jq '.wd'` != '""' && `echo $2 | jq '.wd'` != 'null' ]]; then
 			[[ `cat $RIG_CFG | grep -c "Hashrate WD SECTION"` -gt 0 ]] && sed -i "/.*Hashrate WD SECTION.*/d" $RIG_CFG

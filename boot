@@ -6,7 +6,7 @@ RIG_CFG="/dog/cfg/rig.cfg"
 FLASH_CFG="/dog-flash/rig.cfg"
 NVIDIASMI_FILE=/tmp/nvidiagpudetect
 AMDMEMINFO_FILE=/tmp/amdmeminfo
-exec &>>$LOG
+[ ! -t 1 ] && exec &>> $LOG
 
 cp /dog/service/environment /etc/environment
 . /etc/environment
@@ -73,9 +73,11 @@ else
 fi
 
 netsetup -f
-
-#SERVICE_MODE for future updates
-if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -ne 1 ]]; then
+hello -b #get boot parametres
+. $RIG_CFG
+echo "Service mode: $SERVICE_MODE"
+[[ $SERVICE_MODE -ge 1 ]] && systemctl disable mining || systemctl enable mining
+if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -le 1 ]]; then
 	echo -e "${GREEN}> Including AMD drivers${WHITE}"
 	modprobe amdgpu
 	sleep 2
@@ -88,10 +90,14 @@ if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -ne 1 ]]; then
 		cp $ppfile /tmp/pp_tables/card$card/pp_table
 	done
 
-	amdmeminfo -q -s -n > $AMDMEMINFO_FILE
+	#amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 fi
+amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 
-[[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -ne 1 ]] && echo -e "${GREEN}> Including NVIDIA drivers${WHITE}" && modprobe nvidia_drm
+if [[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -le 1 ]]; then
+	echo -e "${GREEN}> Including NVIDIA drivers${WHITE}"
+	modprobe nvidia_drm
+fi
 
 if [[ ! -f /dog/log/firstrun.log ]]; then
 	tech_info > /dog/log/firstrun.log
@@ -102,6 +108,7 @@ fi
 /dog/sbin/wd-qinheng initial
 /dog/sbin/rodos --initial
 hello --initial
+sleep 0.5
 . $RIG_CFG
 
 [[ $WD_KERN -eq 1 ]] && echo "> Starting Kernel Log Watchdog" && systemctl start wd-kern
