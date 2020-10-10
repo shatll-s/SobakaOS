@@ -75,8 +75,8 @@ fi
 netsetup -f
 hello -b #get boot parametres
 . $RIG_CFG
-echo "Service mode: $SERVICE_MODE"
-[[ $SERVICE_MODE -ge 1 ]] && systemctl disable mining || systemctl enable mining
+echo "Service mode status: $SERVICE_MODE"
+
 if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -le 1 ]]; then
 	echo -e "${GREEN}> Including AMD drivers${WHITE}"
 	modprobe amdgpu

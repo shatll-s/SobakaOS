@@ -27,7 +27,7 @@ function init () {
 	#ID=`echo $raw_data | sed "s/.*ID: \([0-9]*\).*/\1/"`
 
 	[[ $ID == "Поиск устройств... Найдено RODOS-5/RODOS-6: 0" ]] && ID=""
-	[[ ! -z $ID ]] && echo -e "> Rodos detected, ID ${CYAN}$ID${WHITE}" || echo "> No Rodos thermometer detected"
+	[[ ! -z $ID ]] && echo -e "${GREEN}> Rodos detected, ID ${CYAN}$ID${WHITE}" || echo -e "${RED}> No Rodos thermometer detected${WHITE}"
 
 }
 

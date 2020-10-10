@@ -1,12 +1,15 @@
 #!/bin/bash
 #at first make Nvidia & AMD OC, then every 10 sec checks if the miners are closed, return them to live. Logic: second miner closes if it has same name with first
+RIG_CFG="/dog/cfg/rig.cfg"
 LOG="/dog/log/mining.log"
 exec &>>$LOG
 BATCH_CFG="/dog/cfg/batch.cfg"
 MINERLOG1="/dog/log/miner1.log"
 MINERLOG2="/dog/log/miner2.log"
 SCREEN_CFG="/dog/service/screenrc.miner"
+. $RIG_CFG
 
+[[ $SERVICE_MODE -gt 0 ]] && echo "`date --rfc-3339=seconds)` Service $0 will not be started due to service mode" && exit 0
 echo "================================================================"
 echo $(date --rfc-3339=seconds)" Started new session $0"
 

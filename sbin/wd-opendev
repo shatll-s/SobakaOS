@@ -16,7 +16,7 @@ if [[ `lsusb | grep -E '0483:5740|0483:a26d' | wc -l` -gt 0 ]]; then
 	done
 fi
 
-[[ -z $PORT ]] && echo -e "${RED}> There is no open-dev watchdog in system, exiting${WHITE}" && exit 1
+[[ -z $PORT ]] && echo -e "${BROWN}> There is no open-dev watchdog in system, exiting${WHITE}" && exit 1
 #[[ $PORT == "/dev/sg0" ]] && echo -e "${RED}>Detected wrong port (${PORT}), exiting${WHITE}" && exit 1
 
 function watchdog_query() {

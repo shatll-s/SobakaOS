@@ -18,7 +18,7 @@ if [[ `lsusb | grep -E '1a86:7523|5131:2007|0471:2379' | wc -l` -gt 0 ]]; then
 	done
 fi
 [[ ! $PORT && -e $DEFAULT_PORT ]] && PORT=$DEFAULT_PORT && echo -e echo -e "${GREEN}> Detected QinHeng HL-340 watchdog on standart port ${CYAN}${PORT}${WHITE}"
-[[ -z $PORT ]] && echo -e "${RED}> There is no qinheng watchdog in system, exiting${WHITE}" && exit 1
+[[ -z $PORT ]] && echo -e "${BROWN}> There is no qinheng watchdog in system, exiting${WHITE}" && exit 1
 
 . $RIG_CFG
 if [[ -z $WD_QINHENG ]]; then
