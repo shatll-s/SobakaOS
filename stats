@@ -922,8 +922,13 @@ if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]
 fi
 
 ##################################################################
-[[ ! -z $miner1 ]]&& miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}' 
-[[ ! -z $miner2 ]]&& miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
+if [[ ! $SERVICE_MODE || $SERVICE_MODE -eq 0 ]]; then
+	[[ ! -z $miner1 ]] && miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}' 
+	[[ ! -z $miner2 ]] && miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
+else
+	miner1_stats='{}' 
+	miner2_stats='{}' 
+fi
 
 local request=$(
 	jq -n \

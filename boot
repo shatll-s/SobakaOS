@@ -75,34 +75,37 @@ fi
 netsetup -f
 hello -b #get boot parametres
 . $RIG_CFG
-[[ -z $SERVICE_MODE ]] && SERVICE_MODE=0
+#[[ -z $SERVICE_MODE ]] && SERVICE_MODE=0
 echo "Service mode status: $SERVICE_MODE"
 
-if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -eq 0 ]]; then
-	echo -e "${GREEN}> Including AMD drivers${WHITE}"
-	modprobe amdgpu
-	sleep 2
-	echo "Saving Power Play tables:"
-	for ppfile in /sys/class/drm/card*/device/pp_table ; do
-		echo -e "\tSaving $ppfile"
-		card=$(echo $ppfile | sed 's/.*card\([0-9a-z]*\).*/\1/')
-		[[ -z $card ]] && echo "$0: Error matching card number in $ppfile" && continue
-		mkdir -p /tmp/pp_tables/card$card
-		cp $ppfile /tmp/pp_tables/card$card/pp_table
-	done
+if [[ -z $SERVICE_MODE || $SERVICE_MODE -eq 0 ]]; then
+	if [[ `gpu-detect AMD` -gt 0 ]]; then
+		echo -e "${GREEN}> Including AMD drivers${WHITE}"
+		modprobe amdgpu
+		sleep 2
+		echo "Saving Power Play tables:"
+		for ppfile in /sys/class/drm/card*/device/pp_table ; do
+			echo -e "\tSaving $ppfile"
+			card=$(echo $ppfile | sed 's/.*card\([0-9a-z]*\).*/\1/')
+			[[ -z $card ]] && echo "$0: Error matching card number in $ppfile" && continue
+			mkdir -p /tmp/pp_tables/card$card
+			cp $ppfile /tmp/pp_tables/card$card/pp_table
+		done
+		#amdmeminfo -q -s -n > $AMDMEMINFO_FILE
+	fi
+	
 
-	#amdmeminfo -q -s -n > $AMDMEMINFO_FILE
-fi
-amdmeminfo -q -s -n > $AMDMEMINFO_FILE
+	if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+		echo -e "${GREEN}> Including NVIDIA drivers${WHITE}"
+		modprobe nvidia_drm
+	fi
 
-if [[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -eq 0 ]]; then
-	echo -e "${GREEN}> Including NVIDIA drivers${WHITE}"
-	modprobe nvidia_drm
+	if [[ ! -f /dog/log/firstrun.log ]]; then
+		tech_info > /dog/log/firstrun.log
+	fi
 fi
 
-if [[ ! -f /dog/log/firstrun.log ]]; then
-	tech_info > /dog/log/firstrun.log
-fi
+[[ `gpu-detect AMD` -gt 0 ]] && amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 
 #gpu-detect listJS > /run/dog/gpuStats #next hello will use it
 /dog/sbin/wd-opendev initial
