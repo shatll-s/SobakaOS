@@ -78,7 +78,7 @@ hello -b #get boot parametres
 #[[ -z $SERVICE_MODE ]] && SERVICE_MODE=0
 echo "Service mode status: $SERVICE_MODE"
 
-if [[ -z $SERVICE_MODE || $SERVICE_MODE -eq 0 ]]; then
+if [[ -z $SERVICE_MODE || $SERVICE_MODE -le 1 ]]; then
 	if [[ `gpu-detect AMD` -gt 0 ]]; then
 		echo -e "${GREEN}> Including AMD drivers${WHITE}"
 		modprobe amdgpu
