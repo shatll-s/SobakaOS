@@ -75,9 +75,10 @@ fi
 netsetup -f
 hello -b #get boot parametres
 . $RIG_CFG
+[[ -z $SERVICE_MODE ]] && SERVICE_MODE=0
 echo "Service mode status: $SERVICE_MODE"
 
-if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -le 1 ]]; then
+if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -eq 0 ]]; then
 	echo -e "${GREEN}> Including AMD drivers${WHITE}"
 	modprobe amdgpu
 	sleep 2
@@ -94,7 +95,7 @@ if [[ `gpu-detect AMD` -gt 0 && $SERVICE_MODE -le 1 ]]; then
 fi
 amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 
-if [[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -le 1 ]]; then
+if [[ `gpu-detect NVIDIA` -gt 0 && $SERVICE_MODE -eq 0 ]]; then
 	echo -e "${GREEN}> Including NVIDIA drivers${WHITE}"
 	modprobe nvidia_drm
 fi

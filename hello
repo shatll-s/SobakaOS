@@ -224,14 +224,14 @@ function firststats {
 				command_argument=$(echo $response | jq ".remotessh" --raw-output)
 				dog-command remotessh "$command_argument"
 				
-				. $RIG_CFG
-				if [[ $SERVICE_MODE -gt 0 ]]; then
-					$manifest1=''
-					$manifest2=''
-				else
-					$manifest1=`echo $response | jq ".batch1" --raw-output`
-					$manifest2=`echo $response | jq ".batch2" --raw-output`
-				fi
+				#. $RIG_CFG
+				#if [[ $SERVICE_MODE -gt 0 ]]; then
+				#	manifest1=''
+				#	manifest2=''
+				#else
+					manifest1=`echo $response | jq ".batch1" --raw-output`
+					manifest2=`echo $response | jq ".batch2" --raw-output`
+				#fi
 				if [[ ! -z $INITIAL ]]; then
 					echo -e "${GREEN}> This is initial run, applying batches ${WHITE}"
 					netmanager start
