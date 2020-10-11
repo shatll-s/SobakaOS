@@ -1,0 +1,172 @@
+#!/bin/bash
+. colors
+AMD_STOP_TRIGGER="/run/dog/nvidia_stop_trigger"
+RO_TRIGGER="/run/dog/ro_trigger"
+ASW_TRIGGER="/run/dog/asw_trigger"
+RIG_CFG="/dog/cfg/rig.cfg"
+tmpDir="/tmp/amdDriver"
+
+function showHelp () {
+	bname=`basename $0`
+	echo -e "Usage: ${CYAN}$bname [arg1 arg2 ...] update [url]${WHITE}"
+	echo -e "  update\tUpdate AMD driver to latest or argument version"
+	echo ""
+	echo -e "Common options:"
+	echo -e "${GREEN}  -y|--yes                ${WHITE}Do not ask for confirmation, answer yes to all questions"
+	echo -e "${GREEN}  -s|--stable             ${WHITE}Select stable driver"
+	echo -e "${GREEN}  -l|--latest             ${WHITE}Select latest driver"
+	echo -e "${GREEN}  -h|--help               ${WHITE}Show this message"
+	echo ""
+	echo -e "\nExamples:"
+	echo -e "${GREEN}  amd-tool -y --latest update${WHITE}"
+	echo -e "${GREEN}  amd-tool -y -l -s update${WHITE}"
+}
+
+function driver_install () {
+	url=$1
+	
+	df=`df | grep "/$" | awk '{print $4}'`
+	[[ $df -lt 500000 ]] && echo -e "${RED}You don\`t have enough disk space. Try to delete something or disk-expand. Exiting...${WHITE}" && exit 1
+
+	current_driver=`dpkg -l | grep amdgpu-core | awk '{print $3}'`
+	echo -e "Current driver:\t${GREEN}$current_driver${WHITE}"
+
+	if [[ -z $url ]]; then
+		echo -e "> Getting driver versions"
+		local versions_url="https://os.dog/downloads/drivers/versions.php"
+		local versions=`curl -sLk $versions_url | jq '.amd'`
+		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+		
+		for (( i=0; i < `echo $versions | jq '. | length'`; i++ )); do
+			local driverData=`echo $versions | jq ".[$i]"`
+			local name=`echo $driverData | jq -r ".name"`
+			local stable=`echo $driverData | jq -r ".stable"`
+			local latest=`echo $driverData | jq -r ".latest"`
+			
+			local string="${BROWN}$i${WHITE}\t${LIGHTRED}$name${WHITE}\t"
+			[[ $stable == true ]] && string+="${GREEN}stable${WHITE} " || string+="       "
+			[[ $latest == true ]] && string+="${CYAN}latest${WHITE} " || string+="       "
+			echo -e "$string"
+		done
+		
+		echo -e "Select version to install:"
+		read i
+
+		numberFormat='^[0-9]+$'
+		if ! [[ $i =~ $numberFormat ]] ; then
+			echo -e "${RED}Error: you need to enter number here${WHITE}"
+			exit 1
+		fi
+		
+		local newDriver=`echo $versions | jq ".[$i]"`
+		local name=`echo $newDriver | jq -r ".name"`
+		local url=`echo $newDriver | jq -r ".url"`
+	else
+		if ! [[ "$url" == *http* ||  "$url" == *ftp* || "$url" == */* || "$url" == *\.tar* ]]; then
+			#echo "This is not link!"
+			echo -e "> Getting driver versions"
+			versions_url="https://os.dog/downloads/drivers/versions.php"
+			versions=`curl -sLk $versions_url | jq '.amd'`
+			[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+			
+			local newDriversArr=`echo $versions | jq "[.[] | select(.name | contains(\"$url\"))]"`
+			[[ $newDriversArr == "[]" ]] && echo -e "${RED}Can\`t find compatible driver version for option ${CYAN}$url${WHITE}" && exit 1
+			local newDriver=`echo $newDriversArr | jq .[-1]`
+			local name=`echo $newDriver | jq -r ".name"`
+			local url=`echo $newDriver | jq -r ".url"`
+		else
+			name=`basename $url`
+		fi
+	fi
+
+	
+	echo -e "New driver:\t${GREEN}${name}${WHITE}"
+	if [[ $yes -ne 1 ]]; then
+		echo -e "Are you really want to update driver? y/n"
+		read answer
+		if [[ $answer != 'y' &&  $answer != 'yes' && $answer != 'Y' && $answer && 'Yes' ]]; then
+			echo -e "${RED}OK, bye!${WHITE}"
+			exit 1
+		fi
+	fi
+
+	#cd "/dog/downloads"
+	
+	local driver_name=`basename $url`
+
+	if [[ -e /dog/downloads/$driver_name && `stat -c %s /dog/downloads/$driver_name` -lt 100000000 ]]; then
+		echo -e "${RED}> Driver $driver_name is already downloaded, but size is to low. May be this is not driver file?${WHITE}"
+		exit 1
+	elif [[ -e /dog/downloads/$driver_name ]]; then
+		echo -e "${CYAN}> Driver $driver_name is already downloaded${WHITE}"
+	else
+		if [[ "$url" == *http* ||  "$url" == *ftp* ]]; then
+			rm -f "/tmp/$driver_name"
+			
+			[ -t 1 ] && wget -c $url -O "/tmp/$driver_name" || wget -q -c $url -O "/tmp/$driver_name"
+			[[ $? -ne 0 ]] && echo -e "${RED}> Download failed. Check url${WHITE}" && exit 1
+
+			mv "/tmp/$driver_name" "/dog/downloads/$driver_name"
+			[[ $? -ne 0 ]] && echo -e "${RED}> File move failed. Check file${WHITE}" && exit 1
+		else
+			[[ ! -f $url ]] && echo -e "${RED}> File not found. Check path${WHITE}" && exit 1
+			cp -v "$url" /dog/downloads/$driver_name
+			[[ $? -ne 0 ]] && echo -e "${RED}> Copy image failed${WHITE}" && exit 1
+		fi
+	fi
+
+	echo -e "${CYAN}> Uncompressing${WHITE}"
+	rm -r -f $tmpDir
+	#ls -l /tmp
+	mkdir -p $tmpDir
+	#ls -l /tmp
+	tar -xf /dog/downloads/$driver_name -C $tmpDir
+	[[ $? -ne 0 ]] && echo -e "${RED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
+
+	echo -e "${CYAN}> Remove old driver${WHITE}" 
+	[[ -f /usr/bin/amdgpu-uninstall ]] && yes | /usr/bin/amdgpu-uninstall
+	[[ -f /usr/bin/amdgpu-pro-uninstall ]] && yes | /usr/bin/amdgpu-pro-uninstall
+
+	echo -e "${CYAN}> Installing${WHITE}"
+	yes | $tmpDir/*/amdgpu-install --opencl=legacy,pal --headless --no-dkms
+	[[ $? -ne 0 ]] && echo -e "${RED}> Error while installing new driver${WHITE}" &&  rm -r -f $tmpDir && exit 1
+	
+	rm -r -f $tmpDir &&
+	hello
+	exit 0
+}
+
+while [ -n "$1" ]; do
+	option=$1
+	
+	if [[ $option == '--help' || $option == '-h' ]]; then
+		showHelp
+		exit 0
+	elif [[ $option == '--yes' || $option == '-y' ]]; then
+		yes=1
+	elif [[ $option == '--latest' || $option == '-l' ]]; then
+		latest=1
+	elif [[ $option == '--stable' || $option == '-s' ]]; then
+		stable=1
+
+	elif [[ $option == 'update' || $option == 'driver-install' ]]; then
+		command='install'
+		shift
+		[[ ! -z $1 ]] && url=$1
+	else
+		echo "Uncorrect argument $option"
+	fi
+
+	shift
+done
+
+case $command in
+	install)
+		driver_install $url
+	;;
+	*)
+		echo -e "${RED}No command specified${WHITE}"
+		showHelp
+		exit 1
+	;;
+esac

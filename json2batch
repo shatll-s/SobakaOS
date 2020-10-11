@@ -485,7 +485,7 @@ function make_batch () {
 		;;
 		wildrig_multi)
 			#./wildrig-multi --algo algo --opencl-threads auto --opencl-launch auto --url pool:port --user wallet --pass password
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $algo && $fork != "0.10.5" ]]&& minerexec+=" -a $algo" #0.10.5 - old wildrig
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
