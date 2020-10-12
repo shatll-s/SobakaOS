@@ -552,11 +552,17 @@ case $1 in
 			fi
 		fi
 		done
-		
-		[[ `echo $2 | jq ".rigonlineru.enabled"` != null ]]	&& THIRDPARTY_RIGONLINE=`echo $2 | jq ".rigonlineru.enabled"` || THIRDPARTY_RIGONLINE=0
-		[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
+		########################      RigOnline.ru SECTION      ########################
+		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg
+		if [[ `echo $2 | jq ".rigonlineru"` != null ]]; then
+			RIGONLINE_CFG="/dog/cfg/rigonlineru.cfg"
+			[[ `echo $2 | jq -r ".rigonlineru.enabled"` == 1 ]] && THIRDPARTY_RIGONLINE=1 || THIRDPARTY_RIGONLINE=0
 
-		[[ ! -z $(grep "THIRDPARTY_RIGONLINE=" $RIG_CFG) ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
+			[[ `screen-check 3dparty_rigonline` -ne 0 ]] && screen-kill 3dparty_rigonline
+
+			[[ ! -z `grep "THIRDPARTY_RIGONLINE=" $RIG_CFG` ]]&& sed -i "s/.*THIRDPARTY_RIGONLINE=.*/THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE/g" $RIG_CFG || echo "THIRDPARTY_RIGONLINE=$THIRDPARTY_RIGONLINE" >> $RIG_CFG
+		fi
+		######################      RigOnline.ru SECTION END      ######################
 
 		if [[ $WD_KERN -eq 1 && `systemctl is-active wd-kern` == 'inactive' ]]; then
 			systemctl restart wd-kern

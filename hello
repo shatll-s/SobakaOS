@@ -185,6 +185,7 @@ function firststats {
 			"${HOST}?id=${RIG_ID}&method=hello2" -H "Content-Type: application/json; charset=utf-8\r\n")
 		#echo $response
 		if [[ $? -eq 0 ]]; then
+			[[ $VERBOSE -eq 1 ]] && echo $response | jq '.' 
 			#echo $response | jq '.'
 			answer=$(echo $response | jq -r '.hello_answer')
 			#answer=$(echo $response) #just for debug
