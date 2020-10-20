@@ -69,7 +69,7 @@ case $1 in
 			miner_algo="ethash"
 		fi
 		local miner_hr=(`echo $stats_template | jq -r '.[3]' | sed 's/;/\n/g'`)
-		miner_share=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
+		local miner_share=(`echo $stats_template | jq -r '.[9]' | sed 's/;/\n/g'`)
 		miner_badshare=(`echo $stats_template | jq -r '.[10]' | sed 's/;/\n/g'`)
 		miner_invshare=(`echo $stats_template | jq -r '.[11]' | sed 's/;/\n/g'`)
 		miner_busid=(`echo $stats_template | jq -r '.[15]' | sed 's/;/\n/g'`)
@@ -326,27 +326,32 @@ case $1 in
 	lolminer)
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/summary`
 		
-		miner_ver=`echo $stats_template | jq -r '.Software'`
-		miner_online=`echo $stats_template | jq -r '.Session.Startup'`
-		miner_algo=`echo $stats_template | jq -r '.Mining.Algorithm' | sed 's/ -.*//'`
+		local miner_ver=`echo $stats_template | jq -r '.Software'`
+		local miner_online=`echo $stats_template | jq -r '.Session.Startup'`
+		local miner_algo=`echo $stats_template | jq -r '.Mining.Algorithm' | sed 's/ -.*//'`
 		
-		miner_total_hr=`echo $stats_template | jq -r '.Session.Performance_Summary'`
-		miner_total_share=`echo $stats_template | jq -r '.Session.Accepted'`
-		miner_total_badshare=$(echo "`echo $stats_template | jq -r '.Session.Submitted'` - $miner_total_share" | bc -l)
-		miner_busid=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
+		local miner_total_hr=`echo $stats_template | jq -r '.Session.Performance_Summary'`
+		local miner_total_share=`echo $stats_template | jq -r '.Session.Accepted'`
+		local miner_total_badshare=$(echo "`echo $stats_template | jq -r '.Session.Submitted'` - $miner_total_share" | bc -l)
+		
 
-		miner_hr=(`echo $stats_template | jq -r '.GPUs[].Performance'`)
-		miner_share=(`echo $stats_template | jq -r '.GPUs[].Session_Accepted'`)
-		miner_submitted=(`echo $stats_template | jq -r '.GPUs[].Session_Submitted'`)
-		for ((i=0; i < ${#miner_share[@]}; i++)); do
-			miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
-		done
+		local miner_hr=(`echo $stats_template | jq -r '.GPUs[].Performance'`)
+		local miner_share=(`echo $stats_template | jq -r '.GPUs[].Session_Accepted'`)
+		local miner_badshare=(`echo $stats_template | jq -r '.GPUs[].Session_HWErr'`)
+		local miner_submitted=(`echo $stats_template | jq -r '.GPUs[].Session_Submitted'`)
+
+		local miner_fan=(`echo $stats_template | jq -r '.GPUs[]."Fan Speed (%)"'`)
+		local miner_temp=(`echo $stats_template | jq -r '.GPUs[]."Temps (deg C)"'`)
+		local miner_busid=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
+		#for ((i=0; i < ${#miner_share[@]}; i++)); do
+		#	miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
+		#done
 		
 		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
-			miner_total_hr=`echo "scale=0; $miner_total_hr * 1000" | bc -l`
+			miner_total_hr=`echo "scale=0; $miner_total_hr * 1000 / 1" | bc -l`
 			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
 				for ((i=0; i < ${#miner_hr[@]}; i++)); do
-					miner_hr[$i]=`echo "scale=0; ${miner_hr[$i]} * 1000" | bc -l`
+					miner_hr[$i]=`echo "scale=0; ${miner_hr[$i]} * 1000 / 1" | bc -l`
 				done
 			fi
 		fi
