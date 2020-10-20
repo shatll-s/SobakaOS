@@ -341,6 +341,15 @@ case $1 in
 		for ((i=0; i < ${#miner_share[@]}; i++)); do
 			miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
 		done
+		
+		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=0; $miner_total_hr * 1000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=0; ${miner_hr[$i]} * 1000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	noncerpro_cuda)
 		miner_algo="nimiq"
@@ -798,14 +807,22 @@ echo $miner_total_hr > /tmp/hr.$1
 
 ##################################################################
 function stats {
-[[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+[[ $VERBOSE -eq 1 ]] && echo "> Stats function start"
+if [[ ! -f /run/dog/gpuStats ]]; then
+	gpu-detect listJS > /run/dog/gpuStats
+elif [[ $VERBOSE -eq 1 ]]; then
+	echo "> File /run/dog/gpuStats exists"
+fi
+
 list=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand != "I")]'` #integrated is not neeeded
 gpuCount=`echo $list | jq '.|length'`
 
+[[ $VERBOSE -eq 1 ]] && echo "> Nvidia count check"
 if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
+	[[ $VERBOSE -eq 1 ]] && echo "> Nvidia stats requesting"
 	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
 	exitcode=$?
-
+	[[ $VERBOSE -eq 1 ]] && echo "> Nvidia stats request success"
 	if [[ $exitcode -eq 0 ]]; then
 		local timer=0
 		while [[ $timer -le 10 ]]; do
@@ -831,7 +848,7 @@ fi
 #
 #IFS=$'\n' gpu_busid_sys=($(sort <<<"${gpu_busid_raw[*]}"))
 #unset IFS
-
+[[ $VERBOSE -eq 1 ]] && echo "> Start GPU stats collecting"
 for (( i=0; i < $gpuCount; i++ )); do
 	local core_addr[$i]=`echo $list | jq -r ".[$i].coreAddr"`
 	if [[ ${core_addr[$i]} == 'null' ]]; then
@@ -1035,12 +1052,13 @@ export "PATH=$PATH:/dog:/dog/bin:/dog/sbin"
 export CUDA_DEVICE_ORDER
 . $RIG_CFG
 . $BATCH_CFG
-up_time=$(uptime -s)
-up=$(date --date "$up_time" +%s)
+up_time=`uptime -s`
+up=`date --date "$up_time" +%s`
 msg_count=0
 
 if [[ -z $1 || $1 == 'show' ]]; then
 	[[ $1 == 'show' ]] && SHOW=1
+	[[ $2 == '-v' ]] && VERBOSE=1
 	while true; do
 		[[ -f $RIG_CFG ]] && . $RIG_CFG || echo "No config file. Can\`t connect to host"  >> $LOG
 		[[ -f $BATCH_CFG ]] && . $BATCH_CFG
