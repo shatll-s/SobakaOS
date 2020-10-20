@@ -54,7 +54,7 @@ else
 fi
 #msg "Phoenix test" danger "Test"
 echo "$return" > /dog/error.log
-sleep 120
+#sleep 120
 nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
 
 exit 0

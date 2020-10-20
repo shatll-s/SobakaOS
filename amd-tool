@@ -8,8 +8,9 @@ tmpDir="/tmp/amdDriver"
 
 function showHelp () {
 	bname=`basename $0`
-	echo -e "Usage: ${CYAN}$bname [arg1 arg2 ...] update [url]${WHITE}"
+	echo -e "Usage: ${CYAN}$bname [arg1 arg2 ...] delete|update [url]${WHITE}"
 	echo -e "  update\tUpdate AMD driver to latest or argument version"
+	echo -e "  delete\tDelete AMD driver"
 	echo ""
 	echo -e "Common options:"
 	echo -e "${GREEN}  -y|--yes                ${WHITE}Do not ask for confirmation, answer yes to all questions"
@@ -20,6 +21,23 @@ function showHelp () {
 	echo -e "\nExamples:"
 	echo -e "${GREEN}  amd-tool -y --latest update${WHITE}"
 	echo -e "${GREEN}  amd-tool -y -l -s update${WHITE}"
+}
+
+function driver_delete () {
+	echo -e "${CYAN}> Remove old driver${WHITE}" 
+	[[ -f /usr/bin/amdgpu-uninstall ]] && yes | /usr/bin/amdgpu-uninstall
+	[[ -f /usr/bin/amdgpu-pro-uninstall ]] && yes | /usr/bin/amdgpu-pro-uninstall
+
+	echo -e "${CYAN}> Purging some old files${WHITE}"
+	for amdgpupkg in $(dpkg --list | grep amdgpu | awk '{print $2}'); do
+		echo -e "${RED}$amdgpupkg${WHITE}"
+		sudo dpkg --purge --force-all $amdgpupkg
+	done
+
+	for amdgpupkg in $(dpkg --list | grep amdgpu-pro | awk '{print $2}'); do
+		echo $amdgpupkg
+		sudo dpkg --purge --force-all $amdgpupkg
+	done
 }
 
 function driver_install () {
@@ -89,8 +107,6 @@ function driver_install () {
 			exit 1
 		fi
 	fi
-
-	#cd "/dog/downloads"
 	
 	local driver_name=`basename $url`
 
@@ -153,6 +169,8 @@ while [ -n "$1" ]; do
 		command='install'
 		shift
 		[[ ! -z $1 ]] && url=$1
+	elif [[ $option == 'delete' || $option == 'driver-delete' ]]; then
+		command='delete'
 	else
 		echo "Uncorrect argument $option"
 	fi
@@ -163,6 +181,9 @@ done
 case $command in
 	install)
 		driver_install $url
+	;;
+	delete)
+		driver_delete
 	;;
 	*)
 		echo -e "${RED}No command specified${WHITE}"

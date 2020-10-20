@@ -1,37 +1,36 @@
 #!/bin/bash
 #OSdog Autofan v 0.3. Visit os.dog
 #Dependencies: NVIDIA, AMD drivers; jq
+. /etc/environment
+. colors
+
+
 AF_CFG="/dog/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
+SCREEN_CFG="/dog/service/screenrc"
+LOG="/dog/log/af.log"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE_AMD="/tmp/.amd-oc.lock"
 LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
-
-#Sample af.cfg:
-#Don`t forget to delete braces
-#{
-#  "af_enabled": 1,
-#  "af_tt": 67,
-#  "af_hyst": 2,
-#  "af_fanmin": 20,
-#  "af_fanmax": 95,
-#  "af_shift": 4,
-#  "af_delay": 12
-#}
-
-#colors section (somebody can use it without OSdog)
-RED="\e[31m"
-WHITE="\e[0m"
-GREEN="\e[32m"
-BROWN="\e[33m"
-BLUE="\e[34m"
-PURPLE="\e[35m"
-CYAN="\e[36m"
-
-up="↗"
-down="↘"
-
-LINE="echo -e $BROWN================================================================$WHITE"
+[[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+json=`cat /run/dog/gpuStats`
+count=`echo $json | jq '.gpu|length'`
+if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+	export DISPLAY=:0
+	unset startFan
+	unset fanCount
+	allFanCount=0
+	NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
+	listNV=`echo "$json" | jq '[.gpu[] | select(.brand == "N")]'`
+	for (( i=0; i < `echo $listNV | jq '.|length'`; i++ )); do
+		startFan[$i]=$allFanCount
+		name=`echo $listNV | jq -r ".[$i].name"`
+		[[ ! $name =~ "GTX" || $name =~ "1660" ]] && fanCount[$i]=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
+		[[ ${fanCount[$i]} -lt 1 ]] && fanCount[$i]=1
+		
+		((allFanCount = $allFanCount + ${fanCount[$i]}))
+	done
+fi
 
 LOGO="
                 .--~~,__
@@ -71,29 +70,46 @@ function set_fan_amd () {
 		[[ $timer -eq 20 ]] && echo "${RED}Error (active OC)${WHITE}" && return 1
 	done
 	local fan=$1
-	local fan_addr=$2
-	[[ `cat $fan_addr/pwm1_enable` -ne 1 ]] && echo 1 >  $fan_addr/pwm1_enable
-	if [[ $3 != "vega" ]]; then
+	local fanAddr=$2
+	local navi=$3
+
+	[[ `cat $fanAddr/pwm1_enable` -ne 1 ]] && echo 1 > $fanAddr/pwm1_enable
+	#if [[ $navi -eq 0 ]]; then
 		let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
 		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
-		echo $fan_adapted > $fan_addr/pwm1
-	else #this is VEGA
-		local rpm_min=`cat $fan_addr/fan1_min`
-		[[ rpm_min -lt 600 ]] && rpm_min=600 #mb it will fix freezes...
-		local rpm_max=`cat $fan_addr/fan1_max`
-		local fan_target=`echo "scale=0; $fan * $rpm_max / 100" | bc -l`
-		[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
-		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
-		echo $fan_target > $fan_addr/fan1_target
-	fi
+		[[ $fan_adapted -lt 0 ]] && fan_adapted=0
+		echo $fan_adapted > $fanAddr/pwm1
+	
+	#else #this is VEGA / Navi
+	#	[[ `cat $fanAddr/fan1_enable` -ne 1 ]] && echo 1 > $fanAddr/fan1_enable
+	#	[[ `cat $fanAddr/pwm1_enable` -ne 1 ]] && echo 1 > $fanAddr/pwm1_enable
+
+	#	[[ -f $fanAddr/fan1_min ]] && local rpm_min=`cat $fanAddr/fan1_min` || rpm_min=0
+	#	[[ -f $fanAddr/fan1_max ]] && local rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
+
+		#local rpm_min=`cat $fanAddr/fan1_min`
+		#[[ rpm_min -lt 600 ]] && rpm_min=600 #mb it will fix freezes...
+		#local rpm_max=`cat $fanAddr/fan1_max`
+	#	local fan_target=`echo "scale=0; ($fan * $rpm_max + 5) / 100" | bc -l`
+	#	[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
+	#	[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
+	#	echo "$fan_target > $fanAddr/fan1_target"
+	#	echo $fan_target > $fanAddr/fan1_target
+	#	#echo $rpm_min $rpm_max
+	#fi
 }
 
 function prepare_nvidia_args () {
 	local fan=$1
 	local i=$2
-	nv_args+=" -a [gpu:$i]/GPUFanControlState=1"
-	nv_args+=" -a [fan:$i]/GPUTargetFanSpeed=$fan"
-	echo "$nv_args"
+	#echo -e "StartFan ${startFan[$i]}; fanCount ${fanCount[$i]}\n"
+	local args+=" -a [gpu:$i]/GPUFanControlState=1"
+	
+	for ((z=${startFan[$i]}; z < ${startFan[$i]} + ${fanCount[$i]}; z++)); do
+		local args+=" -a [fan:$z]/GPUTargetFanSpeed=$fan"
+	done
+	#nv_args+=" -a [fan:$i]/GPUTargetFanSpeed=$fan"
+	echo "$args"
 }
 
 function nvidia_oc () {
@@ -115,42 +131,81 @@ function nvidia_oc () {
 
 function autofan () {
 	local nv_args=""
+	#local allFanCount=0
 	local time=`date +%s`
 	local secs=`echo "$time - $start_time" | bc -l`
 	local hr_time=`displaytime $secs`
 	local nvidia_smi=`nvidia-smi --query-gpu=index,gpu_bus_id,temperature.gpu,fan.speed --format=csv,noheader`
-	echo -e "${GREEN}Target temp ${CYAN}$target_temp${GREEN}$C, hyst ${CYAN}$hyst${GREEN}, fan min/max ${BLUE}$fan_min${GREEN}/${RED}$fan_max${GREEN}, shift ${CYAN}$fan_shift${GREEN}, delay ${CYAN}$delay${WHITE}"
+	echo -e "${GREEN}TT ${CYAN}$target_temp${GREEN}°C, TT Mem ${CYAN}$ttMem${GREEN}°C, hyst ${CYAN}$hyst${GREEN}, fan min/max ${BLUE}$fan_min${GREEN}/${RED}$fan_max${GREEN}, shift ${CYAN}$fan_shift${GREEN}, delay ${CYAN}$delay${WHITE}"
 	
 	echo -e `date -R`" (working "$hr_time")\n"
-	for (( i=0; i < ${#core_addr[@]}; i++ )); do
-		if [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
-			sed -e 's/DRIVER\=\([a-z]*\)/\1/') == amdgpu ]; then
-			local gpu_name[$i]=$(cat $AMDMEMINFO_FILE | grep $(echo ${gpu_busid_sys[$i]}".00.0") | awk -F":" '{ print $3 }')
-			local fan_addr[$i]=$(ls -d ${core_addr[$i]}/hwmon/hwmon[0-9]*)
-			if [[ ! -f ${fan_addr[$i]}/pwm1 ]]; then
-				echo -e "${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 AMD}\tNo fan data"				
-				continue
-			fi
-			local gpu_fan[$i]=$(($(cat "${fan_addr[$i]}/pwm1") * 100 / 255))
-			local gpu_temp_raw[$i]=`cat "${fan_addr[$i]}/temp1_input"` #temp1_input - current temp 
+	for (( i=0; i < $count; i++ )); do
+		local status=`echo $json | jq ".gpu[$i].status" --raw-output`
+		local name=`echo $json | jq ".gpu[$i].name" --raw-output`
+		local bus=`echo $json | jq ".gpu[$i].bus" --raw-output`
+		local brand=`echo $json | jq ".gpu[$i].brand" --raw-output`
+		local navi=`echo $json | jq ".gpu[$i].navi" --raw-output`
+
+		if [[ $brand == "A" ]]; then
+			local color="$LIGHTRED"
+			local fanAddr[$i]=`echo $json | jq ".gpu[$i].fanAddr" --raw-output`
+			
+			local gpu_temp_raw[$i]=`cat "${fanAddr[$i]}/temp1_input"` #temp1_input - current temp 	
 			local gpu_temp[$i]=$(echo "scale=0; ${gpu_temp_raw[$i]}/1000" | bc -l) #temp format is something like 65000
-			local gpu_brand[$i]="AMD"
-		elif [ $(cat ${core_addr[$i]}/uevent | grep "DRIVER" | \
-			sed 's/DRIVER\=\([a-z]*\)/\1/') == nvidia ]; then #GPU is NVIDIA
-	
-			local nvidiainfo=`echo "$nvidia_smi" | grep -i ${gpu_busid_sys[$i]}":00.0"`
+			local gpu_fan[$i]=$(($(cat "${fanAddr[$i]}/pwm1") * 100 / 255))
+
+			if [[ -f ${fanAddr[$i]}/temp3_input ]]; then
+				local tMem_raw[$i]=`cat "${fanAddr[$i]}/temp3_input"` #temp3_input - Mem temp
+				local tMem[$i]=`echo "scale=0; ${tMem_raw[$i]}/1000" | bc -l`
+			fi
+			
+			
+			#if [[ $navi -eq 0 ]]; then
+			
+			#else
+			#	local gpu_temp_raw2[$i]=`cat "${fanAddr[$i]}/temp3_input"` #temp1_input - current temp 
+			#	local gpu_temp2[$i]=$(echo "scale=0; ${gpu_temp_raw2[$i]}/1000" | bc -l) #temp format is something like 65000
+			           #miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc`	
+			#	[[ -f $fanAddr/fan1_min ]] && local rpm_min=`cat $fanAddr/fan1_min` || rpm_min=0
+			#	[[ -f $fanAddr/fan1_max ]] && local rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
+			#	local gpu_fan[$i]=$(echo "scale=0; `cat ${fanAddr[$i]}/fan1_input` * 100 / ($rpm_max - $rpm_min)" | bc -l)
+			#fi
+		elif [[ $brand == "N" ]]; then
+			local color="$LIGHTGREEN"
+			local nvidiainfo=`echo "$nvidia_smi" | grep -i "$bus"`
 			local gpu_index[$i]=`awk -F ', ' '{print $1}' <<< $nvidiainfo`
 			local gpu_temp[$i]=`awk -F ', ' '{print $3}' <<< $nvidiainfo`
 			local gpu_fan[$i]=$(echo `awk -F ', ' '{print $4}' <<< $nvidiainfo` | sed 's/ %//')
-			local gpu_brand[$i]="NVIDIA"
+		else
+			continue
 		fi
-		[[ -z ${gpu_brand[$i]} ]] && continue
 		
-		if (( ${gpu_temp[$i]} - $hyst > $target_temp )); then #high temp
+		if [[ `echo "${gpu_temp[$i]} - $hyst - $target_temp" | bc -l` -ge 0 ]]; then
+			local tempTrigger='high'
 			local temp_color=$RED
+		elif [[ `echo "${gpu_temp[$i]} + $hyst - $target_temp" | bc -l` -lt 0 ]]; then
+			local temp_color=$BLUE
+			local tempTrigger='low'
+		fi
+		if [[ $ttMem -ne 0 ]]; then
+			if [[ `echo "${tMem[$i]} - $hyst - $ttMem" | bc -l` -ge 0 ]]; then
+				local tMemColor=$RED
+				local tempMemTrigger='high'
+			elif [[ `echo "${tMem[$i]} + $hyst - $ttMem" | bc -l` -lt 0 ]]; then
+				local tempMemTrigger='low'
+			fi
+		fi
+
+		if [[ ${gpu_fan[$i]} -ge $fan_max ]]; then
+			local fan_color=$RED
+		elif [[ ${gpu_fan[$i]} -le $fan_min ]]; then
+			local fan_color=$BLUE
+		fi
+
+		if [[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]]; then #high temp
 			if [[ ${gpu_fan[$i]} -gt $fan_max ]]; then
 				local new_fan[i]=$fan_max
-				local fan_color=$RED
+				#local fan_color=$RED
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -lt $fan_max ]]; then
 				if [[ ${gpu_temp[$i]} -ge $crit_temp ]]; then
@@ -158,20 +213,23 @@ function autofan () {
 				elif (( ${gpu_temp[$i]} - $crit_hyst > $target_temp )); then
 					local new_fan[i]=$((${gpu_fan[$i]} + $crit_fan_shift))
 				else
-					local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
+					if [[ $navi -eq 0 ]]; then
+						local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
+					else
+						local new_fan[i]=$((${gpu_fan[$i]} + 2 * $fan_shift))
+					fi
 				fi
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
 				
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			else
-				local fan_color=$RED
+				#local fan_color=$RED
 				local message="${RED}Max %${WHITE}"
 			fi
-		elif (( ${gpu_temp[$i]} + $hyst < $target_temp )); then #low temp
-			local temp_color=$BLUE
+		elif [[ $tempTrigger == 'low' ]]; then #low temp
 			if [[ ${gpu_fan[$i]} -lt $fan_min ]];then
 				local new_fan[i]=$fan_min
-				local fan_color=$BLUE
+				#local fan_color=$BLUE
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -gt $fan_min ]];then
 				if (( ${gpu_temp[$i]} + $crit_hyst < $target_temp )); then
@@ -182,52 +240,52 @@ function autofan () {
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			else
-				local fan_color=$BLUE
+				#local fan_color=$BLUE
 				local message="${BLUE}Min %${WHITE}" 
 			fi
 		fi
 		[[ -z $temp_color ]] && temp_color=$WHITE
 		[[ -z $fan_color ]] && fan_color="$WHITE"
 		
-		string="${CYAN}$i${WHITE} ${gpu_busid_sys[$i]}:00.0 ${gpu_brand[$i]}\t"
-		string+="Temp: ${temp_color}${gpu_temp[$i]}${WHITE}°C\t"
-		
-		#fucking bug because white is shorter than red
-		[[ "$temp_color" != "$WHITE" ]] && string+=" " 
-		string+="Fan: ${fan_color}${gpu_fan[$i]}${WHITE} "
-		if [[ ${gpu_fan[$i]} -ge 10 &&  ${gpu_fan[$i]} -lt 100 ]]; then
-			string+=" "
-		elif [[ ${gpu_fan[$i]} -lt 10 ]]; then
-			string+="  "
-		fi
+		string="${CYAN}$i${WHITE} $bus ${color}`fix-string \"${name}\" 23` ${WHITE}"
+		string+="Temp: ${temp_color}`fix-string \"${gpu_temp[$i]} \" 3`${WHITE} °C | "
+		[[ ! -z ${tMem[$i]} ]] && string+="${tMemColor}`fix-string \"${tMem[$i]} \" 3`${WHITE} °C | " || string+="         "
+		string+="Fan: ${fan_color}`fix-string \"${gpu_fan[$i]}% \" 6`${WHITE} "
 		string+="$message"
-		#echo $string
 		echo -en "$string"
 		
 		#Set fan if something changed
 		if [[ ! -z ${new_fan[$i]} ]]; then
-			if [[ ${gpu_brand[$i]} == "AMD" ]]; then
-				[[ ${gpu_name[$i]} == *"Vega"* ]] && local vega="vega"
-				
+			if [[ $brand == "A" ]]; then
+				#[[ ${name]} == *"Vega"* ]] && local vega="vega"
+				#echo -n "@${last_fan[i]}@${new_fan[i]}@"
 				#sometimes we can`t put new value, so need to refresh pwm1_enable:
-				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} && ${last_fan[i]} != $fan_min ]]; then
-					echo 0 > ${fan_addr[$i]}/pwm1_enable
+				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} ]]; then #&& ${last_fan[i]} != $fan_min 
+					last_fan[i]=${new_fan[i]}					
+					[[ -z freezeCount[$i] ]] && freezeCount[$i]=0
+					(( freezeCount[$i]++ ))
+					[[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]] && local sign='+' || local sign='-'
+					new_fan[i]=`echo "scale=0; ${new_fan[$i]} $sign 3 * ${freezeCount[$i]}" | bc -l`
+					echo 0 > ${fanAddr[$i]}/pwm1_enable
 					sleep 0.2
-					echo 1 > ${fan_addr[$i]}/pwm1_enable
-					echo -e "${RED} freeze${WHITE}"
+					echo 1 > ${fanAddr[$i]}/pwm1_enable
+					echo -en "${RED} freeze${WHITE}"					
+				else
+					last_fan[i]=${new_fan[i]}
+					local freezeCount[$i]=0
+					#echo -en "ok"
 				fi
 
-				echo -en `set_fan_amd ${new_fan[i]} ${fan_addr[$i]} $vega`
-				last_fan[i]=${new_fan[i]}
-			elif [[ ${gpu_brand[$i]} == "NVIDIA" ]]; then
-				#local result=`set_fan_nvidia ${new_fan[i]} ${gpu_index[$i]}`
-				nv_args=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
+				echo -en `set_fan_amd ${new_fan[i]} ${fanAddr[$i]} $navi`
+				
+			elif [[ $brand == "N" ]]; then
+				nv_args+=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
 			fi
 		fi
 		echo "" #sometimes amd say something
-		unset temp_color fan_color message
+		unset temp_color fan_color message tempMemTrigger tempTrigger tMemColor
 	done
-	#echo $nv_args
+	#echo -e "$nv_args"
 	[[ ! -z $nv_args ]] && local nv_result=`nvidia_oc $nv_args`
 	[[ ! -z $nv_result ]] && echo -e $nv_result
 	$LINE
@@ -271,6 +329,8 @@ function start () {
 		else
 			[[ $msg_trigger == 1 ]] && msg_trigger=0 && echo ""
 			target_temp=`echo $cfg | jq -r '.af_tt'`
+			ttMem=`echo $cfg | jq -r '.af_ttmem'`
+			[[ $ttMem == 'null' ]] && ttMem=0
 			hyst=`echo $cfg | jq -r '.af_hyst'`
 			fan_shift=`echo $cfg | jq -r '.af_shift'`
 			fan_max=`echo $cfg | jq -r '.af_fanmax'`
@@ -300,8 +360,13 @@ case $1 in
 	;;
 	start|restart)
 		/dog/screen-kill af
-		screen -dmS af bash -c "/dog/af loop"
+		screen -c $SCREEN_CFG -dmS "af" -Logfile $LOG bash -c "/dog/af loop"
+		#screen -dmS af bash -c "/dog/af loop"
 		#echo "$(date --rfc-3339=seconds) Autofan (re)started"
+	;;
+	log)
+		[[ ! $2 ]] && n=200 || n=$2
+		tail -n $n $LOG
 	;;
 	*)
 		bname=`basename $0`

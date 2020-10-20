@@ -39,6 +39,7 @@ echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
 export DISPLAY=:0
 NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
 
+screen-kill pill
 pkill -f '/dog/sbin/nvidia-pill'
 pkill -f '/dog/sbin/OhGodAnETHlargementPill-r2'
 
@@ -146,8 +147,8 @@ if [[ $PILL == 1 ]]; then
 	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
 		sleep=30 
 	fi
-	nvidia-pill "$PILL_ARGS" "$sleep" 	
-	#screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 $PILL_ARGS" &
+	#nvidia-pill "$PILL_ARGS" "$sleep" 	
+	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/nvidia-pill \"$PILL_ARGS\" \"$sleep\"" &
 fi
 echo -e $BROWN"================================================================"$WHITE
 

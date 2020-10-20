@@ -286,7 +286,7 @@ for (( i=0; i < $n; i++ )); do
 		echo "manual" > $coreAddr/power_dpm_force_performance_level
 		uppArgs="smc_pptable/FanStopTemp=0 "
 		uppArgs+="smc_pptable/FanStartTemp=0 "
-		uppArgs+="smc_pptable/FanTargetTemperature=0 "
+		#uppArgs+="smc_pptable/FanTargetTemperature=0 "
 		
 		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "
 		uppArgs+="smc_pptable/MinVoltageGfx=2800 "
@@ -349,7 +349,7 @@ for (( i=0; i < $n; i++ )); do
 			echo 1 > $fanAddr/pwm1_enable
 			
 			[[ -f  $fanAddr/fan1_min ]] && rpm_min=`cat $fanAddr/fan1_min` || rpm_min=0
-			[[ -f  $fanAddr/fan1_min ]] && rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
+			[[ -f  $fanAddr/fan1_max ]] && rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
 
 			fan_target=`echo "scale=0; ${FAN[$i]} * $rpm_max / 100" | bc -l`
 			[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
