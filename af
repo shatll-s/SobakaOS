@@ -187,7 +187,8 @@ function autofan () {
 			local temp_color=$BLUE
 			local tempTrigger='low'
 		fi
-		if [[ $ttMem -ne 0 ]]; then
+
+		if [[ $ttMem -ne 0 && ! -z ${tMem[$i]} ]]; then
 			if [[ `echo "${tMem[$i]} - $hyst - $ttMem" | bc -l` -ge 0 ]]; then
 				local tMemColor=$RED
 				local tempMemTrigger='high'
@@ -246,7 +247,7 @@ function autofan () {
 		fi
 		[[ -z $temp_color ]] && temp_color=$WHITE
 		[[ -z $fan_color ]] && fan_color="$WHITE"
-		
+
 		string="${CYAN}$i${WHITE} $bus ${color}`fix-string \"${name}\" 23` ${WHITE}"
 		string+="Temp: ${temp_color}`fix-string \"${gpu_temp[$i]} \" 3`${WHITE} °C | "
 		[[ ! -z ${tMem[$i]} ]] && string+="${tMemColor}`fix-string \"${tMem[$i]} \" 3`${WHITE} °C | " || string+="         "
