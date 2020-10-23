@@ -267,9 +267,11 @@ function autofan () {
 					(( freezeCount[$i]++ ))
 					[[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]] && local sign='+' || local sign='-'
 					new_fan[i]=`echo "scale=0; ${new_fan[$i]} $sign 3 * ${freezeCount[$i]}" | bc -l`
-					echo 0 > ${fanAddr[$i]}/pwm1_enable
-					sleep 0.2
-					echo 1 > ${fanAddr[$i]}/pwm1_enable
+					#if [[ $nave -eq 1 ]]; then
+					#	echo 0 > ${fanAddr[$i]}/pwm1_enable
+					#	sleep 0.2
+					#	echo 1 > ${fanAddr[$i]}/pwm1_enable
+					#fi
 					echo -en "${RED} freeze${WHITE}"					
 				else
 					last_fan[i]=${new_fan[i]}

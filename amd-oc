@@ -11,7 +11,7 @@ LOCK_FILE="/tmp/.amd-oc.lock"
 
 NAVI_VDDCI_MIN=650
 NAVI_VDDCI_MAX=850
-NAVI_MVDD_MIN=1200
+NAVI_MVDD_MIN=1100
 NAVI_MVDD_MAX=1350
 
 listAMD=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "A")]'`
@@ -289,7 +289,11 @@ for (( i=0; i < $n; i++ )); do
 		#uppArgs+="smc_pptable/FanTargetTemperature=0 "
 		
 		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "
-		uppArgs+="smc_pptable/MinVoltageGfx=2800 "
+		uppArgs+="smc_pptable/MinVoltageGfx=2400 "
+		#uppArgs+="smc_pptable/MinVoltageUlvGfx=2400 "
+		#uppArgs+="smc_pptable/MinVoltageSoc=2400 "
+
+
 		#uppArgs+="smc_pptable/MinVoltageSoc=2800 "
 		#upp -p /sys/class/drm/card7/device/pp_table dump | grep Soc
 		if [[ ! -z ${SOC_VDD_MAX[$i]} ]]; then
