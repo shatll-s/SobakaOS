@@ -20,7 +20,7 @@ myself="$mydir/$SCRIPT_NAME"
 skip=2048
 count=45056
 
-LATEST_URL="https://os.dog/downloads/iso/dog-1.47.zip"
+#LATEST_URL="https://os.dog/downloads/iso/dog-1.47.zip"
 
 # download timeout
 TIMEOUT=20
@@ -29,6 +29,9 @@ TMPDIR="/tmp/dog"
 url=
 yes=
 sshPass=
+LIST=
+LATEST=
+STABLE=
 
 RED="\e[31m"
 WHITE="\e[0m"
@@ -68,7 +71,9 @@ function showHelp {
 	echo -e
 	echo -e "Common options:"
 	echo -e "${GREEN}  -y|--yes                ${WHITE}Do not ask for confirmation, answer yes to all questions"
+	echo -e "${GREEN}  --list	               ${WHITE}Show images list"
 	echo -e "${GREEN}  -l|--latest             ${WHITE}Select latest image"
+	echo -e "${GREEN}  -s|--stable             ${WHITE}Select stable image"
 	echo -e "${GREEN}  -h|--help               ${WHITE}Show this message"	
 
 	echo -e "Image download options:"
@@ -387,12 +392,85 @@ function write {
 }
 
 
+function list () {
+	#echo "LATEST $LATEST"
+	#echo "STABLE $STABLE"
+	echo -e "> Getting image versions"
+	local versions_url="https://os.dog/downloads/iso/versions.php"
+	local versions=`curl -sLk $versions_url | jq '.iso'`
+	[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+	
+	local header="${BROWN}#${WHITE}  ${CYAN}Version${WHITE}\t"
+		header+="${PURPLE}System${WHITE}  | ${YELLOW}Kernel${WHITE} | ${RED}Drivers${WHITE}\n"
+		header+="==============================================================="
+	echo -e "$header"
+	for (( i=0; i < `echo $versions | jq '. | length'`; i++ )); do
+		local isoData=`echo $versions | jq ".[$i]"`
+			for option in version name description kernel system amd nvidia stable latest; do
+			if [[ `echo $isoData | jq ".$option"` != null ]]; then
+				option_value="`echo $isoData | jq -r \".$option\"`" #double slash, because eval open it
+				eval "local ${option}=\"$option_value\""
+			elif [[ $option == 'name' ]]; then
+				local name='     '
+			fi
+		done
+		#local name=`echo $isoData | jq -r ".name"`
+		#local description=`echo $isoData | jq -r ".description"`
+		#local kernel=`echo $isoData | jq -r ".kernel"`
+		#local system=`echo $isoData | jq -r ".system"`
+		#local amd=`echo $isoData | jq -r ".amd"`
+		#local nvidia=`echo $isoData | jq -r ".nvidia"`
+		#local stable=`echo $isoData | jq -r ".stable"`
+		#local latest=`echo $isoData | jq -r ".latest"`
+		
+		local string="${BROWN}$i${WHITE}  ${CYAN}$version $name${WHITE}\t"
+		string+="${PURPLE}$system${WHITE}\t| ${YELLOW}$kernel${WHITE}\t | "
+		string+="${RED}$amd${WHITE} | ${GREEN}$nvidia${WHITE}"
+		[[ $stable == true ]] && string+=" ${CYAN}stable${WHITE}" || string+="       "
+		[[ $latest == true ]] && string+=" ${CYAN}latest${WHITE}" || string+="       "
+		echo -e "$string"
+	done
 
+	if [[ $LIST -eq 1 ]]; then
+		echo -e "Select version to install:"
+		read i
+
+		numberFormat='^[0-9]+$'
+		if ! [[ $i =~ $numberFormat ]] ; then
+			echo -e "${RED}Error: you need to enter number here${WHITE}"
+			exit 1
+		fi
+
+		local newIso=`echo $versions | jq ".[$i]"`
+		
+	elif [[ $LATEST -eq 1 ]]; then
+		local latestVersions=`echo $versions | jq "[.[] | select(.latest == true)]"`
+		[[ $latestVersions == "[]" ]] && echo -e "${RED}Can\`t find compatible image version${WHITE}" && exit 1
+		local newIso=`echo $latestVersions | jq .[-1]`
+	
+	elif [[ $STABLE -eq 1 ]]; then
+		local stableVersions=`echo $versions | jq "[.[] | select(.stable == true)]"`
+		[[ $stableVersions == "[]" ]] && echo -e "${RED}Can\`t find compatible image version${WHITE}" && exit 1
+		local newIso=`echo $stableVersions | jq .[-1]`
+	fi
+	
+	local version=`echo $newIso | jq -r ".version"`
+	[[ `echo $newIso | jq ".name"` != null ]] && local selectedName=`echo $newIso | jq -r ".name"`
+	local localUrl=`echo $newIso | jq -r ".url"`
+
+	echo -e "Selected version: ${CYAN}${version} ${selectedName}${WHITE} (${GREEN}$localUrl${WHITE})"
+	url=$localUrl
+	#echo -e "Download url: ${CYAN}${url}${WHITE}"
+}
 
 function start {
 	wr=0
 	[[ -f "/replace.conf" ]] && source "/replace.conf"
 	if [[ $wr -ne 1 ]]; then
+		#echo "@"$url
+		[[ $LATEST -eq 1 || $STABLE -eq 1 || $LIST -eq 1 ]] && list
+		#echo "@"$url
+		#exit
 		[[ -z $url ]] &&  echo -e "${BROWN}No path or URL to os.dog image provided${WHITE}\n" && showHelp && exit 1
 		prepare #1 part
 	else
@@ -409,7 +487,12 @@ while [ -n "$1" ]; do
 	elif [[ $option == '--yes' || $option == '-y' ]]; then
 		yes=1
 	elif [[ $option == '--latest' || $option == '-l' ]]; then
-		url=$LATEST_URL
+		LATEST=1
+		#url=$LATEST_URL
+	elif [[ $option == '--stable' || $option == '-s' ]]; then
+		STABLE=1
+	elif [[ $option == '--list' ]]; then
+		LIST=1
 	elif [[ $option == '--rigid' || $option == '-id' ]]; then
 		shift
 		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
