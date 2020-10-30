@@ -250,7 +250,7 @@ function autofan () {
 
 		string="${CYAN}$i${WHITE} $bus ${color}`fix-string \"${name}\" 23` ${WHITE}"
 		string+="Temp: ${temp_color}`fix-string \"${gpu_temp[$i]} \" 3`${WHITE} °C | "
-		[[ ! -z ${tMem[$i]} ]] && string+="${tMemColor}`fix-string \"${tMem[$i]} \" 3`${WHITE} °C | " || string+="         "
+		[[ ! -z ${tMem[$i]} ]] && string+="${tMemColor}`fix-string \"${tMem[$i]} \" 4`${WHITE} °C | " || string+="         "
 		string+="Fan: ${fan_color}`fix-string \"${gpu_fan[$i]}% \" 6`${WHITE} "
 		string+="$message"
 		echo -en "$string"

@@ -322,9 +322,9 @@ for (( i=0; i < $n; i++ )); do
 			uppArgs+="smc_pptable/MemMvddVoltage/3=${vlt_mvdd} "
     	fi
 		uppArgs+="overdrive_table/max/8=960 "
-		uppArgs+="overdrive_table/min/3=700 "
-		uppArgs+="overdrive_table/min/5=700 "
-		uppArgs+="overdrive_table/min/7=700"
+		uppArgs+="overdrive_table/min/3=650 "
+		uppArgs+="overdrive_table/min/5=650 "
+		uppArgs+="overdrive_table/min/7=650"
 
 		#echo "upp -p $coreAddr/pp_table set $uppArgs --write"
 		upp -p $coreAddr/pp_table set $uppArgs --write
@@ -335,8 +335,8 @@ for (( i=0; i < $n; i++ )); do
 			echo "s 1 ${CORE_CLOCK[$i]}" > $coreAddr/pp_od_clk_voltage
 
 			if [[ ! -z ${CORE_VOLTAGE[$i]} ]]; then
-				[[ ${CORE_VOLTAGE[$i]} -gt 725 ]] &&
-					echo "vc 1 $((${CORE_CLOCK[$i]}-100)) $((${CORE_VOLTAGE[$i]}-25))" > $coreAddr/pp_od_clk_voltage
+				#[[ ${CORE_VOLTAGE[$i]} -gt 725 ]] &&
+				echo "vc 1 $((${CORE_CLOCK[$i]}-100)) $((${CORE_VOLTAGE[$i]}-25))" > $coreAddr/pp_od_clk_voltage
 				echo "vc 2 ${CORE_CLOCK[$i]} ${CORE_VOLTAGE[$i]}" > $coreAddr/pp_od_clk_voltage
 				echo c > $coreAddr/pp_od_clk_voltage
 			fi
