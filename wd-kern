@@ -16,6 +16,8 @@ errorMsgAmdWarning+=("VM_L2_PROTECTION_FAULT_STATUS")
 errorMsgAmdError=()
 errorMsgAmdError+=("Failed message")
 errorMsgAmdError+=("No response")
+#errorMsgAmdError+=("No more image in the PCI ROM")
+
 
 errorMsgNvidiaWarning=()
 errorMsgNvidiaWarning+=("Zaglushka")

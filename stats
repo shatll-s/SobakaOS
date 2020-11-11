@@ -274,6 +274,8 @@ case $1 in
 		miner_total_share=`echo $stats_template | jq -r '.accepted_count'`
 		miner_total_badshare=`echo $stats_template | jq -r '.rejected_count'`
 		miner_hr=(`echo $stats_template | jq '.gpus[].hashrate'`)
+		miner_share=(`echo $stats_template | jq '.stat_by_gpu[].accepted_count'`)
+		miner_badshare=(`echo $stats_template | jq '.stat_by_gpu[].rejected_count'`)
 		miner_temp=(`echo $stats_template | jq '.gpus[].temperature'`)
 		miner_fan=(`echo $stats_template | jq '.gpus[].fan_speed'`)
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
