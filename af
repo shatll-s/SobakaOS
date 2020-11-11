@@ -180,7 +180,7 @@ function autofan () {
 			continue
 		fi
 		
-		if [[ `echo "${gpu_temp[$i]} - $hyst - $target_temp" | bc -l` -ge 0 ]]; then
+		if [[ $gpu_temp -ne 0 && `echo "${gpu_temp[$i]} - $hyst - $target_temp" | bc -l` -ge 0 ]]; then
 			local tempTrigger='high'
 			local temp_color=$RED
 		elif [[ `echo "${gpu_temp[$i]} + $hyst - $target_temp" | bc -l` -lt 0 ]]; then

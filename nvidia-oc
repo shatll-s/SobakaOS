@@ -147,8 +147,11 @@ if [[ $PILL == 1 ]]; then
 	if [[ ! -z $1 && $1 == "--pill-delay" ]]; then
 		sleep=30 
 	fi
-	#nvidia-pill "$PILL_ARGS" "$sleep" 	
-	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/nvidia-pill \"$PILL_ARGS\" \"$sleep\"" &
+	[[ ! $sleep ]] && sleep=1
+	#nvidia-pill "$PILL_ARGS" "$sleep" 
+	#echo "sleep $sleep; /dog/sbin/nvidia-pill \"$PILL_ARGS\" \"$sleep\""
+#	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/nvidia-pill \"$PILL_ARGS\" \"$sleep\"" &
+	screen -dmS pill bash -c "sleep $sleep; /dog/sbin/OhGodAnETHlargementPill-r2 \"$PILL_ARGS\" \"$sleep\"" &
 fi
 echo -e $BROWN"================================================================"$WHITE
 
