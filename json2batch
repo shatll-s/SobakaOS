@@ -291,33 +291,46 @@ function make_batch () {
 			minerexec+=" --api-bind 127.0.0.1:$API_port"
 		;;
 		t_rex)
-			minerexec+=" -c config"
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $coin ]]&& minerexec+=" --coin $coin"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
+			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind-http 0.0.0.0:$API_port --no-watchdog"
+
+
+
+			#OLD METHOD			
+			#minerexec+=" -c config"
 			#make config file
-			dog_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
-
-			[[ ! -z $template ]]&& dog_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $dog_json`
-			[[ ! -z $pool ]]&& dog_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $dog_json`
-			[[ ! -z $pass ]]&& dog_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $dog_json`
-			[[ ! -z $algo ]]&& dog_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $dog_json`
-
+			#dog_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
+			#
+			#[[ ! -z $template ]]&& dog_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $dog_json`
+			#[[ ! -z $pool ]]&& dog_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $dog_json`
+			#[[ ! -z $pass ]]&& dog_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $dog_json`
+			#[[ ! -z $algo ]]&& dog_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $dog_json`
+			#
 			#looking for keys in json
-			if [[ $config != "{null}" ]]; then
-				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
-				for ((y=0; y < ${#keys[@]}; y++)); do
-					[[ $keys[$y] == "api-bind-http" ]] && local api_trigger=1
+			#if [[ $config != "{null}" ]]; then
+			#	keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+			#	for ((y=0; y < ${#keys[@]}; y++)); do
+			#		[[ $keys[$y] == "api-bind-http" ]] && local api_trigger=1
 					#echo "Check ${keys[$y]}"
-					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
-						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
+			#		[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
+			#			dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
 
-					value=`echo $config | jq ".\"${keys[$y]}\""`
-					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
-				done
-			fi
-			if [[ $api_trigger -ne 1 ]]; then
-				dog_json=`jq "del(.\"api-bind-http\")" <<< "$dog_json"` #if key exist, delete it
-				dog_json=`jq ". + { \"api-bind-http\": \"127.0.0.1:$API_port\" }" <<< "$dog_json"`
-			fi
-			echo -e "$dog_json" | jq '.' > "${miner_dir}config"
+			#		value=`echo $config | jq ".\"${keys[$y]}\""`
+			#		dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
+			#	done
+			#fi
+			#if [[ $api_trigger -ne 1 ]]; then
+			#	dog_json=`jq "del(.\"api-bind-http\")" <<< "$dog_json"` #if key exist, delete it
+			#	dog_json=`jq ". + { \"api-bind-http\": \"127.0.0.1:$API_port\" }" <<< "$dog_json"`
+			#fi
+			#echo -e "$dog_json" | jq '.' > "${miner_dir}config"
 		;;
 		nanominer)
 			minerexec+=" /dog/miners/nanominer/config.ini "

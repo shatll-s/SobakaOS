@@ -261,7 +261,7 @@ function autofan () {
 				#[[ ${name]} == *"Vega"* ]] && local vega="vega"
 				#echo -n "@${last_fan[i]}@${new_fan[i]}@"
 				#sometimes we can`t put new value, so need to refresh pwm1_enable:
-				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} ]]; then #&& ${last_fan[i]} != $fan_min 
+				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} && ${last_fan[i]} -gt $fan_min  ]]; then 
 					last_fan[i]=${new_fan[i]}					
 					[[ -z freezeCount[$i] ]] && freezeCount[$i]=0
 					(( freezeCount[$i]++ ))
