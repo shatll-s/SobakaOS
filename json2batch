@@ -338,7 +338,15 @@ function make_batch () {
 			config+="webPort=0\n"
 			config+="mport=-${API_port}\n"
 			config+="rigName = $name\n"
-			[[ ! -z $algo ]]&& config+="[$algo]\n"
+
+			if [[ ! -z $algo ]]; then
+				if [[ *${algo^^}* == "ETHASH ETCHASH RANDOMX UBQHASH CUCKAROO30 KAWPOW" ]]; then
+					config+="[$algo]\n"
+				else
+					[[ ! $coin ]] && coin=$algo
+				fi
+			fi
+
 			[[ ! -z $coin ]]&& config+="coin=$coin\n"
 			config+="wallet = $wallet\n"
 			config+="pool1 = $pool\n"
