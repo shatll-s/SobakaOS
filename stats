@@ -65,6 +65,11 @@ case $1 in
 		fi
 		if [[ $1 == "nanominer" ]]; then
 			miner_algo=`cat /dog/miners/nanominer/config.ini | grep -E "\[" | sed 's/.*\[\([a-z]*\)\].*/\1/'`
+
+			if [[ ! $miner_algo ]]; then
+				[[ $miner1 == "nanominer" ]] && minerId=1 || minerId=2
+				miner_algo=`cat /tmp/batch${minerId} | jq -r '.algo'`
+			fi
 		else
 			miner_algo="ethash"
 		fi
