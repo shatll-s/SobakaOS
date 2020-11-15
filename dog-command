@@ -650,6 +650,12 @@ case $1 in
 		if [[ `echo $2 | jq '.mb_af'` != '""' && `echo $2 | jq '.mb_af'` != 'null' ]]; then
 			cfg=`echo $2 | jq ".mb_af"`
 			echo "$cfg" > /dog/cfg/mb-af.cfg
+
+			if [[ `echo "$cfg" | jq -r '.enabled'` -eq 1 ]]; then
+				[[ `systemctl is-active mb-af` == 'inactive' ]] && systemctl restart mb-af
+			elif [[ `echo "$cfg" | jq -r '.enabled'` -eq 0 ]]; then
+				[[ `systemctl is-active mb-af` == 'active' ]] && systemctl stop mb-af
+			fi
 		fi
 		#####################          mb-af SECTION END         ####################		
 		[[ $3 != '--hello' ]] && msg "Rig settings" ok \

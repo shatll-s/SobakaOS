@@ -1,0 +1,7 @@
+[Unit]
+Description=OSdog Motherboard Autofan Service
+
+[Service]
+Type=oneshot
+RemainAfterExit=1
+ExecStart=/dog/mb-af start

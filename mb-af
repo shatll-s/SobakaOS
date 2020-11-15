@@ -98,7 +98,7 @@ function start () {
 	
 	while true; do
 		cfg=`cat $CFG`
-		for option in enabled tt hyst fanmin fanmax fan_shift delay pwm; do
+		for option in enabled tt hyst fanmin fanmax shift delay pwm; do
 			if [[ `echo $cfg | jq ".$option"` != null ]]; then
 				option_value="`echo $cfg | jq -r \".$option\"`" #double slash, because eval open it
 				eval "local $option=\"$option_value\""
