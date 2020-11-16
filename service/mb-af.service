@@ -1,7 +1,9 @@
 [Unit]
 Description=OSdog Motherboard Autofan Service
+#After=af.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=1
+ExecStartPre=/bin/sleep 15
 ExecStart=/dog/mb-af start

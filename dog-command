@@ -577,7 +577,7 @@ case $1 in
 
 			WD_RESTART=3	#default
 			WD_REBOOT=5		#default
-			for option in wd_enabled wd_restart wd_reboot wd_hr; do
+			for option in wd_enabled wd_wakealarm wd_restart wd_reboot wd_hr; do
 				[[ `cat $RIG_CFG | grep -c "${option^^}="` -gt 0 ]] && sed -i "/.*${option^^}=.*/d" $RIG_CFG
 				if [[ $option != 'wd_hr' ]]; then
 					if [[ `echo $2 | jq ".wd.$option"` != null ]]; then				

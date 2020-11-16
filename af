@@ -180,13 +180,16 @@ function autofan () {
 			continue
 		fi
 		
-		if [[ $gpu_temp -ne 0 && `echo "${gpu_temp[$i]} - $hyst - $target_temp" | bc -l` -ge 0 ]]; then
-			local tempTrigger='high'
-			local temp_color=$RED
-		elif [[ `echo "${gpu_temp[$i]} + $hyst - $target_temp" | bc -l` -lt 0 ]]; then
-			local temp_color=$BLUE
-			local tempTrigger='low'
+		if [[ ! -z $target_temp && $target_temp -ne 0 ]]; then
+			if [[ `echo "${gpu_temp[$i]} - $hyst - $target_temp" | bc -l` -ge 0 ]]; then
+				local tempTrigger='high'
+				local temp_color=$RED
+			elif [[ `echo "${gpu_temp[$i]} + $hyst - $target_temp" | bc -l` -lt 0 ]]; then
+				local temp_color=$BLUE
+				local tempTrigger='low'
+			fi
 		fi
+		
 
 		if [[ $ttMem -ne 0 && ! -z ${tMem[$i]} ]]; then
 			if [[ `echo "${tMem[$i]} - $hyst - $ttMem" | bc -l` -ge 0 ]]; then
@@ -331,9 +334,13 @@ function start () {
 			sleep 10
 		else
 			[[ $msg_trigger == 1 ]] && msg_trigger=0 && echo ""
+
 			target_temp=`echo $cfg | jq -r '.af_tt'`
+			[[ $target_temp == 'null' ]] && target_temp=0
+
 			ttMem=`echo $cfg | jq -r '.af_ttmem'`
 			[[ $ttMem == 'null' ]] && ttMem=0
+
 			hyst=`echo $cfg | jq -r '.af_hyst'`
 			fan_shift=`echo $cfg | jq -r '.af_shift'`
 			fan_max=`echo $cfg | jq -r '.af_fanmax'`

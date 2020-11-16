@@ -87,6 +87,7 @@ function showMsg () {
 
 function start () {
 	start_time=`date +%s`
+	showMsg "Started"	
 	echo -e "${BROWN}$LOGO${GREEN}"
 	$LINE
 	coreAddrRaw=(`ls -d /sys/class/hwmon/hwmon[0-9]*`) #device | egrep 'card[0-9]{1,2}/'`)
@@ -119,7 +120,7 @@ function start () {
 			local fanAddr=(`find $mbAddr/pwm${pwm}`)
 			
 			[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
-			crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
+			crit_shift=`echo "scale=0; $shift * 3 / 1" | bc -l`
 		fi
 
 		if [[ ! -f $STATS ]]; then
@@ -140,7 +141,7 @@ function start () {
 		#Show stats sometimes, like hr in miner
 		if [[ ! $statsCounter || $statsCounter -ge 10 ]]; then
 			statsCounter=0
-			local statsMsg="${CYAN}${PURELINE}\n${GREEN}Target temp: ${CYAN}$tt${GREEN}, hyst: ${CYAN}$hyst${CYAN}, fan ${BLUE}$fanmin${GREEN}/${RED}$fanmax${GREEN}, shift ${CYAN}$fan_shift${GREEN}, delay ${CYAN}$delay${GREEN}, pwm ${CYAN}$pwm${WHITE}"
+			local statsMsg="${CYAN}${PURELINE}\n${GREEN}Target temp: ${CYAN}$tt${GREEN}, hyst: ${CYAN}$hyst${CYAN}, fan ${BLUE}$fanmin${GREEN}/${RED}$fanmax${GREEN}, shift ${CYAN}$shift${GREEN}, delay ${CYAN}$delay${GREEN}, pwm ${CYAN}$pwm${WHITE}"
 			statsMsg+="\n${CYAN}${PURELINE}${WHITE}"	
 			echo -e $statsMsg
 		else
@@ -153,6 +154,7 @@ function start () {
 		done
 		
 		local fanRaw=`cat $fanAddr`
+		#echo "FAN: @$fanRaw@"
 		local fan=`echo "scale=2; $fanRaw/2.55" | bc -l` #fan power is beetween 0 and 255
 		
 		if (( $maxTemp - $hyst > $tt )); then #high temp
@@ -166,11 +168,11 @@ function start () {
 				if [[ $maxTemp -ge $crit_temp ]]; then
 					local newFan=$fanmax
 				elif (( $maxTemp - $crit_hyst > $tt )); then
-					local newFan=$(($fan + $crit_fan_shift))
+					local newFan=`echo "scale=0; $fan + $crit_shift" | bc -l`
 				else
-					local newFan=$(($fan + $fan_shift))
+					local newFan=`echo "scale=0; $fan + $shift" | bc -l`
 				fi
-				[[ $newFan -gt $fanmax ]] && newFan=$fanmax
+				[[ `echo "if ($newFan > $fanmax) print 1" | bc -l` -eq 1 ]] && newFan=$fanmax
 				local type="up"
 				local action="${CYAN}$up ${newFan}${WHITE}"
 			else
@@ -186,12 +188,12 @@ function start () {
 				local action="${CYAN}$up ${newFan}${WHITE}"
 			elif [[ `echo "if ($fan > $fanmin) print 1" | bc -l` -eq 1 ]];then
 				if (( $maxTemp + $crit_hyst < $tt )); then
-					local newFan=$(($maxTemp - $crit_fan_shift))
+					local newFan=`echo "scale=0; $fan - $crit_shift" | bc -l`
 				else
-					local newFan=$(($maxTemp - $fan_shift))
+					local newFan=`echo "scale=0; $fan - $shift" | bc -l`
 				fi
 				local type="down"
-				[[ $newFan -lt $fanmin ]] && newFan=$fanmin
+				[[ `echo "if ($newFan < $fanmin) print 1" | bc -l` -eq 1 ]] && newFan=$fanmin
 				local action="${CYAN}$down ${newFan}${WHITE}"
 			else
 				local fanColor=$BLUE
@@ -204,7 +206,7 @@ function start () {
 		if [[ ! -z $newFan ]]; then #Set fan if something changed
 			echo 1 > ${fanAddr}_enable
 			local adoptedFan=`echo "scale=0; $newFan * 255 / 100" | bc -l`
-			echo $adoptedFan
+			#echo $adoptedFan
 
 			if [[ $type == "up" && `echo "if ($adoptedFan <= $fan * 2.55) print 1" | bc -l` -eq 1 ]]; then
 				let adoptedFan=$adoptedFan+4
@@ -217,7 +219,7 @@ function start () {
 			elif [[ $adoptedFan -lt 0 ]]; then
 				adoptedFan=0
 			fi
-			echo $adoptedFan
+			#echo $adoptedFan
 			echo $adoptedFan > $fanAddr
 		fi
 		
