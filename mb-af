@@ -261,3 +261,4 @@ case $1 in
 		echo -e "Usage: ${CYAN}$bname show|start|stop|restart|log|start-cli|test|setup${WHITE}"
 	;;
 esac
+

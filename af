@@ -4,7 +4,6 @@
 . /etc/environment
 . colors
 
-
 AF_CFG="/dog/cfg/af.cfg"
 [[ ! -f $AF_CFG ]] && echo "You need to create config file $AF_CFG..." && exit 1
 SCREEN_CFG="/dog/service/screenrc"
@@ -12,25 +11,6 @@ LOG="/dog/log/af.log"
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 LOCK_FILE_AMD="/tmp/.amd-oc.lock"
 LOCK_FILE_NVIDIA="/tmp/.nvidia-oc.lock"
-[[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
-json=`cat /run/dog/gpuStats`
-count=`echo $json | jq '.gpu|length'`
-if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
-	export DISPLAY=:0
-	unset startFan
-	unset fanCount
-	allFanCount=0
-	NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
-	listNV=`echo "$json" | jq '[.gpu[] | select(.brand == "N")]'`
-	for (( i=0; i < `echo $listNV | jq '.|length'`; i++ )); do
-		startFan[$i]=$allFanCount
-		name=`echo $listNV | jq -r ".[$i].name"`
-		[[ ! $name =~ "GTX" || $name =~ "1660" ]] && fanCount[$i]=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
-		[[ ${fanCount[$i]} -lt 1 ]] && fanCount[$i]=1
-		
-		((allFanCount = $allFanCount + ${fanCount[$i]}))
-	done
-fi
 
 LOGO="
                 .--~~,__
@@ -189,7 +169,6 @@ function autofan () {
 				local tempTrigger='low'
 			fi
 		fi
-		
 
 		if [[ $ttMem -ne 0 && ! -z ${tMem[$i]} ]]; then
 			if [[ `echo "${tMem[$i]} - $hyst - $ttMem" | bc -l` -ge 0 ]]; then
@@ -200,10 +179,12 @@ function autofan () {
 			fi
 		fi
 
-		if [[ ${gpu_fan[$i]} -ge $fan_max ]]; then
+		if [[ ${gpu_fan[$i]} -gt $fan_max ]]; then
 			local fan_color=$RED
-		elif [[ ${gpu_fan[$i]} -le $fan_min ]]; then
+			local new_fan[$i]=$fan_max
+		elif [[ ${gpu_fan[$i]} -lt $fan_min ]]; then
 			local fan_color=$BLUE
+			local new_fan[$i]=$fan_min
 		fi
 
 		if [[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]]; then #high temp
@@ -248,10 +229,11 @@ function autofan () {
 				local message="${BLUE}Min %${WHITE}" 
 			fi
 		fi
+
 		[[ -z $temp_color ]] && temp_color=$WHITE
 		[[ -z $fan_color ]] && fan_color="$WHITE"
 
-		string="${CYAN}$i${WHITE} $bus ${color}`fix-string \"${name}\" 23` ${WHITE}"
+		string="${CYAN}`fix-string "$i" 3`${WHITE} $bus ${color}`fix-string \"${name}\" 23` ${WHITE}"
 		string+="Temp: ${temp_color}`fix-string \"${gpu_temp[$i]} \" 3`${WHITE} °C | "
 		[[ ! -z ${tMem[$i]} ]] && string+="${tMemColor}`fix-string \"${tMem[$i]} \" 4`${WHITE} °C | " || string+="         "
 		string+="Fan: ${fan_color}`fix-string \"${gpu_fan[$i]}% \" 6`${WHITE} "
@@ -286,6 +268,7 @@ function autofan () {
 				
 			elif [[ $brand == "N" ]]; then
 				nv_args+=`prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
+				#echo `prepare_nvidia_args ${new_fan[i]} ${gpu_index[$i]}`
 			fi
 		fi
 		echo "" #sometimes amd say something
@@ -366,13 +349,32 @@ case $1 in
 		echo "$(date --rfc-3339=seconds) Autofan stopped"
 	;;
 	loop)
+		[[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
+		json=`cat /run/dog/gpuStats`
+		count=`echo $json | jq '.gpu|length'`
+
+		if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+			export DISPLAY=:0
+			unset startFan
+			unset fanCount
+			allFanCount=0
+			NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
+			listNV=`echo "$json" | jq '[.gpu[] | select(.brand == "N")]'`
+			for (( i=0; i < `echo $listNV | jq '.|length'`; i++ )); do
+				startFan[$i]=$allFanCount
+				name=`echo $listNV | jq -r ".[$i].name"`
+				[[ ! $name =~ "GTX" || $name =~ "1660" ]] && fanCount[$i]=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
+				[[ ${fanCount[$i]} -lt 1 ]] && fanCount[$i]=1
+				echo "Fan count $i ${fanCount[$i]}"
+				((allFanCount = $allFanCount + ${fanCount[$i]}))
+			done
+		fi
+
 		start
 	;;
 	start|restart)
 		/dog/screen-kill af
 		screen -c $SCREEN_CFG -dmS "af" -Logfile $LOG bash -c "/dog/af loop"
-		#screen -dmS af bash -c "/dog/af loop"
-		#echo "$(date --rfc-3339=seconds) Autofan (re)started"
 	;;
 	log)
 		[[ ! $2 ]] && n=200 || n=$2

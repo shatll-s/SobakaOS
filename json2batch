@@ -216,13 +216,14 @@ function make_batch () {
 				fi
 				echo -e "$epools_str" > "$miner_dir/epools.txt"
 			fi
-
+			
 			[[ ! -z $template ]]&& minerexec+=" -wal $template"
 			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
 			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport $API_port" || API_port=`echo $addition | sed "s/.*-cdmport [-]*\([0-9]*\).*/\1/"`
 			[[ $addition != *"-hstats"* ]] && minerexec+=" -hstats 0"
+			[[ $addition != *"-coin"* && $coin == 'etc' ]] && minerexec+=" -coin etc"
 		
-			minerexec+=" -log 1 -logfile /dog/log/phoenix.log -logsmaxsize 5"
+			minerexec+=" -rmode 2 -log 1 -logfile /dog/log/phoenix.log -logsmaxsize 5"
 		;;
 		ewbf)
 			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
