@@ -19,7 +19,7 @@ function listJS () {
 		unset brand color name bus b coreAddr vendor
 		local bus=`echo $string | awk '{print $1}'`
 		local b=`echo $bus | awk -F ':' '{print $1}'`
-		
+
 		for gpuCoreAddr in ${coreAddrArray[@]}; do
 			[[ ! -f $gpuCoreAddr/uevent ]] && continue
 			local gpuBusRaw=`cat $gpuCoreAddr/uevent | grep "PCI_SLOT_NAME" | sed 's/.*0000:\([0-9abcdefABCDEF]*\):.*/\1/'`
@@ -29,6 +29,7 @@ function listJS () {
 				break
 			fi
 		done
+
 		if [[ $string =~ "NVIDIA" && ! $string =~ "nForce" ]]; then
 			local brand="N"
 
@@ -56,13 +57,14 @@ function listJS () {
 			local info=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5", " $4 }'`
 			
 			if [[ ! -z $coreAddr ]]; then
+				local iCard=`echo $coreAddr | sed "s/.*card\([0-9]*\).*/\1/"`
 				local fanAddr=`ls -d $coreAddr/hwmon/hwmon[0-9]*`
 				local n=`echo $coreAddr | sed 's#/sys/class/drm/card\([0-9a-zA-Z]*\).*#\1#'`
 
 				if [[ -e $coreAddr/mem_info_vram_total ]]; then
 					local mem="`cat $coreAddr/mem_info_vram_total 2>/dev/null`" && mem="$(( $mem/1024/1024 ))"
-				elif [[ -e /sys/kernel/debug/dri/$cardno/amdgpu_vram ]]; then
-					local mem="`stat -c %s /sys/kernel/debug/dri/$cardno/amdgpu_vram 2>/dev/null`" && mem="$(( $mem/1024/1024 ))"
+				elif [[ -e /sys/kernel/debug/dri/$iCard/amdgpu_vram ]]; then
+					local mem="`stat -c %s /sys/kernel/debug/dri/$iCard/amdgpu_vram 2>/dev/null`" && mem="$(( $mem/1024/1024 ))"
 				else
 					local mem=`dmesg | grep ".*VRAM.*used" | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`
 				fi

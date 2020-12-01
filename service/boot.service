@@ -1,5 +1,6 @@
 [Unit]
 Description=OSdog boot
+Wants=netmngr.service
 
 [Service]
 Type=oneshot

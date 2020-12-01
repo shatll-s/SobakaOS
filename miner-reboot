@@ -45,7 +45,7 @@ fi
 
 if [[ -f $reboot_logfile ]]; then
 	#return="`date --rfc-3339=seconds` `echo -e \"${GREEN} Last 50 strings of $Miner log:${WHITE}\"`$LF`tail -n 20 $reboot_logfile | cut -f 1 -d ' ' --complement`" #| sed -e 's/\"//g; /^\s*$/d;'`
-	return="`tail -n 20 $reboot_logfile`"
+	return="`tail -n 100 $reboot_logfile`"
 	echo "/dog/msg \"$lastmsg\" danger \"$return\""
 	/dog/msg "$lastmsg" danger "$return"
 else

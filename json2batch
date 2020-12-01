@@ -300,7 +300,8 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind-http 0.0.0.0:$API_port --no-watchdog"
+			[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
+			minerexec+=" --api-bind-http 0.0.0.0:$API_port"
 
 
 

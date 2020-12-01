@@ -148,11 +148,15 @@ function driver_install () {
 	current_driver=`nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/'`
 	echo -e "Current driver:\t${GREEN}$current_driver${WHITE}"
 	echo -e "New driver:\t${GREEN}${LATEST_NVIDIA}${WHITE}"
-	echo -e "Are you really want to update driver? y/n"
-	read answer
-	if [[ $answer != 'y' &&  $answer != 'yes' && $answer != 'Y' && $answer && 'Yes' ]]; then
-		echo -e "${RED}OK, bye!${WHITE}"
-		exit 1
+	if [[ $2 == '-y' ]]; then
+		echo "Found '-y' option, no questions will be asked"
+	else
+		echo -e "Are you really want to update driver? y/n"
+		read answer
+		if [[ $answer != 'y' &&  $answer != 'yes' && $answer != 'Y' && $answer != 'Yes' ]]; then
+			echo -e "${RED}OK, bye!${WHITE}"
+			exit 1
+		fi
 	fi
 	services_stop
 
@@ -214,7 +218,7 @@ case $1 in
 		flash_bios $2 $3 "$4"
 	;;
 	driver_install|update)
-		driver_install $2
+		driver_install $2 $3
 	;;
 	*)
 		bname=`basename $0`
