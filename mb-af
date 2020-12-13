@@ -4,6 +4,7 @@
 . colors
 
 CFG="/dog/cfg/mb-af.cfg"
+RIG_CFG="/dog/cfg/rig.cfg"
 SCREEN_CFG="/dog/service/screenrc"
 LOG="/dog/log/mb-af.log"
 STATS="/run/dog/stats"
@@ -18,6 +19,7 @@ LOGO="
 "
 delay=10
 maxRefresh=20 #if stats are olden, something is wrong
+defaultCritTemp=85
 
 function testFan () {
 	fan=$1
@@ -99,14 +101,14 @@ function start () {
 	
 	while true; do
 		cfg=`cat $CFG`
-		for option in enabled tt hyst fanmin fanmax shift delay pwm; do
+		for option in enabled tt hyst fanmin fanmax shift delay pwm invert; do
 			if [[ `echo $cfg | jq ".$option"` != null ]]; then
 				option_value="`echo $cfg | jq -r \".$option\"`" #double slash, because eval open it
 				eval "local $option=\"$option_value\""
 				#echo "local $option=\"$option_value\""
 			fi
 		done
-		
+
 		if [[ $enabled -ne 1 ]]; then
 			if [[ $msg_trigger != 1 ]]; then
 				echo -n "Autofan is not enabled, waiting."
@@ -115,12 +117,24 @@ function start () {
 				echo -n "."
 			fi
 			sleep 10
+			continue
 		else
 			[[ $msg_trigger == 1 ]] && msg_trigger=0 && echo ""
 			local fanAddr=(`find $mbAddr/pwm${pwm}`)
 			
 			[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
 			crit_shift=`echo "scale=0; $shift * 3 / 1" | bc -l`
+
+			if [[ ! -f $RIG_CFG ]]; then
+				. $RIG_CFG
+				if [[ ! -z $WD_TEMP_CRIT ]]; then #! -z $WD_TEMP_ENABLED && $WD_TEMP_ENABLED -eq 1 && 
+					crit_temp=WD_TEMP_CRIT
+				else
+					crit_temp=$defaultCritTemp
+				fi
+			else
+				crit_temp=$defaultCritTemp
+			fi
 		fi
 
 		if [[ ! -f $STATS ]]; then
@@ -154,6 +168,7 @@ function start () {
 		done
 		
 		local fanRaw=`cat $fanAddr`
+		[[ $invert -eq 1 ]] && fanRaw=`echo "scale=0; 255 - $fanRaw" | bc -l`
 		#echo "FAN: @$fanRaw@"
 		local fan=`echo "scale=2; $fanRaw/2.55" | bc -l` #fan power is beetween 0 and 255
 		
@@ -219,7 +234,10 @@ function start () {
 			elif [[ $adoptedFan -lt 0 ]]; then
 				adoptedFan=0
 			fi
+
 			#echo $adoptedFan
+			[[ $invert -eq 1 ]] && adoptedFan=`echo "scale=0; 255 - $adoptedFan" | bc -l`
+
 			echo $adoptedFan > $fanAddr
 		fi
 		

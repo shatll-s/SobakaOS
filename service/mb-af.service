@@ -3,12 +3,12 @@ Description=OSdog Motherboard Autofan Service
 #After=af.service
 
 [Service]
-#Type=forking
-#Restart=on-failure
-#RestartSec=3
-Type=oneshot
-RemainAfterExit=1
-ExecStartPre=/bin/sleep 15
+Type=forking
+Restart=on-failure
+RestartSec=3
+#Type=oneshot
+#RemainAfterExit=1
+#ExecStartPre=/bin/sleep 15
 ExecStart=/dog/mb-af start
 
 

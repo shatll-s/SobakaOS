@@ -569,13 +569,25 @@ case $1 in
 		miner_ver=(`echo $stats_template | jq -r '.version'`)
 		miner_algo=(`echo $stats_template | jq -r '.stratum.algorithm'`)
 		miner_online=(`echo $stats_template | jq -r '.start_time'`)
-		miner_temp=(`echo $stats_template | jq -r '.miner.devices[].temperature'`)
-		miner_fan=(`echo $stats_template | jq -r '.miner.devices[].fan'`)
+		miner_tempRaw=(`echo $stats_template | jq -r '.miner.devices[].temperature'`)
+		miner_fanRaw=(`echo $stats_template | jq -r '.miner.devices[].fan'`)
+
+		for ((i=0; i < ${#miner_tempRaw[@]}; i++)); do
+			if [[ ${miner_tempRaw[$i]} -eq 0 && ${miner_fanRaw[$i]} -eq 0 ]]; then
+				miner_temp[$i]=''
+				miner_fan[$i]=''
+			else
+				miner_temp[$i]=${miner_tempRaw[$i]}
+				miner_fan[$i]=${miner_fanRaw[$i]}
+			fi
+		done
 		#miner_power=(`echo $stats_template | jq -r '.miner.devices[].power'`) # | sed 's/;/\n/g'`)
 		miner_busid=(`echo $stats_template | jq -r '.miner.devices[].pci_bus_id'`)
+		miner_share=(`echo $stats_template | jq -r '.miner.devices[].accepted_shares'`)
+		miner_badshare=(`echo $stats_template | jq -r '.miner.devices[].rejected_shares'`)
 		miner_hr_raw=(`echo $stats_template | jq -r '.miner.devices[].hashrate_raw'`)
 		miner_total_hr=0
-		
+
 		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
 			[[ $miner_dual_algo == "ethash" || $miner_algo == 'ethash' ]] && delimiter=1000 || delimiter=1
 			miner_hr[i]=`echo "scale=2; ${miner_hr_raw[i]} / $delimiter" | bc -l`
