@@ -80,39 +80,60 @@ function loop() {
 		else
 			local miner_restart_timeout="n/a"
 		fi
+
+		if [[ ! -z $WD_NONET_REBOOT_TIME= ]]; then
+			local nonet_reboot_timeout=`echo $WD_NONET_REBOOT_TIME 60 | awk '{print $1 * $2}'`
+		else
+			local nonet_reboot_timeout=1800 #30min
+		fi
 		echo -en "${RED}WARNING${WHITE}\t${CYAN}$miner${WHITE} $hr kHs <  $minhash kHs for $elapsed seconds\t"
-		echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE} | restart ${GREEN}${miner_restart_timeout}s${WHITE})"
-		if [[ ! -z $WD_REBOOT ]]; then
-			if [[ $elapsed -ge $reboot_timeout ]]; then
-				
-				if [[ $WD_WAKEALARM -eq 1 ]]; then
-					msg "Hashrate WD: $miner low hr ($hr kH/s), shutdown & wake up" danger "`get_log miner$1`"
-					echo -e "${RED}WD: Shutdown and wake up after $WD_REBOOT minutes${WHITE}"
-					nohup bash -c "sreboot wakealarm" > /tmp/nohup.log 2>&1 &
-				else
-					msg "Hashrate WD: $miner low hr ($hr kH/s), rebooting" danger "`get_log miner$1`"
-					echo -e "${RED}WD: Rebooting after $WD_REBOOT minutes${WHITE}"
-					nohup bash -c "sreboot" > /tmp/nohup.log 2>&1 &
-				fi				
+		echo -e "(reboot ${GREEN}${reboot_timeout}s${WHITE} | restart ${GREEN}${miner_restart_timeout}s${WHITE} | net reboot ${GREEN}${nonet_reboot_timeout}s${WHITE})"
+
+		local noNetTrigger=0
+		if [[ ! -z $WD_NONET_NOREBOOT ]]; then
+			ping -c 1 8.8.8.7 > /dev/null 2>&1
+			local pingExitcode=$?
+
+			if [[ $pingExitcode -ne 0 ]]; then
+				if [[ $elapsed -lt $nonet_reboot_timeout ]]; then
+					local noNetTrigger=1
+				fi
 			fi
-		else
-			echo "Miner restart is not allowed"
 		fi
-		if [[ ! -z $WD_RESTART ]]; then
-			[[ ! $miner_restart_count ]] && miner_restart_count=0
-			local restart_time=`echo "$miner_restart_count + 1" | bc -l`
-			local miner_restart_timeout2=`echo "$miner_restart_timeout * $restart_time" | bc -l`
-			#debug			
-			#echo "restart_time $restart_time | miner_restart_timeout $miner_restart_timeout | miner_restart_timeout2 $miner_restart_timeout2"
-			if [[ $elapsed -ge $miner_restart_timeout2 ]]; then
-				msg "Hashrate WD: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) Restarting after $miner_restart_timeout2 seconds for $restart_time time\n`get_log miner$1`"
-				echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $miner_restart_timeout2 seconds for $restart_time time${WHITE}"
-				(( miner_restart_count++ ))
-				screen-kill $miner
+
+		if [[ $noNetTrigger -eq 0 ]]; then
+			if [[ ! -z $WD_REBOOT ]]; then
+				if [[ $elapsed -ge $reboot_timeout ]]; then
+					if [[ $WD_WAKEALARM -eq 1 ]]; then
+						msg "Hashrate WD: $miner low hr ($hr kH/s), shutdown & wake up" danger "`get_log miner$1`"
+						echo -e "${RED}WD: Shutdown and wake up after $WD_REBOOT minutes${WHITE}"
+						nohup bash -c "sreboot wakealarm" > /tmp/nohup.log 2>&1 &
+					else
+						msg "Hashrate WD: $miner low hr ($hr kH/s), rebooting" danger "`get_log miner$1`"
+						echo -e "${RED}WD: Rebooting after $WD_REBOOT minutes${WHITE}"
+						nohup bash -c "sreboot" > /tmp/nohup.log 2>&1 &
+					fi				
+				fi
+			else
+				echo "Miner restart is not allowed"
 			fi
-		else
-			echo "Rig reboot is not allowed"
+			if [[ ! -z $WD_RESTART ]]; then
+				[[ ! $miner_restart_count ]] && miner_restart_count=0
+				local restart_time=`echo "$miner_restart_count + 1" | bc -l`
+				local miner_restart_timeout2=`echo "$miner_restart_timeout * $restart_time" | bc -l`
+				#debug			
+				#echo "restart_time $restart_time | miner_restart_timeout $miner_restart_timeout | miner_restart_timeout2 $miner_restart_timeout2"
+				if [[ $elapsed -ge $miner_restart_timeout2 ]]; then
+					msg "Hashrate WD: $miner low hashrate ($hr kH/s), restarting" danger "$(date --rfc-3339=seconds) Restarting after $miner_restart_timeout2 seconds for $restart_time time\n`get_log miner$1`"
+					echo -e "${YELLOW}Restarting ${CYAN}$miner_loc${WHITE} ${YELLOW}after $miner_restart_timeout2 seconds for $restart_time time${WHITE}"
+					(( miner_restart_count++ ))
+					screen-kill $miner
+				fi
+			else
+				echo "Rig reboot is not allowed"
+			fi
 		fi
+
 		ok_count=0
 	fi
 	#save local variables to memory

@@ -48,7 +48,7 @@ function listJS () {
             #fi
 			local info="$vbios"
 			(( nv++ )) #nvidia gpus
-		elif [[ $string =~ "Advanced Micro Devices" ]]; then
+		elif [[ $string =~ "Advanced Micro Devices" && $string != *"BeaverCreek"* ]]; then
 			local brand="A"
 			#local color="$LIGHTRED"
 			
@@ -78,7 +78,7 @@ function listJS () {
 			fi
 		else
 			local brand="I"
-			local name=`lspci | grep VGA | grep Intel | sed 's/.*controller: //'`
+			local name=`lspci -s "$bus" | sed 's/.*controller: //'`
 			local info=" "
 			unset coreAddr bus #b #no need
 		fi

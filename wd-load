@@ -7,6 +7,7 @@ RIG_CFG="/dog/cfg/rig.cfg"
 BATCH_CFG="/dog/cfg/batch.cfg"
 SCREEN_CFG="/dog/service/screenrc"
 LOG="/dog/log/wd-load.log"
+AF_CFG="/dog/cfg/af.cfg" #show if reboot
 AF_LOG="/dog/log/af.log" #show if reboot
 STATS="/run/dog/stats"
 STATS_HELLO="/run/dog/statsHello"
@@ -125,10 +126,18 @@ function start () {
 
 		if [[ ! $load || $load == 'null' ]]; then
 			local statsText="${RED}Something wrong, no load values are available${WHITE}\n"
-			if [[ -f $AF_LOG ]]; then
-				local afLogUpdate=`stat -c %Y $AF_LOG`
-				local afLogRefresh=$(($now - $afLogUpdate))
-				[[ $afLogRefresh -le 60 ]] && statsText+=`tail -n 20 $AF_LOG`
+
+			if [[ -f $AF_CFG ]]; then
+				local afCfg=`cat $AF_CFG`
+				local afEnabled=`echo $cfg | jq -r '.af_enabled'`
+				if [[ $enabled -eq 1 ]]; then
+					if [[ -f $AF_LOG ]]; then
+					#	local afLogUpdate=`stat -c %Y $AF_LOG`
+					#	local afLogRefresh=$(($now - $afLogUpdate))
+					#	[[ $afLogRefresh -le 60 ]] && 
+						statsText+=`tail -n 20 $AF_LOG`
+					fi
+				fi
 			fi
 			trigger=4
 		fi
