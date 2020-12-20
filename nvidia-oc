@@ -4,7 +4,8 @@ NVIDIA_CFG="/dog/cfg/nvidia.cfg"
 LOCK_FILE="/tmp/.nvidia-oc.lock"
 [[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
 #list=`cat /run/dog/gpuStats`
-listNV=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "N")]'`
+#listNV=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "N")]'`
+listNV=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "N") | select(.status != "1")]'`
 
 function getdata () {
 	for option in core_clock memory_clock power_limit pill pill_args light fan; do
@@ -46,7 +47,6 @@ pkill -f '/dog/sbin/OhGodAnETHlargementPill-r2'
 echo -e $BROWN"================================================================"$WHITE
 #n=$(gpu-detect NVIDIA)
 n=`echo $listNV | jq '.|length'`
-echo "LENGTH $n"
 [[ $n == 0 ]]&&	echo $(date --rfc-3339=seconds)" 0 NVIDIA GPU detected" && exit 1
 echo -e $(date --rfc-3339=seconds)" $n ${GREEN}NVIDIA${WHITE} GPU detected"
 

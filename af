@@ -205,7 +205,7 @@ function autofan () {
 					fi
 				fi
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
-				
+				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			else
 				#local fan_color=$RED
@@ -222,6 +222,7 @@ function autofan () {
 				else
 					local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
 				fi
+				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			else
@@ -229,6 +230,10 @@ function autofan () {
 				local message="${BLUE}Min %${WHITE}" 
 			fi
 		fi
+
+			
+
+	
 
 		[[ -z $temp_color ]] && temp_color=$WHITE
 		[[ -z $fan_color ]] && fan_color="$WHITE"
