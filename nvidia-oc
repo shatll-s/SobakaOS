@@ -105,7 +105,7 @@ allFanCount=0
 for (( i=0; i < $n; i++ )); do
 	name=`echo $listNV | jq -r ".[$i].name"`
 	bus=`echo $listNV | jq -r ".[$i].bus"`
-	[[ ! $name =~ "GTX" || $name =~ "1660" ]] && fanCount=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
+	[[ ! $name =~ "GTX" || $name =~ "1660" || $name =~ "RTX" ]] && fanCount=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
 	[[ $fanCount -lt 1 ]] && fanCount=1
 	
 	echo -e "${LIGHTGREEN}GPU $i: $name${WHITE} ($bus)"

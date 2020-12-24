@@ -321,7 +321,9 @@ for (( i=0; i < $n; i++ )); do
 			uppArgs+="smc_pptable/MemMvddVoltage/2=${vlt_mvdd} "
 			uppArgs+="smc_pptable/MemMvddVoltage/3=${vlt_mvdd} "
     	fi
-		uppArgs+="overdrive_table/max/8=960 "
+
+		[[ ! -z ${MEMORY_CLOCK[$i]} && ${MEMORY_CLOCK[$i]} -gt 650 ]] && odLimit=${MEMORY_CLOCK[$i]} || odLimit=960
+		uppArgs+="overdrive_table/max/8=$odLimit "
 		uppArgs+="overdrive_table/min/3=650 "
 		uppArgs+="overdrive_table/min/5=650 "
 		uppArgs+="overdrive_table/min/7=650"

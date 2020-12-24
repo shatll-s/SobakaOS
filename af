@@ -368,9 +368,9 @@ case $1 in
 			for (( i=0; i < `echo $listNV | jq '.|length'`; i++ )); do
 				startFan[$i]=$allFanCount
 				name=`echo $listNV | jq -r ".[$i].name"`
-				[[ ! $name =~ "GTX" || $name =~ "1660" ]] && fanCount[$i]=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
+				[[ ! $name =~ "GTX" || $name =~ "1660" || $name =~ "RTX" ]] && fanCount[$i]=`echo "$NV_FANS_LIST" | grep -c "gpu:$i]"` #non-GTX and GTX 1660 GPUs
 				[[ ${fanCount[$i]} -lt 1 ]] && fanCount[$i]=1
-				echo "Fan count $i ${fanCount[$i]}"
+				#echo "Fan count $i ${fanCount[$i]}"
 				((allFanCount = $allFanCount + ${fanCount[$i]}))
 			done
 		fi
