@@ -135,49 +135,108 @@ function driver_install () {
 	
 	df=`df | grep "/$" | awk '{print $4}'`
 	[[ $df -lt 500000 ]] && echo -e "${RED}You don\`t have enough disk space. Try to delete something or disk-expand. Exiting...${WHITE}" && exit 1
-		
-	if [[ -z $url ]]; then
-		echo -e "${CYAN}> Getting the latest version${WHITE}"
-		versions_url="https://os.dog/downloads/drivers/driver_versions.txt"
-		versions=`curl -sLk $versions_url`
-		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && return 1
-		eval "$versions"
-		url="https://os.dog/downloads/drivers/${LATEST_NVIDIA}"
-	fi
-
 	current_driver=`nvidia-smi | grep "Driver Version" | sed 's/.*Driver Version: \([0-9.]*\)\s.*/\1/'`
 	echo -e "Current driver:\t${GREEN}$current_driver${WHITE}"
-	echo -e "New driver:\t${GREEN}${LATEST_NVIDIA}${WHITE}"
-	if [[ $2 == '-y' ]]; then
-		echo "Found '-y' option, no questions will be asked"
+	
+	if [[ -z $url && $latestVer -ne 1 && $stableVer -ne 1 ]]; then
+		echo -e "> Getting driver versions"
+		local versions_url="https://os.dog/downloads/drivers/versions.php"
+		local versions=`curl -sLk $versions_url | jq '.nvidia'`
+		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+		
+		for (( i=0; i < `echo $versions | jq '. | length'`; i++ )); do
+			local driverData=`echo $versions | jq ".[$i]"`
+			local name=`echo $driverData | jq -r ".name"`
+			local stable=`echo $driverData | jq -r ".stable"`
+			local latest=`echo $driverData | jq -r ".latest"`
+			
+			local string="${BROWN}$i${WHITE}\t${LIGHTGREEN}$name${WHITE}\t"
+			[[ `expr length $name` -lt 8 ]] && string+="\t"
+			[[ $stable == true ]] && string+="${GREEN}stable${WHITE} " || string+="       "
+			[[ $latest == true ]] && string+="${CYAN}latest${WHITE} " || string+="       "
+			echo -e "$string"
+		done
+		
+		echo -e "Select version to install:"
+		read i
+
+		numberFormat='^[0-9]+$'
+		if ! [[ $i =~ $numberFormat ]] ; then
+			echo -e "${RED}Error: you need to enter number here${WHITE}"
+			exit 1
+		fi
+		
+		local newDriver=`echo $versions | jq ".[$i]"`
+		local name=`echo $newDriver | jq -r ".name"`
+		local url=`echo $newDriver | jq -r ".url"`
+	elif [[ $latestVer -eq 1 || $stableVer -eq 1 ]]; then
+		echo -e "> Getting driver versions"
+		versions_url="https://os.dog/downloads/drivers/versions.php"
+		versions=`curl -sLk $versions_url | jq '.nvidia'`
+		[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+		
+		[[ $latestVer -eq 1 ]] && local newDriversArr=`echo $versions | jq "[.[] | select(.latest == true)]"` || local newDriversArr=`echo $versions | jq "[.[] | select(.stable == true)]"`
+		
+		[[ $newDriversArr == "[]" ]] && echo -e "${RED}Can\`t find compatible driver version for latest/stable option" && exit 1
+		local newDriver=`echo $newDriversArr | jq .[-1]`
+		local name=`echo $newDriver | jq -r ".name"`
+		local url=`echo $newDriver | jq -r ".url"`
 	else
+		if ! [[ "$url" == *http* ||  "$url" == *ftp* || "$url" == */* || "$url" == *\.run ]]; then
+			#echo "This is not link!"
+			echo -e "> Getting driver versions"
+			versions_url="https://os.dog/downloads/drivers/versions.php"
+			versions=`curl -sLk $versions_url | jq '.nvidia'`
+			[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
+			
+			local newDriversArr=`echo $versions | jq "[.[] | select(.name | contains(\"$url\"))]"`
+			[[ $newDriversArr == "[]" ]] && echo -e "${RED}Can\`t find compatible driver version for option ${CYAN}$url${WHITE}" && exit 1
+			local newDriver=`echo $newDriversArr | jq .[-1]`
+			local name=`echo $newDriver | jq -r ".name"`
+			local url=`echo $newDriver | jq -r ".url"`
+		else
+			name=`basename $url`
+		fi
+	fi
+	echo -e "New driver:\t${GREEN}${name}${WHITE}"
+
+	if [[ $yes -ne 1 ]]; then
 		echo -e "Are you really want to update driver? y/n"
 		read answer
-		if [[ $answer != 'y' &&  $answer != 'yes' && $answer != 'Y' && $answer != 'Yes' ]]; then
+		if [[ $answer != 'y' &&  $answer != 'yes' && $answer != 'Y' && $answer && 'Yes' ]]; then
 			echo -e "${RED}OK, bye!${WHITE}"
 			exit 1
 		fi
 	fi
-	services_stop
 
-	cd "/dog/downloads"
-	driver_name=`basename $url`
-
-	if [[ -e ./$driver_name ]]; then
+	local driver_name=`basename $url`
+	
+	if [[ -e /dog/downloads/$driver_name && `stat -c %s /dog/downloads/$driver_name` -lt 100000000 ]]; then
+		echo -e "${RED}> Driver $driver_name is already downloaded, but size is to low. May be this is not driver file?${WHITE}"
+		exit 1
+	elif [[ -e /dog/downloads/$driver_name ]]; then
 		echo -e "${CYAN}> Driver $driver_name is already downloaded${WHITE}"
 	else
-		echo -e "${CYAN}> Downloading $url${WHITE}"
-		rm -f "/tmp/$driver_name"
-		wget -c $url -O "/tmp/$driver_name" #`[ -t 0 ] && echo '--no-verbose'`
-		mv "/tmp/$driver_name" "/dog/downloads/$driver_name"
-		[[ $? -ne 0 ]] && echo -e "${RED}Error downloading driver${WHITE}" && exit 1
+		if [[ "$url" == *http* ||  "$url" == *ftp* ]]; then
+			rm -f "/tmp/$driver_name"
+			
+			[ -t 1 ] && wget -c $url -O "/tmp/$driver_name" || wget -q -c $url -O "/tmp/$driver_name"
+			[[ $? -ne 0 ]] && echo -e "${RED}> Download failed. Check url${WHITE}" && exit 1
+
+			mv "/tmp/$driver_name" "/dog/downloads/$driver_name"
+			[[ $? -ne 0 ]] && echo -e "${RED}> File move failed. Check file${WHITE}" && exit 1
+		else
+			[[ ! -f $url ]] && echo -e "${RED}> File not found. Check path${WHITE}" && exit 1
+			cp -v "$url" /dog/downloads/$driver_name
+			[[ $? -ne 0 ]] && echo -e "${RED}> Copy image failed${WHITE}" && exit 1
+		fi
 	fi
 
-
+	services_stop
 	echo -e "${CYAN}> Installing${WHITE}"
 	#apt update
 	#apt-get install -y dkms
-	sh "$driver_name" --accept-license --no-questions --ui=none --install-libglvnd #--dkms 
+	sh "/dog/downloads/$driver_name" --accept-license --no-questions --ui=none --install-libglvnd #--dkms 
 	exitcode=$?
 	hello
 
@@ -201,33 +260,128 @@ function driver_install () {
 	fi
 }
 
-case $1 in
-	services_start|start)
+function showHelp () {
+	bname=`basename $0`
+	echo -e "Usage: ${CYAN}$bname [arg1 arg2 ...] command [url]${WHITE}"
+	echo -e "  update\t\tUpdate driver to latest or argument version"
+	echo -e "  start\t\t\tStart mining, X-server, load Nvidia modules"
+	echo -e "  stop\t\t\tStop mining, X-server, unload Nvidia modules"
+	echo -e "  get-bios gpu_id\tGet bios version"
+	echo -e "  save-bios gpu_id file\tSave Nvidia GPU bios to file"
+	echo ""
+	echo -e "Common options:"
+	echo -e "${GREEN}  -y|--yes                ${WHITE}Do not ask for confirmation, answer yes to all questions"
+	echo -e "${GREEN}  -s|--stable             ${WHITE}Select stable driver"
+	echo -e "${GREEN}  -l|--latest             ${WHITE}Select latest driver"
+	echo -e "${GREEN}  -h|--help               ${WHITE}Show this message"
+	echo ""
+	echo -e "\nExamples:"
+	echo -e "${GREEN}  nvidia-tool -y --latest update${WHITE}"
+	echo -e "${GREEN}  nvidia-tool -y -l update${WHITE}"
+	echo -e "${GREEN}  nvidia-tool -y update 460.32${WHITE}"
+}
+
+while [ -n "$1" ]; do
+	option=$1
+	
+	if [[ $option == '--help' || $option == '-h' ]]; then
+		showHelp
+		exit 0
+	elif [[ $option == '--yes' || $option == '-y' ]]; then
+		yes=1
+	elif [[ $option == '--latest' || $option == '-l' ]]; then
+		latestVer=1
+	elif [[ $option == '--stable' || $option == '-s' ]]; then
+		stableVer=1
+	elif [[ $option == 'services_start' || $option == 'start' ]]; then
+		command='start'
+	elif [[ $option == 'services_stop' || $option == 'stop' ]]; then
+		command='stop'
+	elif [[ $option == 'get-bios' || $option == 'get_bios' ]]; then
+		command='getBios'
+
+		shift
+		if [[ ! -z $1 ]]; then
+			gpuId=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
+	elif [[ $option == 'save-bios' || $option == 'save_bios' ]]; then
+		command='saveBios'
+
+		shift
+		if [[ ! -z $1 ]]; then
+			gpuId=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
+
+		shift
+		if [[ ! -z $1 ]]; then
+			file=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
+	elif [[ $option == 'flash_bios' || $option == 'flash' ]]; then
+		command='flashBios'
+		gpu_i=$1
+	file=$2
+	[[ ! -z $3 ]] && add="$3"
+
+		shift
+		if [[ ! -z $1 ]]; then
+			gpuId=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
+
+		shift
+		if [[ ! -z $1 ]]; then
+			file=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
+
+		shift
+		[[ ! -z $1 ]] && add="$1"
+	elif [[ $option == 'update' ]]; then
+		command='install'
+		shift
+		[[ ! -z $1 ]] && url=$1	
+	else
+		echo "Uncorrect argument $option"
+	fi
+
+	shift
+done
+
+case $command in
+	start)
 		services_start
 	;;
-	services_stop|stop)
+	stop)
 		services_stop
 	;;
-	get_bios|bios_ver)
-		get_biosver $2
+	getBios)
+		get_biosver $gpuId
 	;;
-	save_bios|save)
-		save_bios $2 $3
+	saveBios)
+		save_bios $gpuId $file
 	;;
-	flash_bios|flash)
-		flash_bios $2 $3 "$4"
+	flashBios)
+		flash_bios $gpuId $file "$add"
 	;;
-	driver_install|update)
-		driver_install $2 $3
+	install)
+		driver_install $url
 	;;
 	*)
-		bname=`basename $0`
-		echo -e "Usage: ${CYAN}$bname start|stop|install|save gpu_id file|get_bios gpu_id${WHITE}"
-		echo -e "  start, services_start\t\tStart mining, X-server, load Nvidia modules"
-		echo -e "  stop, services_stop\t\tStop mining, X-server, load Nvidia modules"
-		echo -e "  get_bios, bios_ver gpu_id\tGet bios version "
-		echo -e "  save, save_bios gpu_id file\tSave Nvidia GPU bios"
-		echo -e "  update, driver_install\tUpdate Nvidia driver to latest or argument version"
-		echo -e "  \t\t\t\te .g. nvidia-tool update http://ru.download.nvidia.com/XFree86/Linux-x86_64/418.56/NVIDIA-Linux-x86_64-418.56.run"
+		echo -e "${RED}No command specified${WHITE}"
+		showHelp
+		exit 1
 	;;
 esac

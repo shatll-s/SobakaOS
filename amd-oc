@@ -126,7 +126,7 @@ for (( i=0; i < $n; i++ )); do
 	name=`echo $listAMD | jq -r ".[$i].name"`
 	navi=`echo $listAMD | jq -r ".[$i].navi"`
 	coreAddr=`echo $listAMD | jq -r ".[$i].coreAddr"`
-	
+	uppArgs=''
 
 	if [[ -z $coreAddr || $coreAddr == 'null' ]]; then
 		echo -e "${LIGHTRED}GPU $i: $name${WHITE}"
@@ -187,24 +187,35 @@ for (( i=0; i < $n; i++ )); do
 			
 			if [[ ${CORE_CLOCK[$i]} ]]; then
 				if [[ $name == *"Vega"* ]]; then
-					for (( vega_state=1; vega_state <= 7; vega_state++ )); do
-						vega_clock=`echo "scale=0; ${CORE_CLOCK[$i]} - (7-$vega_state)*10" | bc -l`
-						$script -i $card --core-state $vega_state --core-clock $vega_clock | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-						#echo "$vega_state = $vega_clock"
-					done
+					if [[ ${CORE_STATE[$i]} ]]; then
+						maxCoreClock=`echo "scale=0; ${CORE_CLOCK[$i]} + (7 - ${CORE_STATE[$i]})*10" | bc -l`
+						for (( vega_state=1; $vega_state <= 7; vega_state++ )); do
+							vega_clock=`echo "scale=0; $maxCoreClock - (7-$vega_state)*10" | bc -l`
+							$script -i $card --core-state $vega_state --core-clock $vega_clock | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+						done
+					else
+						for (( vega_state=1; $vega_state <= 7; vega_state++ )); do
+							vega_clock=`echo "scale=0; ${CORE_CLOCK[$i]} - (7-$vega_state)*10" | bc -l`
+							$script -i $card --core-state $vega_state --core-clock $vega_clock | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+							#echo "$vega_state = $vega_clock"
+						done
+					fi
 				else
 					str="$str --core-state ${CORE_STATE[$i]} --core-clock ${CORE_CLOCK[$i]}"
 				fi
 			fi
-
 			if [[ ${CORE_VOLTAGE[$i]} ]]; then
-				volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$i]}" -A1) \
+				#if [[ $name != *"Vega"* }}$ENHANCED -eq 1 ]]; then
+					volt_state=`echo -e $($script -i $card --show-core | grep "DPM state ${CORE_STATE[$i]}" -A1) \
 					| sed -e 's/)//g; s/.*entry \([0-9]*\)/\1/'`
-				str="$str --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$i]}"
+					str="$str --volt-state $volt_state --vddc-table-set ${CORE_VOLTAGE[$i]}"
+				#fi
+				
 			fi
 		fi
 		#str="$script -i $card"
-
+		
+	
 		if [[ -z ${MEMORY_STATE[$i]} || ${MEMORY_STATE[$i]} == "A" ]]; then
 			MEMORY_STATE[$i]=`$script -i $card --show-mem | grep -E "Memory state ([0-9]+):" | tail -n 1 | sed "s/Memory state \([0-9]*\).*/\1/"`
 		fi
@@ -212,17 +223,39 @@ for (( i=0; i < $n; i++ )); do
 		if [[ ! -z ${MEMORY_CLOCK[$i]} ]]; then
 			str="$str --mem-state ${MEMORY_STATE[$i]} --mem-clock ${MEMORY_CLOCK[$i]}"
 		fi
-		[[ $ALT -eq 1 && ! -z ${MEMORY_VOLTAGE[$i]} ]] && str="$str --vddci ${MEMORY_VOLTAGE[$i]}" #no need to change --mvdd --mvdd 1000"
 
-		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
-		#29 is "wolfamdctrl -i 5", so it`s useless to do
+		if [[ $name != *"Vega"* ]]; then
+			[[ $ALT -eq 1 && ! -z ${MEMORY_VOLTAGE[$i]} ]] && str="$str --vddci ${MEMORY_VOLTAGE[$i]}"
+		fi
 		
-		if [[ $ALT -ne 1 ]]; then 
+		[[ $(echo $str | awk '{print length}') -gt 30 ]] && echo "$str" && bash -c "$str" | sed -e "s/^MyTool 0.0.1$//; /^\s*$/d; s/'//g"
+		#29 is "wolfamdctrl -i 5", so it`s useless to do		
+
+		if [[ $name == *"Vega"* ]]; then
+			if [[ $ENHANCED -eq 1 ]]; then
+				coreVoltageAdopted=`echo "scale=2; ${CORE_VOLTAGE[$i]}/1000" | bc -l`
+				echo "atitool -i=$i -vddcr_soc=$coreVoltageAdopted"
+				atitool -i=$i -vddcr_soc=$coreVoltageAdopted
+				bash -c "sleep 20 && atitool -i=$i -vddcr_soc=$coreVoltageAdopted" &
+			fi
+			
 			if [[ ! -z ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_STATE[$i]} && ! -z ${MEMORY_CLOCK[$i]} ]]; then
-				mem_str="m ${MEMORY_STATE[$i]} ${MEMORY_CLOCK[$i]} ${MEMORY_VOLTAGE[$i]}"
-				echo "$mem_str > $coreAddr/pp_od_clk_voltage"
-				echo "$mem_str" >$coreAddr/pp_od_clk_voltage
-				echo "c" > $coreAddr/pp_od_clk_voltage
+				if [[ $ENHANCED -eq 1 ]]; then
+					adoptedMvdd=`echo "scale=2; ${MEMORY_VOLTAGE[$i]}/1000" | bc -l`
+					echo "atitool -i=$i -vddcr_hbm=$adoptedMvdd"
+					atitool -i=$i -vddcr_hbm=$adoptedMvdd
+				fi
+			fi
+
+			#upp -p $coreAddr/pp_table set $uppArgs --write
+		else
+			if [[ $ALT -ne 1 ]]; then 
+				if [[ ! -z ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_STATE[$i]} && ! -z ${MEMORY_CLOCK[$i]} ]]; then
+					mem_str="m ${MEMORY_STATE[$i]} ${MEMORY_CLOCK[$i]} ${MEMORY_VOLTAGE[$i]}"
+					echo "$mem_str > $coreAddr/pp_od_clk_voltage"
+					echo "$mem_str" >$coreAddr/pp_od_clk_voltage
+					echo "c" > $coreAddr/pp_od_clk_voltage
+				fi
 			fi
 		fi
 
@@ -234,33 +267,33 @@ for (( i=0; i < $n; i++ )); do
 		fi
 
 		
-		if [[ $name == *"Vega"* ]]; then
+		#if [[ $name == *"Vega"* ]]; then
 			#echo "manual" >$coreAddr/power_dpm_force_performance_level
 			#echo 4 >$coreAddr/pp_power_profile_mode
 
-			echo "echo auto > $coreAddr/power_dpm_force_performance_level"
-			echo "auto" > $coreAddr/power_dpm_force_performance_level	
-		else
+		#	echo "echo auto > $coreAddr/power_dpm_force_performance_level"
+		#	echo "auto" > $coreAddr/power_dpm_force_performance_level	
+		#else
 			if [[ $ENHANCED -eq 1 && $name != *"Vega"* ]]; then
 				echo auto > $coreAddr/power_dpm_force_performance_level
 				echo -e "${CYAN}Auto${WHITE} Core State selection (because of Enhanced OC)"
-			elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
-				echo auto > $coreAddr/power_dpm_force_performance_level
-				echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
+			#elif [[ $ms_trigger -eq 1 && $cs_trigger -eq 1 ]]; then
+			#	echo auto > $coreAddr/power_dpm_force_performance_level
+			#	echo -e "${CYAN}Auto${WHITE} Core State selection (no states given)"
 			else
 				echo manual > $coreAddr/power_dpm_force_performance_level
 				#Core & Memory states selection
-				if [[ $cs_trigger -ne 1 ]]; then #if core state given
+				#if [[ $cs_trigger -ne 1 ]]; then #if core state given
 					echo -e "${CYAN}Manual${WHITE} Core State selection (${CYAN}P${CORE_STATE[$i]}${WHITE})."
 					echo ${CORE_STATE[$i]} > $coreAddr/pp_dpm_sclk
-				fi
+				#fi
 
-				if [[ $ms_trigger -ne 1 ]]; then
+				#if [[ $ms_trigger -ne 1 ]]; then
 					echo -e "${CYAN}Manual${WHITE} Memory State selection (${CYAN}P${MEMORY_STATE[$i]}${WHITE})."
 					echo ${MEMORY_STATE[$i]} > $coreAddr/pp_dpm_mclk
-				fi
+				#fi
 			fi
-		fi
+		#fi
 		#Fan section
 		if (( ${FAN[$i]} == "A" )); then
 			echo -e "${CYAN}Auto${WHITE} fan."

@@ -96,7 +96,6 @@ function driver_install () {
 			name=`basename $url`
 		fi
 	fi
-
 	
 	echo -e "New driver:\t${GREEN}${name}${WHITE}"
 	if [[ $yes -ne 1 ]]; then
