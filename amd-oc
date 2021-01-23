@@ -232,6 +232,10 @@ for (( i=0; i < $n; i++ )); do
 		#29 is "wolfamdctrl -i 5", so it`s useless to do		
 
 		if [[ $name == *"Vega"* ]]; then
+			dataArr=(`upp -p $coreAddr/pp_table get MclkDependencyTable/NumEntries SocclkDependencyTable/NumEntries`)
+			maxMemState=$(( dataArr[0] - 1 ))
+			
+			uppArgs=
 			if [[ $ENHANCED -eq 1 ]]; then
 				coreVoltageAdopted=`echo "scale=2; ${CORE_VOLTAGE[$i]}/1000" | bc -l`
 				echo "atitool -i=$i -vddcr_soc=$coreVoltageAdopted"
@@ -240,13 +244,29 @@ for (( i=0; i < $n; i++ )); do
 			fi
 			
 			if [[ ! -z ${MEMORY_VOLTAGE[$i]} && ! -z ${MEMORY_STATE[$i]} && ! -z ${MEMORY_CLOCK[$i]} ]]; then
+				uppArgs+="VddmemLookupTable/0/Vdd=${MEMORY_VOLTAGE[$i]} "
 				if [[ $ENHANCED -eq 1 ]]; then
 					adoptedMvdd=`echo "scale=2; ${MEMORY_VOLTAGE[$i]}/1000" | bc -l`
 					echo "atitool -i=$i -vddcr_hbm=$adoptedMvdd"
 					atitool -i=$i -vddcr_hbm=$adoptedMvdd
 				fi
+				
+			fi
+			if [[ ! -z ${VDDCI[$i]} ]]; then
+		   		uppArgs+="VddciLookupTable/0/Vdd=${VDDCI[$i]} "
+	
 			fi
 
+			#if [[ ! -z ${MEMORY_CLOCK[$i]} ]]; then
+			#	memClock=${MEMORY_CLOCK[$i]}
+			#	uppArgs=
+			#	for ((y=$maxMemState; y >= 1; y--)); do
+			#		uppArgs+="MclkDependencyTable/${y}/VddInd=1 "
+			#		uppArgs+="MclkDependencyTable/${y}/MemClk=$(( memClock*100 )) "
+			#	done
+			#fi
+
+			[[ ! -z $uppArgs ]] && upp -p $coreAddr/pp_table set $uppArgs --write
 			#upp -p $coreAddr/pp_table set $uppArgs --write
 		else
 			if [[ $ALT -ne 1 ]]; then 
