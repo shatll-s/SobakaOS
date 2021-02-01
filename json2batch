@@ -523,7 +523,9 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api_listen=$API_port --bus_reorder --watchdog_script=watchdog.sh" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
+			[[ $addition != *"--cm_api_listen="* ]] && minerexec+=" --cm_api_listen=$API_port" || API_port=`echo $addition | sed "s/.*-cm_api_listen=[-]*\([0-9]*\).*/\1/"`
+
+			minerexec+=" --bus_reorder --watchdog_script=watchdog.sh" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
 		cryptodredge)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"

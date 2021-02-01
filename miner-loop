@@ -5,6 +5,8 @@ miner="$1"
 port="$2"
 batch="$3"
 
+[[ ! `cat /etc/group | grep miner` ]] && groupadd -g 1800 miner #will remove later
+
 function check_con () {
 	while true; do
   		for con in `netstat -anp | grep TIME_WAIT | grep $port | awk '{print $5}'`; do
@@ -20,7 +22,7 @@ function check_con () {
 check_con $miner
 
 while true; do
-	bash -c "$batch"
+	sudo -g miner bash -c "$batch"
 	exitcode=$?
 	echo -e "${RED}Error on miner start: exitcode $exitcode${WHITE}"
 	if [[ $exitcode -eq 127 ]]; then

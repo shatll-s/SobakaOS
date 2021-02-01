@@ -5,6 +5,7 @@ RO_TRIGGER="/run/dog/ro_trigger"
 ASW_TRIGGER="/run/dog/asw_trigger"
 RIG_CFG="/dog/cfg/rig.cfg"
 tmpDir="/tmp/amdDriver"
+dkmsOption='--no-dkms'
 
 function showHelp () {
 	bname=`basename $0`
@@ -29,12 +30,12 @@ function driver_delete () {
 	[[ -f /usr/bin/amdgpu-pro-uninstall ]] && yes | /usr/bin/amdgpu-pro-uninstall
 
 	echo -e "${CYAN}> Purging some old files${WHITE}"
-	for amdgpupkg in $(dpkg --list | grep amdgpu | awk '{print $2}'); do
+	for amdgpupkg in $(dpkg --list | grep amdgpu | grep -v libdrm-amdgpu | grep -v xserver-xorg-video-amdgpu | awk '{print $2}'); do
 		echo -e "${RED}$amdgpupkg${WHITE}"
 		sudo dpkg --purge --force-all $amdgpupkg
 	done
 
-	for amdgpupkg in $(dpkg --list | grep amdgpu-pro | awk '{print $2}'); do
+	for amdgpupkg in $(dpkg --list | grep amdgpu-pro | grep -v libdrm-amdgpu | grep -v xserver-xorg-video-amdgpu | awk '{print $2}'); do
 		echo $amdgpupkg
 		sudo dpkg --purge --force-all $amdgpupkg
 	done
@@ -143,7 +144,7 @@ function driver_install () {
 	[[ -f /usr/bin/amdgpu-pro-uninstall ]] && yes | /usr/bin/amdgpu-pro-uninstall
 
 	echo -e "${CYAN}> Installing${WHITE}"
-	yes | $tmpDir/*/amdgpu-install --opencl=legacy,pal --headless --no-dkms
+	yes | $tmpDir/*/amdgpu-install --opencl=legacy,pal --headless $dkmsOption
 	[[ $? -ne 0 ]] && echo -e "${RED}> Error while installing new driver${WHITE}" &&  rm -r -f $tmpDir && exit 1
 	
 	rm -r -f $tmpDir &&
@@ -163,7 +164,8 @@ while [ -n "$1" ]; do
 		latest=1
 	elif [[ $option == '--stable' || $option == '-s' ]]; then
 		stable=1
-
+	elif [[ $option == '--dkms' || $option == '-d' ]]; then
+		dkmsOption=''
 	elif [[ $option == 'update' || $option == 'driver-install' ]]; then
 		command='install'
 		shift
