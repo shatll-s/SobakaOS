@@ -5,7 +5,7 @@ After=network.target boot.service dogx.service
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sleep 15
+#ExecStartPre=/bin/sleep 15
 ExecStart=/dog/vnc
 
 [Install]

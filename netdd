@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 #screen -dmS netdd bash -c "wget -O /tmp/netdd https://os.dog/downloads/other/netdd && chmod 700 /tmp/netdd && /tmp/netdd -y -l"
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin:$PATH"
 bname=`basename $0`
@@ -400,9 +401,9 @@ function list () {
 	local versions=`curl -sLk $versions_url | jq '.iso'`
 	[[ -z $versions ]] && echo -e "${RED}Error downloading versions from $versions_url${WHITE}" && exit 1
 	
-	local header="${BROWN}#${WHITE}  ${CYAN}Version${WHITE}\t"
+	local header="${BROWN}#${WHITE}  ${CYAN}Version${WHITE}\t\t"
 		header+="${PURPLE}System${WHITE}  | ${YELLOW}Kernel${WHITE} | ${RED}Drivers${WHITE}\n"
-		header+="==============================================================="
+		header+="======================================================================="
 	echo -e "$header"
 	for (( i=0; i < `echo $versions | jq '. | length'`; i++ )); do
 		local isoData=`echo $versions | jq ".[$i]"`
@@ -424,6 +425,7 @@ function list () {
 		#local latest=`echo $isoData | jq -r ".latest"`
 		
 		local string="${BROWN}$i${WHITE}  ${CYAN}$version $name${WHITE}\t"
+		[[ `expr length $version` -lt 8 ]] && string+="\t"
 		string+="${PURPLE}$system${WHITE}\t| ${YELLOW}$kernel${WHITE}\t | "
 		string+="${RED}$amd${WHITE} | ${GREEN}$nvidia${WHITE}"
 		[[ $stable == true ]] && string+=" ${CYAN}stable${WHITE}" || string+="       "

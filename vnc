@@ -9,6 +9,25 @@ else
 	PASSWD="12345678"
 fi
 
+
+#Check OSdog X server
+echo -en "> Checking OSdog X server "
+try=0
+while [[ $try -lt 30 ]]; do
+	[[ ! -z `systemctl status dogx | grep "active (running)"` ]] && break
+	echo -n '.'
+	sleep 1
+	((try++))	
+done
+echo ""
+
+[[ $try -ge 30 ]] &&
+	echo -e $(date --rfc-3339=seconds)" ${RED}OSdog X server is not active, VNC service can not be started!${WHITE}" &&
+	exit 1
+
+echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
+#Check end
+
 #echo "Password = $PASSWD"
 
 x11vnc -storepasswd $PASSWD /dog/cfg/.vncpasswd

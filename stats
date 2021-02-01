@@ -19,6 +19,7 @@ function miner_stats() {
 #local miner=$1
 local port=$2
 local batch="$3"
+local verboseFunc="$4"
 case $1 in
 	ewbf)
 		stats_template=`echo "GET /getstat" | nc -w $API_TIMEOUT localhost $port | tail -n 1`
@@ -333,19 +334,32 @@ case $1 in
 	lolminer)
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/summary`
 		
+		[[ $verboseFunc -eq 1 ]] && echo "> Stats template:" && echo "$stats_template" #&& echo "$stats_template" | jq '.'
 		local miner_ver=`echo $stats_template | jq -r '.Software'`
 		local miner_online=`echo $stats_template | jq -r '.Session.Startup'`
 		local miner_algo=`echo $stats_template | jq -r '.Mining.Algorithm' | sed 's/ -.*//'`
 		
 		local miner_total_hr=`echo $stats_template | jq -r '.Session.Performance_Summary'`
 		local miner_total_share=`echo $stats_template | jq -r '.Session.Accepted'`
+
+
 		local miner_total_badshare=$(echo "`echo $stats_template | jq -r '.Session.Submitted'` - $miner_total_share" | bc -l)
 		
 
 		local miner_hr=(`echo $stats_template | jq -r '.GPUs[].Performance'`)
+
 		local miner_share=(`echo $stats_template | jq -r '.GPUs[].Session_Accepted'`)
-		local miner_badshare=(`echo $stats_template | jq -r '.GPUs[].Session_HWErr'`)
-		local miner_submitted=(`echo $stats_template | jq -r '.GPUs[].Session_Submitted'`)
+		local totalShares=(`echo $stats_template | jq -r '.GPUs[].Session_Submitted'`)
+
+		for ((i=0; i < ${#totalShares[@]}; i++)); do
+			miner_badshare[$i]=`echo "${totalShares[$i]} - ${miner_share[$i]}" | bc -l`
+		done
+
+		local miner_invshare=(`echo $stats_template | jq -r '.GPUs[].Session_HWErr'`)
+		local miner_total_invshare=0
+		for ((i=0; i < ${#miner_invshare[@]}; i++)); do
+			local miner_total_invshare=`echo "$miner_total_invshare + ${miner_invshare[$i]}" | bc -l`
+		done
 
 		local miner_fan=(`echo $stats_template | jq -r '.GPUs[]."Fan Speed (%)"'`)
 		local miner_temp=(`echo $stats_template | jq -r '.GPUs[]."Temps (deg C)"'`)
@@ -874,6 +888,7 @@ fi
 #unset IFS
 [[ $VERBOSE -eq 1 ]] && echo "> Start GPU stats collecting"
 for (( i=0; i < $gpuCount; i++ )); do
+	[[ $VERBOSE -eq 1 ]] && echo "> ... GPU $i stats collecting"
 	local core_addr[$i]=`echo $list | jq -r ".[$i].coreAddr"`
 	if [[ ${core_addr[$i]} == 'null' ]]; then
 		local Fan[$i]=''
@@ -910,7 +925,7 @@ for (( i=0; i < $gpuCount; i++ )); do
 				eval "Temp$label[$i]=$temp"
 			fi
 		done
-
+		
 		local Power[$i]=$(cat ${kernel_addr[$i]} | grep -m1 '(average GPU)' | sed 's/.\([0-9]*\).*/\1/')
 		local CoreClock[$i]=`echo $pp_dpm_sclk | sed "s/.* \([0-9]*\)Mhz.*/\1/"`
 		local CoreState[$i]=`echo $pp_dpm_sclk | sed  "s/\([0-9]*\):.*/\1/"`
@@ -933,6 +948,7 @@ for (( i=0; i < $gpuCount; i++ )); do
 		fi
 	fi
 done
+[[ $VERBOSE -eq 1 ]] && echo "> GPU stats collecting finished"
 Ip=(`ifconfig | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | sed 's/addr\://'`)
 
 ##################################################################
@@ -950,9 +966,10 @@ for option in Temp Temp2 Temp3 Fan Power CoreClock CoreState MemClock MemState U
 done
 
 ##################################################################
+[[ $VERBOSE -eq 1 ]] && echo "> Start CPU temp collecting"
 if [[ ! -z `dpkg -s lm-sensors 2>&1 | grep '^Version: ' | sed 's/Version: //'` ]]; then
-	cpuTempIntel=(`sensors -u *-isa-* | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
-	cpuTempAMD=(`sensors -u k10temp-pci-* | grep "k10temp-pci" -A3 | grep "_input" | sed "s/.*_input: //"`)
+	cpuTempIntel=(`sensors -u *-isa-* 2>/dev/null | grep Core -A1 | grep _input | sed 's/.*_input: //'`)
+	cpuTempAMD=(`sensors -u k10temp-pci-* 2>/dev/null | grep "k10temp-pci" -A3 | grep "_input" | sed "s/.*_input: //"`)
 	cpu_temp=(`echo ${cpuTempIntel[@]} ${cpuTempAMD[@]}`)
 	if [[ ! -z $cpu_temp ]]; then
 		local maxCpuTemp
@@ -964,7 +981,10 @@ fi
 
 ##################################################################
 if [[ ! $SERVICE_MODE || $SERVICE_MODE -eq 0 ]]; then
-	[[ ! -z $miner1 ]] && miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}' 
+	[[ $VERBOSE -eq 1 ]] && echo "> Start miner 1 stats collecting"
+	[[ ! -z $miner1 ]] && miner1_stats=$(miner_stats "$miner1" "$port1" "$batch1") || miner1_stats='{}'
+	[[ $VERBOSE -eq 1 ]] && echo "`miner_stats "$miner1" "$port1" "$batch1" 1`"
+	[[ $VERBOSE -eq 1 ]] && echo "> Start miner 2 stats collecting"
 	[[ ! -z $miner2 ]] && miner2_stats=$(miner_stats "$miner2" "$port2" "$batch2") || miner2_stats='{}'
 else
 	miner1_stats='{}' 

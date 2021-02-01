@@ -188,20 +188,23 @@ function autofan () {
 		fi
 
 		if [[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]]; then #high temp
+			#echo 'High'
 			if [[ ${gpu_fan[$i]} -gt $fan_max ]]; then
 				local new_fan[i]=$fan_max
 				#local fan_color=$RED
 				local message="${CYAN}$down ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -lt $fan_max ]]; then
-				if [[ ${gpu_temp[$i]} -ge $crit_temp ]]; then
+				if [[ ${gpu_temp[$i]} -ge $crit_temp || ${tMem[$i]} -ge $memCritTemp ]]; then
 					local new_fan[$i]=$fan_max
 				elif (( ${gpu_temp[$i]} - $crit_hyst > $target_temp )); then
-					local new_fan[i]=$((${gpu_fan[$i]} + $crit_fan_shift))
+					local new_fan[$i]=$((${gpu_fan[$i]} + $crit_fan_shift))
+				elif (( ${tMem[$i]} - $crit_hyst > $ttMem )); then
+					local new_fan[$i]=$((${gpu_fan[$i]} + $crit_fan_shift))
 				else
 					if [[ $navi -eq 0 ]]; then
-						local new_fan[i]=$((${gpu_fan[$i]} + $fan_shift))
+						local new_fan[$i]=$((${gpu_fan[$i]} + $fan_shift))
 					else
-						local new_fan[i]=$((${gpu_fan[$i]} + 2 * $fan_shift))
+						local new_fan[$i]=$((${gpu_fan[$i]} + 2 * $fan_shift))
 					fi
 				fi
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
@@ -212,15 +215,16 @@ function autofan () {
 				local message="${RED}Max %${WHITE}"
 			fi
 		elif [[ $tempTrigger == 'low' ]]; then #low temp
+			#echo 'Low'
 			if [[ ${gpu_fan[$i]} -lt $fan_min ]];then
-				local new_fan[i]=$fan_min
+				local new_fan[$i]=$fan_min
 				#local fan_color=$BLUE
 				local message="${CYAN}$up ${new_fan[$i]}${WHITE}"
 			elif [[ ${gpu_fan[$i]} -gt $fan_min ]];then
 				if (( ${gpu_temp[$i]} + $crit_hyst < $target_temp )); then
-					local new_fan[i]=$((${gpu_fan[$i]} - $crit_fan_shift))
+					local new_fan[$i]=$((${gpu_fan[$i]} - $crit_fan_shift))
 				else
-					local new_fan[i]=$((${gpu_fan[$i]} - $fan_shift))
+					local new_fan[$i]=$((${gpu_fan[$i]} - $fan_shift))
 				fi
 				[[ ${new_fan[$i]} -gt $fan_max ]] && new_fan[$i]=$fan_max
 				[[ ${new_fan[$i]} -lt $fan_min ]] && new_fan[$i]=$fan_min
@@ -335,6 +339,7 @@ function start () {
 			fan_min=`echo $cfg | jq -r '.af_fanmin'`
 			delay=`echo $cfg | jq -r '.af_delay'`
 			crit_temp=80
+			memCritTemp=95
 			[[ $hyst -ge 2 ]] && crit_hyst=`echo "scale=0; $hyst * 3 / 1" | bc -l` || crit_hyst=10
 			crit_fan_shift=`echo "scale=0; $fan_shift * 3 / 1" | bc -l`
 
@@ -359,6 +364,7 @@ case $1 in
 		count=`echo $json | jq '.gpu|length'`
 
 		if [[ `gpu-detect NVIDIA` -gt 0 ]]; then
+			sleep 5
 			export DISPLAY=:0
 			unset startFan
 			unset fanCount
