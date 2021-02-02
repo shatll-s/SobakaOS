@@ -523,8 +523,13 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			[[ $addition != *"--cm_api_listen="* ]] && minerexec+=" --cm_api_listen=$API_port" || API_port=`echo $addition | sed "s/.*-cm_api_listen=[-]*\([0-9]*\).*/\1/"`
-
+			if [[ $addition != *"--cm_api_listen="* ]]; then
+				minerexec+=" --cm_api_listen=$API_port"
+			else
+				API_portRaw=`echo "$addition" | sed "s/.*--cm_api_listen=[-]*\([.0-9:]*\)[\s]*.*/\1/"` #may be with IPaddr, 127.0.0.1:3333
+				API_port=`echo "$API_portRaw" | sed "s/.*:\([0-9]*\)$/\1/"`
+			fi
+			
 			minerexec+=" --bus_reorder --watchdog_script=watchdog.sh" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
 		cryptodredge)
