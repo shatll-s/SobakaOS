@@ -300,6 +300,10 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+
+			[[ $addition != *"--script-exit"* ]] && apiport=" --script-exit watchdog_exit.sh"
+			[[ $addition != *"--script-crash"* ]] && apiport=" --script-crash watchdog_crash.sh"
+
 			#[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
 			minerexec+=" --api-bind-http 0.0.0.0:$API_port"
 
