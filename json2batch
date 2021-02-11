@@ -300,7 +300,7 @@ function make_batch () {
 			fi
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
+			#[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
 			minerexec+=" --api-bind-http 0.0.0.0:$API_port"
 
 
@@ -623,13 +623,14 @@ function make_batch () {
 			minerexec+=" --telemetry=$API_port --log-file=/dog/log/$miner.log"
 		;;
 		srbminer)
+			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
 			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
 			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool=" --nicehash true"
 			#echo "@"$template"@"
 			[[ ! -z $template ]]&& minerexec+=" --wallet $template"
 			#[[ ! -z $name ]]&& minerexec+=" --worker $name"
 			[[ ! -z $pass ]]&& minerexec+=" --password $pass"
-			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
+			
 
 			
 			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"

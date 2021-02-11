@@ -3,6 +3,7 @@
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 NVIDIASMI_FILE=/tmp/nvidiaGpuDetect
 NAVI_ID="1002:7310|1002:7312|1002:7318|1002:7319|1002:731A|1002:731B|1002:731F|1002:7340"
+NAVI2_ID="1002:73BF"
 
 function listJS () {
 	local listJS='{}'
@@ -76,7 +77,13 @@ function listJS () {
 				local status=0
 				if [[ -f $coreAddr/uevent ]]; then
 					. $coreAddr/uevent
-					[[ `echo $PCI_ID | grep -E "$NAVI_ID"` ]] && local navi=1 || local navi=0
+					if [[ `echo $PCI_ID | grep -E "$NAVI_ID"` ]]; then
+						local navi=1
+					elif [[ `echo $PCI_ID | grep -E "$NAVI2_ID"` ]]; then
+						local navi=2
+					else
+						local navi=0
+					fi
 				fi
 			else
 				local status=1

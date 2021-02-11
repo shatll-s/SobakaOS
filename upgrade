@@ -63,14 +63,24 @@ upgrade_deb dog-libs $dog_libs
 upgrade_deb dog-sbin $dog_sbin
 
 apt-get -q=2 install lm-sensors expect hddtemp libnetfilter-queue1 libssl1.0 python3-setuptools
-upp > /dev/null 2>&1
+ver=`upp version 2>/dev/null`
+
 exitcode=$?
 if [[ $exitcode -ne 0 ]]; then
+	uppNeedInstall=1
+else
+	echo -e "${BROWN}> Uplift Power Play is already installed, check for version${WHITE}"
+	[[ $ver != "0.0.8" ]] && uppNeedInstall=1
+fi
+
+if [[ $uppNeedInstall -eq 1 ]]; then
 	echo -e "${GREEN}> Uplift Power Play installing${WHITE}"
 	cd /dog/sbin/upp/
 	python3 ./setup.py install > /dev/null 2>&1
 	exitcode=$?
 	[[ $exitcode -eq 0 ]] && echo -e "${GREEN}> Uplift Power Play installed${WHITE}" || echo -e "${RED}> Error while installing Uplift Power Play${WHITE}"
+else
+	echo -e "${GREEN}> Uplift Power Play is already latest version${WHITE}"
 fi
 
 crontab="/var/spool/cron/crontabs/root"

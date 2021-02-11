@@ -124,11 +124,11 @@ fi
 shbox start 
 
 if [[ $USE_GRAPHIC -eq 1 || -z $USE_GRAPHIC ]]; then
-	if [[ `gpu-detect AMD` -lt 8 ]]; then
+	if [[ `gpu-detect AMD` -lt 8 || `gpu-detect NVIDIA` -ge 1 ]]; then
 		echo "> Starting OSdog Xserver"
 		sudo systemctl start dogx
 	else
-		echo "> Don\`t start OSdog Xserver (there are 8+ AMD GPUs)"
+		echo "> Don\`t start OSdog Xserver (there are 8+ AMD GPUs and no Nvidia)"
 		sudo systemctl start dog-console
 	fi
 else

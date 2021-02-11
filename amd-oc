@@ -81,7 +81,7 @@ SOC_CLK_MAX=($SOC_CLK_MAX)
 [[ ! $FAN ]]&& FAN[0]="A"
 FAN=($FAN)
 
-for (( i=0; i < $n; ++i )); do
+for (( i=0; $i < $n; ++i )); do
 	[[ ! ${CORE_CLOCK[$i]} && ! -z ${CORE_CLOCK[0]} ]]&& CORE_CLOCK[$i]=${CORE_CLOCK[-1]}
 	[[ ! ${CORE_STATE[$i]} && ! -z ${CORE_STATE[0]} ]]&& CORE_STATE[$i]=${CORE_STATE[-1]}
 	[[ ! ${CORE_VOLTAGE[$i]} && ! -z ${CORE_VOLTAGE[0]} ]]&& CORE_VOLTAGE[$i]=${CORE_VOLTAGE[-1]}
@@ -159,7 +159,7 @@ for (( i=0; i < $n; i++ )); do
 		echo "Something is wrong, may be you need to upgrade to work with Power Play tables"
 	fi
 	
-	if [[ $navi -ne 1 ]]; then
+	if [[ -z $navi || $navi -eq 0 ]]; then
 		[[ $name == *"Vega"* ]] && script="vegatool" || script="wolfamdctrl"
 		if [[ $ENHANCED -eq 1 && $name != *"Vega"* ]]; then
 			echo -e "${LIGHTRED}Enhanced overclock (for all states)${WHITE}"
@@ -335,10 +335,17 @@ for (( i=0; i < $n; i++ )); do
 		fi
 	#elif [[ $name == *"5700"* || $name == *"5500"* || $name == *"5600"* ]]; then
 	else #this is NAVI
-		#echo "It\`s 5700!"
+		echo "Detected NAVI $navi GPU"
 		echo "manual" > $coreAddr/power_dpm_force_performance_level
-		uppArgs="smc_pptable/FanStopTemp=0 "
-		uppArgs+="smc_pptable/FanStartTemp=0 "
+		uppArgs=""
+		if [[ $navi -eq 1 ]]; then
+			uppArgs+="smc_pptable/FanStopTemp=0 "
+			uppArgs+="smc_pptable/FanStartTemp=0 "
+		else #big navi
+			#upp -p /sys/class/drm/card0/device/pp_table dump | grep Fan
+			uppArgs+="smc_pptable/FanStopTemp=20 "
+			uppArgs+="smc_pptable/FanStartTemp=35 "
+		fi
 		#uppArgs+="smc_pptable/FanTargetTemperature=0 "
 		
 		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "

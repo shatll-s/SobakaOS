@@ -425,7 +425,7 @@ function list () {
 		#local latest=`echo $isoData | jq -r ".latest"`
 		
 		local string="${BROWN}$i${WHITE}  ${CYAN}$version $name${WHITE}\t"
-		[[ `expr length $version` -lt 8 ]] && string+="\t"
+		[[ `expr length $version` -lt 7 ]] && string+="\t"
 		string+="${PURPLE}$system${WHITE}\t| ${YELLOW}$kernel${WHITE}\t | "
 		string+="${RED}$amd${WHITE} | ${GREEN}$nvidia${WHITE}"
 		[[ $stable == true ]] && string+=" ${CYAN}stable${WHITE}" || string+="       "

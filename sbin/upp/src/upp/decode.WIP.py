@@ -22,10 +22,6 @@ primitives = [
     ctypes.c_uint32, ctypes.c_float
 ]
 
-# Defined as uint in kernel, but in reality these are float
-float_fields = ['a', 'b', 'c', 'm',
-                'VcBtcPsmA', 'VcBtcPsmB', 'VcBtcVminA', 'VcBtcVminB']
-float_arrays = ['Fset', 'Vdroop']
 
 def odict(init_data=None):
     """
@@ -113,26 +109,14 @@ def extract_rom(vrom_file, out_pp_file):
     rom_partn_offset = struct.unpack('<H', rom_partn_offset_bytes)[0]
     boot_msg_offset = rom_tbl.usBIOS_BootupMessageOffset
     cfg_file_offset = rom_tbl.usConfigFilenameOffset
-    crc_blck_offset = rom_tbl.usCRC_BlockOffset
 
     part_info = rom_bytes[rom_partn_offset:boot_msg_offset-1].split(b'\x00')
-    boot_msgs = rom_bytes[boot_msg_offset:rom_tbl_offset-1].split(b'\x00')
-    chksm = rom_bytes[0x21:0x22]
-    crc32 = rom_bytes[crc_blck_offset:crc_blck_offset+4]
+    boot_msgs = rom_bytes[boot_msg_offset:cfg_file_offset-1].split(b'\x00')
 
     print('Video ROM information:\n')
     for msg in part_info + boot_msgs:
-        if msg:
-            print('  ' + msg.decode().strip('\r\n'))
-    chksm_check = 0
-    chksm_check_bytes_length = rom_bytes[0x2] * 512
-    for byte in rom_bytes[:chksm_check_bytes_length]:
-        chksm_check += byte
-    chksm_check = chksm_check & 0xff
+        print('  ' + msg.decode().strip('\r\n'))
     print('')
-    print('CHKSUM: 0x{} (off by {}), CRC: 0x{}'.format(chksm.hex().upper(),
-                                                       chksm_check,
-                                                       crc32.hex().upper()))
 
     # Fetching 'Master Data Table'
     master_dt_tbl_ofst = rom_tbl.usMasterDataTableOffset
@@ -216,7 +200,7 @@ def _get_bigcap_indices(string):
 
 def _print_raw_value(offset, symbol, rawbytes, name, value):
     hexval = _bytes2hex(rawbytes)
-    raw_msg = ' 0x{:04x} ({:04n}) {} {:>8} {:32s}:{: n}'
+    raw_msg = ' 0x{:04x} ({:04n}) {} {:>8} {:32s}: {:n}'
     # Polaris variable names have small-caps prefixes that we don't want
     big_caps = _get_bigcap_indices(name)
     if big_caps:
@@ -260,6 +244,9 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
         family = 'Tonga'
     elif module_suffix == 'atom_gen.vega10_pptable':
         family = 'Vega10'
+    # APU Experimantal
+    elif module_suffix == 'atom_gen.pptable_apu':
+        family = 'APU'
     else:
         print('ERROR: Module {} does not contain jump structures.', module)
         return cs, total_len
@@ -298,6 +285,13 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
         'VddciLookupTable', 'PixclkDependencyTable', 'DispClkDependencyTable',
         'PhyClkDependencyTable', 'MMDependencyTable', 'HardLimitTable',
         'VCEStateTable', 'GPIOTable'
+    ]
+
+    # APU Experimantal
+    simple_tables += [
+        'Unknown09Table', 'Unknown0bTable', 'Unknown0dTable', 'Unknown13Table',
+        'Unknown2cTable', 'Unknown36Table', 'Unknown08Table', 'Unknown0aTable',
+        'Unknown10Table'
     ]
 
     if name in simple_tables:
@@ -377,13 +371,65 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
         cs = FixedEntriesCountArray
     else:
         total_len = 0
+        index = 0
         for field in cs._fields_:
             if field[1] in primitives:
                 total_len += struct.calcsize(field[1]._type_)
+            # APU Experimental, special version-less jump-table at offset @ 0x36
+            elif issubclass(field[1], ctypes.Array):
+                entry_len = struct.unpack('B', header_bytes[:1])[0]
+                entry_name, entry_type = cs._fields_[-1]
+
+                class FixedEntriesArray(ctypes.LittleEndianStructure):
+                    _pack_ = cs._pack_
+                    _fields_ = cs._fields_[:-1] + [(entry_name,
+                                                    entry_type._type_ * entry_len)]
+
+                cs = FixedEntriesArray
+                total_bytes = 0
+                for f in field[1]._type_._fields_:
+                    fl = getattr(field[1]._type_, f[0])
+                    total_bytes += fl.size
+                total_len += entry_len * total_bytes
+
+            # APU Experimental, versioned tables containing multiple sub-arrays of varios structures
+            elif issubclass(field[1], ctypes.Structure):
+                for subfield in field[1]._fields_:
+                    total_bytes = 0
+                    if 'ucNumEntries' == subfield[0]:
+                        entry_len = struct.unpack('B', header_bytes[total_len:total_len+1])[0]
+                        total_len += 1
+                    elif 'entries' == subfield[0]:
+                        for f in subfield[1]._type_._fields_:
+                            fl = getattr(subfield[1]._type_, f[0])
+                            total_bytes += fl.size
+                        total_len += entry_len * total_bytes
+
+                # Here we need to fix the number of entries in sub-array...
+                entry_name, entry_type = field[1]._fields_[-1]
+
+                class FixedEntryArray(ctypes.LittleEndianStructure):
+                    _pack_ = field[1]._pack_
+                    _fields_ = field[1]._fields_[:-1] + [(entry_name,
+                                                          entry_type._type_ * entry_len)]
+
+                # ...as well as fix the top structure to contain corrected sub-arrays
+                fixed_entry = FixedEntryArray
+                fix_fields = cs._fields_
+                fix_fields[index] = (cs._fields_[index][0], fixed_entry)
+
+                class FixedEntriesCountArray(ctypes.LittleEndianStructure):
+                    _pack_ = cs._pack_
+                    _fields_ = fix_fields
+
+                cs = FixedEntriesCountArray
             else:
                 entry_len = struct.calcsize(field[1]._type_._type_)
                 array_size = field[1]._length_
                 total_len += entry_len * array_size
+
+            index += 1
+
     if debug:
         print('DEBUG: Detected C structture of', len(cs._fields_),
               'elements, total size of', total_len, 'bytes')
@@ -439,15 +485,12 @@ def build_data_tree(data, raw=None, decoded=None, parent_name='/',
         if data._type_ in primitives:
             d_symbol = data._type_._type_
             for d_value in data:
-                d_bytes = d_value.to_bytes(d_size, 'little')
-                if parent_name in float_arrays:
-                    d_symbol = 'f'
-                    d_value = struct.unpack(d_symbol, d_bytes)[0]
                 child_key = index
                 decoded[child_key] = {'value':  d_value,
                                       'offset': d_offset,
                                       'type':   d_symbol}
                 if rawdump:
+                    d_bytes = d_value.to_bytes(d_size, 'little')
                     _print_raw_value(d_offset, d_symbol, d_bytes,
                                      parent_name, d_value)
                 d_offset += d_size
@@ -488,8 +531,13 @@ def build_data_tree(data, raw=None, decoded=None, parent_name='/',
                 d_symbol = ctyp_cls._type_
                 d_size = d_meta.size
                 d_bytes = d_value.to_bytes(d_size, 'little')
-                if ctyp_cls == ctypes.c_uint and name in float_fields:
+                # Defined as uint in kernel, but in reality these are float
+                if name in ['a', 'b', 'c', 'm'] and ctyp_cls == ctypes.c_uint:
                     d_symbol = 'f'
+                    d_value = struct.unpack(d_symbol, d_bytes)[0]
+                # Defined as uint in kernel, but some report these as signed?
+                elif name in ['VddcOffset', 'VddgfxOffset']:
+                    d_symbol = 'h'
                     d_value = struct.unpack(d_symbol, d_bytes)[0]
                 if rawdump:
                     _print_raw_value(d_offset, d_symbol, d_bytes,
@@ -512,7 +560,8 @@ def build_data_tree(data, raw=None, decoded=None, parent_name='/',
                     else:
                         c_struct, size = _get_ofst_cstruct(data.__module__,
                                                            name,
-                                                           raw[ofst:ofst+2],
+#                                                           raw[ofst:ofst+2],
+                                                           raw[ofst:],
                                                            debug)
                         if c_struct:
                             top = ofst + size
@@ -555,7 +604,11 @@ def select_pp_struct(rawbytes, rawdump=False, debug=False):
     pp_header = common_hdr.from_buffer(rawbytes[:4])
     pp_ver = validate_pp(pp_header, len(rawbytes), rawdump)
 
-    if pp_ver == (7, 1):        # Polaris
+    if pp_ver == (6, 1):        # APU Experimental
+        gpugen = 'APU'
+        from upp.atom_gen import pptable_apu as pp_struct
+        ctypes_strct = pp_struct.struct__ATOM_APU_POWERPLAYTABLE
+    elif pp_ver == (7, 1):      # Polaris
         gpugen = 'Polaris'
         from upp.atom_gen import pptable_v1_0 as pp_struct
         ctypes_strct = pp_struct.struct__ATOM_Tonga_POWERPLAYTABLE
@@ -571,10 +624,6 @@ def select_pp_struct(rawbytes, rawdump=False, debug=False):
         gpugen = 'Navi 10 or 14'
         from upp.atom_gen import smu_v11_0_navi10 as pp_struct
         ctypes_strct = pp_struct.struct_smu_11_0_powerplay_table
-    elif pp_ver == (15, 0):     # Navi 20, 21
-        gpugen = 'Navi 21/22/23'
-        from upp.atom_gen import smu_v11_0_7_navi20 as pp_struct
-        ctypes_strct = pp_struct.struct_smu_11_0_7_powerplay_table
     elif pp_ver is not None:
         msg = 'Can not decode PowerPlay table version {}.{}'
         print(msg.format(pp_ver[0], pp_ver[1]))
@@ -609,10 +658,8 @@ def dump_pp_table(pp_bin_file, data_dict=None, indent=0, parent='',
         if data_dict[member] is None:
             print('{}{}: UNUSED'.format(' '*indent, member))
         elif 'value' in data_dict[member]:
-            msg = '{}{}: {}'
-            if data_dict[member]['type'] == 'f':
-                msg = '{}{}:{: n}'
-            print(msg.format(' '*indent, name, data_dict[member]['value']))
+            print('{}{}: {}'.format(' '*indent, name,
+                                    data_dict[member]['value']))
         else:
             print('{}{}:'.format(' '*indent, name))
             dump_pp_table(None, data_dict[member], indent+2, parent=member)

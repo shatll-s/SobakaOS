@@ -4,6 +4,8 @@ LOG_DIR="/dog/log"
 #[[ -z $1 ]] && miner="claymore" || miner=$1
 miner=$1
 Miner=${miner^}
+action=$2
+
 logfile="${LOG_DIR}/${miner}.log"
 reboot_logfile="${LOG_DIR}/${miner}_reboot.log"
 [[ -f $reboot_logfile ]] && rm $reboot_logfile #remove old reboot log

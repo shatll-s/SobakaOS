@@ -3,8 +3,10 @@
 
 import click
 import tempfile
-from Registry import Registry
 from upp import decode
+import pkg_resources
+import os.path
+import sys
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 REG_CTRL_CLASS = 'Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000'
@@ -50,6 +52,12 @@ def _get_pp_data_from_registry(reg_file_path):
                                               delete=False)
     msg = ' Soft PowerPlay data from {}\n  key:value > {}\n'
     try:
+        from Registry import Registry
+    except ImportError as e:
+        print('ERROR: -f/--from-registry option requires python-registry',
+              'package, consider installing it with PIP.')
+        sys.exit(-2)
+    try:
         reg = Registry.Registry(reg_file_path)
         key = reg.open(REG_KEY)
         data_type = key.value(REG_KEY_VAL).value_type_str()
@@ -65,17 +73,32 @@ def _get_pp_data_from_registry(reg_file_path):
     return tmp_pp_file.name
 
 
-def _write_pp_to_reg_file(filename, data, debug=False):
-    reg_string = REG_KEY_VAL[3:] + '"=hex:' + data.hex(',')
-    reg_lines = [reg_string[i:i+75] for i in range(0, len(reg_string), 75)]
-    reg_lines[0] = '"' + REG_KEY_VAL[:3] + reg_lines[0]
-    formatted_reg_string = '\\\r\n  '.join(reg_lines)
-    reg_pp_data = REG_HEADER + formatted_reg_string + 2 * '\r\n'
-    if debug:
-        print(reg_pp_data)
-    decode._write_pp_tables_file(filename, reg_pp_data.encode('utf-16'))
-    print('Written {} Soft PowerPlay bytes to {}'.format(len(data), filename))
+def _check_file_writeable(filename):
+    if os.path.exists(filename):
+        if os.path.isfile(filename):
+            return os.access(filename, os.W_OK)
+        else:
+            return False
+    pdir = os.path.dirname(filename)
+    if not pdir:
+        pdir = '.'
+    return os.access(pdir, os.W_OK)
 
+
+def _write_pp_to_reg_file(filename, data, debug=False):
+    if _check_file_writeable(filename):
+        reg_string = REG_KEY_VAL[3:] + '"=hex:' + data.hex(',')
+        reg_lines = [reg_string[i:i+75] for i in range(0, len(reg_string), 75)]
+        reg_lines[0] = '"' + REG_KEY_VAL[:3] + reg_lines[0]
+        formatted_reg_string = '\\\r\n  '.join(reg_lines)
+        reg_pp_data = REG_HEADER + formatted_reg_string + 2 * '\r\n'
+        if debug:
+            print(reg_pp_data)
+        decode._write_pp_tables_file(filename, reg_pp_data.encode('utf-16'))
+        print('Written {} Soft PowerPlay bytes to {}'.format(len(data),
+                                                             filename))
+    else:
+        print('Can not write to {}'.format(filename))
     return 0
 
 
@@ -121,8 +144,8 @@ def cli(ctx, debug, pp_file, from_registry):
       - Polaris
       - Vega
       - Radeon VII
-      - Navi 10
-      - Navi 14
+      - Navi 10, 14
+      - Navi 21, 22, 23
 
     Note: iGPUs found in many recent AMD APUs are using completely different
     PowerPlay control methods, this tool does not support them.
@@ -137,12 +160,19 @@ def cli(ctx, debug, pp_file, from_registry):
     ctx.obj['FROMREGISTRY'] = from_registry
 
 
+@click.command(short_help='Show UPP version.')
+def version():
+    """Shows UPP version."""
+    version = pkg_resources.require("upp")[0].version
+    click.echo(version)
+
+
 @click.command(short_help='Dumps all PowerPlay parameters to console.')
 @click.option('--raw/--no-raw', '-r/ ', help='Show raw binary data.',
               default='False')
 @click.pass_context
 def dump(ctx, raw):
-    """Dump all PowerPlay data to console
+    """Dumps all PowerPlay data to console
 
     De-serializes PowerPlay binary data into a human-readable text output.
     For example:
@@ -222,7 +252,7 @@ def get(ctx, variable_path_set):
         var_path = _normalize_var_path(set_pair_str)
         res = decode.get_value(pp_file, var_path, data, debug=debug)
         if res:
-            print(res['value'])
+            print('{:n}'.format(res['value']))
         else:
             print('ERROR: Incorrect variable path:', set_pair_str)
             return 2
@@ -230,14 +260,14 @@ def get(ctx, variable_path_set):
     return 0
 
 
-@click.command(short_help='Set value to PowerPlay parameter(s)')
+@click.command(short_help='Set value to PowerPlay parameter(s).')
 @click.argument('variable-path-set', nargs=-1, required=True)
-@click.option('-t', '--to-reg', is_flag=True, default=False,
-              help='Save output to Windows registry .reg file as well.')
 @click.option('-w', '--write', is_flag=True,
               help='Write changes to PP binary.', default=False)
+@click.option('-t', '--to-registry', metavar='<filename>',
+              help='Output to Windows registry .reg file.')
 @click.pass_context
-def set(ctx, variable_path_set, to_reg, write):
+def set(ctx, variable_path_set, to_registry, write):
     """Sets value to one or multiple PP parameters
 
     The parameter path and value must be specified in
@@ -250,9 +280,13 @@ def set(ctx, variable_path_set, to_reg, write):
     The PP tables will not be changed unless additional
     --write option is set.
 
-    Optionally, if --to-reg output is used an additional Windows registry
-    format file will be generated, named same as PowerPlay output target
-    filename with an additional '.reg' extension.
+    Optionally, if -t/--to-registry output is specified, an additional Windows
+    registry format file with '.reg' extension will be generated, for example:
+
+    \b
+        upp set /PowerTuneTable/TDP=75 --to-registry=test
+
+    will produce the file test.reg in the current working directory.
     """
     debug = ctx.obj['DEBUG']
     pp_file = ctx.obj['PPBINARY']
@@ -285,8 +319,8 @@ def set(ctx, variable_path_set, to_reg, write):
     else:
         print("WARNING: Nothing was written to '{}'.".format(pp_file),
               "Add --write option to commit the changes for real!")
-    if to_reg:
-        _write_pp_to_reg_file(pp_file + '.reg', pp_bytes, debug=debug)
+    if to_registry:
+        _write_pp_to_reg_file(to_registry + '.reg', pp_bytes, debug=debug)
 
     return 0
 
@@ -295,6 +329,7 @@ cli.add_command(extract)
 cli.add_command(dump)
 cli.add_command(get)
 cli.add_command(set)
+cli.add_command(version)
 
 
 def main():
