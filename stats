@@ -288,9 +288,12 @@ case $1 in
 		miner_algo=`echo $stats_template | jq -r '.algorithm'`
 		miner_online_raw=`echo $stats_template | jq -r '.uptime'`
 		[[ ! -z $miner_online_raw ]] && miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+
 		miner_total_hr=`echo $stats_template | jq -r '.hashrate'`
 		miner_total_share=`echo $stats_template | jq -r '.accepted_count'`
 		miner_total_badshare=`echo $stats_template | jq -r '.rejected_count'`
+
+		miner_busid=(`echo $stats_template | jq -r '.gpus[].pci_bus'`)
 		miner_hr=(`echo $stats_template | jq '.gpus[].hashrate'`)
 		miner_share=(`echo $stats_template | jq '.stat_by_gpu[].accepted_count'`)
 		miner_badshare=(`echo $stats_template | jq '.stat_by_gpu[].rejected_count'`)

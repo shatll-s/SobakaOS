@@ -301,11 +301,12 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 
-			[[ $addition != *"--script-exit"* ]] && apiport=" --script-exit watchdog_exit.sh"
-			[[ $addition != *"--script-crash"* ]] && apiport=" --script-crash watchdog_crash.sh"
+			
+			[[ -f ${miner_dir}watchdog_exit.sh && $addition != *"--script-exit"* ]] && minerexec+=" --script-exit ${miner_dir}watchdog_exit.sh"
+			[[ -f ${miner_dir}watchdog_crash.sh && $addition != *"--script-crash"* ]] && minerexec+=" --script-crash ${miner_dir}watchdog_crash.sh"
 
 			#[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
-			minerexec+=" --api-bind-http 0.0.0.0:$API_port"
+			minerexec+=" --pci-indexing --log-path /dog/log/t_rex.log --api-bind-http 0.0.0.0:$API_port"
 
 
 
@@ -383,7 +384,11 @@ function make_batch () {
 			[[ $addition != *"--tls"* && `echo $pool | grep -c "nicehash"` -eq 1 ]] && minerexec+=" --tls off" #NiceHash
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
-			minerexec+=" --apiport $API_port"
+
+
+			[[ $addition != *"--watchdog "* ]] && minerexec+=" --watchdog script"
+			[[ -f ${miner_dir}watchdog.sh && $addition != *"--watchdogscript"* ]] && minerexec+=" --watchdogscript=${miner_dir}watchdog.sh"
+			minerexec+=" --apiport $API_port --log on --logfile /dog/log/lolminer.log"
 		;;
 		gminer)
 			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
