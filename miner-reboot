@@ -20,8 +20,8 @@ function get_lastmsg () {
 		teamredminer)
 			keywords="DEAD"
 		;;
-		t_rex)
-			keywords="is idle"
+		t_rex*)
+			keywords="is idle|Can't find nonce"
 		;;
 	esac
 	
@@ -35,7 +35,9 @@ function get_lastmsg () {
 			local msg=`echo "$raw_msg" | sed 's/.*\(GPU [a-zA-Z0-9]*: detected DEAD ([.:a-zA-Z0-9]*)\).*/\1/' | tr -dc '[:print:]'`
 		;;
 		t_rex)
-			local msg=`echo "$raw_msg" | sed -e 's/.*WARN: //; s/, last.*//' | tr -dc '[:print:]'`
+			#WARN: GPU #4: Gigabyte P106-100 is idle, last activity was 59 secs ago
+			#TREX: Can't find nonce with device [ID=4, GPU #4], cuda exception in [synchronize, 51], an illegal instruction was encountered, try to reduce overclock to stabilize GPU state
+			local msg=`echo "$raw_msg" | sed -e 's/.*GPU #\([0-9]*\).*/GPU \1 error/' | tr -dc '[:print:]'`
 		;;
 	esac
 
@@ -66,10 +68,8 @@ else
 	echo "/dog/msg \"$lastmsg\" danger \"$return\""
 	/dog/msg "$lastmsg" danger "$return"
 fi
-#msg "Phoenix test" danger "Test"
-echo "$return" > /dog/error.log
-#sleep 120
 
+#exit 0
 nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
 
 exit 0
