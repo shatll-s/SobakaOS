@@ -11,23 +11,35 @@ reboot_logfile="${LOG_DIR}/${miner}_reboot.log"
 [[ -f $reboot_logfile ]] && rm $reboot_logfile #remove old reboot log
 
 function get_lastmsg () {
-	if [[ $miner == "claymore" ]]; then
-		keywords="WATCHDOG|hangs"
-	elif [[ $miner == "teamredminer" ]]; then
-		keywords="DEAD"
-	fi
 	local logtext="$1"
+
+	case $miner in
+		claymore)
+			keywords="WATCHDOG|hangs"
+		;;
+		teamredminer)
+			keywords="DEAD"
+		;;
+		t_rex)
+			keywords="is idle"
+		;;
+	esac
+	
 	local raw_msg=`echo "$logtext" | grep -m1 -E "$keywords"`
-	if [[ $miner == "claymore" ]]; then
-		local msg=`echo "$raw_msg" | sed -e 's/.*WATCHDOG: //' | tr -dc '[:print:]'`
-	elif [[ $miner == "teamredminer" ]]; then
-		#local msg=`echo "$raw_msg" | sed -e 's/, will execute.*//; s/.* GPU/GPU/' | tr -dc '[:print:]'`
-		local msg=`echo "$raw_msg" | sed 's/.*\(GPU [a-zA-Z0-9]*: detected DEAD ([.:a-zA-Z0-9]*)\).*/\1/' | tr -dc '[:print:]'`
-	fi
-	#echo "$1"
-	#echo -e "\n\n#######################\n\n"
-	#echo "$raw_msg"
-	#echo -e "\n\n#######################\n\n"
+
+	case $miner in
+		claymore)
+			local msg=`echo "$raw_msg" | sed -e 's/.*WATCHDOG: //' | tr -dc '[:print:]'`
+		;;
+		teamredminer)
+			local msg=`echo "$raw_msg" | sed 's/.*\(GPU [a-zA-Z0-9]*: detected DEAD ([.:a-zA-Z0-9]*)\).*/\1/' | tr -dc '[:print:]'`
+		;;
+		t_rex)
+			local msg=`echo "$raw_msg" | sed -e 's/.*WARN: //; s/, last.*//' | tr -dc '[:print:]'`
+		;;
+	esac
+
+
 	echo "$msg" 
 }
 
@@ -57,6 +69,7 @@ fi
 #msg "Phoenix test" danger "Test"
 echo "$return" > /dog/error.log
 #sleep 120
+
 nohup bash -c 'sreboot' > /tmp/nohup.log 2>&1 &
 
 exit 0
