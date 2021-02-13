@@ -21,7 +21,7 @@ function get_lastmsg () {
 			keywords="DEAD"
 		;;
 		t_rex*)
-			keywords="is idle|Can't find nonce"
+			keywords="is idle|Can't find nonce|can't get"
 		;;
 	esac
 	
