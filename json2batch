@@ -139,8 +139,12 @@ function get_free_port () {
 function make_batch () {
 	[[ ! -z $fork ]] && miner_dir="/dog/miners/$miner/$fork/" || miner_dir="/dog/miners/$miner/"
 	local minerexec="cd $miner_dir; " #some miners solvers, so let them do it in their dirs
-	if [[ $miner == "ccminer" && $fork == "tpruvot-2.3.1" ]]; then
-		:
+	if [[ $miner == "ccminer" ]]; then
+		if [[ $fork == "tpruvot-2.3.1" || $fork == "rx2" ]]; then
+			:
+		else
+			minerexec+="${PREFIX[$miner]}"
+		fi
 	else
 		minerexec+="${PREFIX[$miner]}" #prefix=EXPORT MEMORY_ALLOCATION......
 	fi
@@ -246,7 +250,10 @@ function make_batch () {
 		;;
 		ccminer)
 			#minerexec+="$fork -o $pool"
-			minerexec+=" -o $pool"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
@@ -643,7 +650,16 @@ function make_batch () {
 
 			
 			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
-		;;	
+		;;
+		verthashminer)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+		;;
 		*)
 			: #do nothing
 		;;
