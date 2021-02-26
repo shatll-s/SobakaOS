@@ -380,21 +380,23 @@ function make_batch () {
 			minerexec+=" --o=$API_port"
 		;;
 		lolminer)
-			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
-			#[[ ! -z $algo ]]&& minerexec+=" --coin $algo" 
-			#[[ ! -z $pool_without_port ]]&& minerexec+=" --pool $pool_without_port"
-			#[[ ! -z $port ]]&& minerexec+=" --port $port"
-			#old versions
+			coinsArray=("AION AUTO144_5 AUTO192_7 BEAM BTCZ BTG CTXC EXCC GRIN-C29M GRIN-C32 MWC-C29D MWC-C31 XSG YEC ZCL ZER")
 
-			[[ ! -z $algo ]]&& minerexec+=" --algo $algo" #old
+			if [[ ! -z $coin && " ${coinsArray[@]} " =~ " ${coin} " ]]; then
+				minerexec+=" --coin $coin"
+			elif [[ ! -z $algo ]]; then
+				minerexec+=" --algo $algo"
+			fi
 			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
 			[[ $addition != *"--tls"* && `echo $pool | grep -c "nicehash"` -eq 1 ]] && minerexec+=" --tls off" #NiceHash
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			[[ ! -z $template ]]&& minerexec+=" --user $template"
 
 
-			[[ $addition != *"--watchdog "* ]] && minerexec+=" --watchdog script"
-			[[ -f ${miner_dir}watchdog.sh && $addition != *"--watchdogscript"* ]] && minerexec+=" --watchdogscript=${miner_dir}watchdog.sh"
+			if [[ $addition != *"--watchdog "* ]]; then
+				minerexec+=" --watchdog script"
+				[[ -f ${miner_dir}watchdog.sh && $addition != *"--watchdogscript"* ]] && minerexec+=" --watchdogscript=${miner_dir}watchdog.sh"
+			fi
 			minerexec+=" --apiport $API_port --log on --logfile /dog/log/lolminer.log"
 		;;
 		gminer)

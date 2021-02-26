@@ -303,7 +303,7 @@ case $1 in
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
 		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
 			multiplier=1000000
-		elif [[ $miner_algo == "ethash" ]]; then
+		elif [[ $miner_algo == "ethash" || $miner_algo == "kawpow" ]]; then
 			multiplier=1000
 		fi
 
@@ -619,7 +619,7 @@ case $1 in
 		miner_total_hr=0
 
 		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
-			[[ $miner_dual_algo == "ethash" || $miner_algo == 'ethash' ]] && delimiter=1000 || delimiter=1
+			[[ $miner_dual_algo == "ethash" || $miner_algo == 'ethash' || $miner_algo == 'kawpow' ]] && delimiter=1000 || delimiter=1
 			miner_hr[i]=`echo "scale=2; ${miner_hr_raw[i]} / $delimiter" | bc -l`
 			miner_total_hr=`echo "$miner_total_hr + ${miner_hr[$i]}" | bc -l`
 		done
@@ -749,19 +749,27 @@ case $1 in
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port`
 		
 		local miner_online_raw=`echo $stats_template | jq -r '.start_time'`
-		miner_online_raw=`echo $stats_template | jq -r '.mining_time'`
-		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
-		miner_ver=`echo $stats_template | jq -r '.miner_version'`
-		miner_algo=`echo $stats_template | jq -r '.algorithm'`
+		local miner_online_raw=`echo $stats_template | jq -r '.mining_time'`
+		[[ ! -z $miner_online_raw ]] && local miner_online=`date --date "-$miner_online_raw sec" +%s` #absolute time
+		local miner_ver=`echo $stats_template | jq -r '.miner_version'`
+		local miner_busid=(`echo $stats_template | jq -r '.gpu_devices[].bus_id'`)
+		local miner_temp=(`echo $stats_template | jq -r '.gpu_devices[].temperature'`)
 
-		miner_busid=(`echo $stats_template | jq -r '.gpu_devices[].bus_id'`)
-		miner_temp=(`echo $stats_template | jq -r '.gpu_devices[].temperature'`)
-		miner_hr_raw=`echo $stats_template | jq '.gpu_hashrate[]'` # | jq 'del(total)'`
-		miner_hr=(`echo $miner_hr_raw | jq -r 'del(.total)[]'`)
-		miner_total_hr=`echo $stats_template | jq -r '.gpu_hashrate[].total'`
-
-		miner_total_share=`echo $stats_template | jq -r '.shares.accepted'`
-		miner_total_badshare=`echo $stats_template | jq -r '.shares.rejected'`
+		if [[ `echo "$miner_ver >= 67" | sed 's/\.//g' | bc -l` -eq 1 ]]; then
+			local miner_algo=`echo $stats_template | jq -r '.algorithms[0].name'`
+			local miner_hr_raw=`echo $stats_template | jq '.algorithms[0].hashrate.gpu'` # | jq 'del(total)'`
+			local miner_hr=(`echo $miner_hr_raw | jq -r 'del(.total)[]'`)
+			local miner_total_hr=`echo $stats_template | jq -r '.algorithms[0].hashrate.now'`
+			local miner_total_share=`echo $stats_template | jq -r '.algorithms[0].shares.accepted'`
+			local miner_total_badshare=`echo $stats_template | jq -r '.algorithms[0].shares.rejected'`
+		else #old API
+			local miner_algo=`echo $stats_template | jq -r '.algorithm'`
+			local miner_hr_raw=`echo $stats_template | jq '.gpu_hashrate[]'` # | jq 'del(total)'`
+			local miner_hr=(`echo $miner_hr_raw | jq -r 'del(.total)[]'`)
+			local miner_total_hr=`echo $stats_template | jq -r '.gpu_hashrate[].total'`
+			local miner_total_share=`echo $stats_template | jq -r '.shares.accepted'`
+			local miner_total_badshare=`echo $stats_template | jq -r '.shares.rejected'`
+		fi
 	
 	;;
 	verthashminer)

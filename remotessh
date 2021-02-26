@@ -35,8 +35,9 @@ function setup () {
 	fi
 	echo "> Settings are written to $RIG_CFG"
 	
-
-	apt-get -q=2 install autossh
+	local ver=`apt-cache policy autossh | grep Installed | sed 's/Installed://; s/\s*//'`
+	[[ ! $ver ]] && echo -e "${GREEN}> Installing some packets${WHITE}" && apt-get -q=2 install autossh
+	
 	#[[ $USE -eq 1 ]] && systemctl start remotessh || systemctl stop remotessh
 }
 
