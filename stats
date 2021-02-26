@@ -66,6 +66,8 @@ case $1 in
 					[[ $miner1 == "nanominer" ]] && minerId=1 || minerId=2
 					miner_algo=`cat /tmp/batch${minerId} | jq -r '.algo'`
 				fi
+
+				[[ $miner_algo == 'autolykos' ]] && miner_algo='autolykos2'
 			;;
 		esac
 
