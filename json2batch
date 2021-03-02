@@ -225,7 +225,12 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" -pass $pass"
 			[[ $addition != *"-cdmport"* ]] && minerexec+=" -cdmport $API_port" || API_port=`echo $addition | sed "s/.*-cdmport [-]*\([0-9]*\).*/\1/"`
 			[[ $addition != *"-hstats"* ]] && minerexec+=" -hstats 0"
-			[[ $addition != *"-coin"* && $coin == 'etc' ]] && minerexec+=" -coin etc"
+
+			if [[ ! -z $algo && $algo == 'etchash' && $addition != *"-coin etc"* ]]; then
+				minerexec+=" -coin etc"
+			elif [[ $addition != *"-coin"* && $coin == 'etc' ]]; then
+				minerexec+=" -coin etc"
+			fi
 		
 			minerexec+=" -rmode 2 -log 1 -logfile /dog/log/phoenix.log -logsmaxsize 5"
 		;;
@@ -649,7 +654,7 @@ function make_batch () {
 			#[[ ! -z $name ]]&& minerexec+=" --worker $name"
 			[[ ! -z $pass ]]&& minerexec+=" --password $pass"
 			
-
+			[[ -f ${miner_dir}watchdog_osdog.sh && $addition != *"--reboot-script-gpu-watchdog"* ]] && minerexec+=" --reboot-script-gpu-watchdog ${miner_dir}watchdog_osdog.sh"
 			
 			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
 		;;
