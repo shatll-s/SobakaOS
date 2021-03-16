@@ -21,9 +21,9 @@ echo "================================================================"
 function tech_info()
 {
 	local info="#This is some technical information\n"
-	info+="hwclock: `sudo hwclock`\n"
-	info+="uptime -s: `sudo uptime -s`\n"
-	info+="`sudo timedatectl | sed 's/^\s*//g'`\n\n"
+	info+="hwclock: `hwclock`\n"
+	info+="uptime -s: `uptime -s`\n"
+	info+="`timedatectl | sed 's/^\s*//g'`\n\n"
 	info+="Hostname: `cat /etc/hostname`\n"
 	info+="`ifconfig -a`"
 	echo -e "$info"
@@ -126,14 +126,14 @@ shbox start
 if [[ $USE_GRAPHIC -eq 1 || -z $USE_GRAPHIC ]]; then
 	if [[ `gpu-detect AMD` -lt 8 || `gpu-detect NVIDIA` -ge 1 ]]; then
 		echo "> Starting OSdog Xserver"
-		sudo systemctl start dogx
+		systemctl start dogx
 	else
 		echo "> Don\`t start OSdog Xserver (there are 8+ AMD GPUs and no Nvidia)"
-		sudo systemctl start dog-console
+		systemctl start dog-console
 	fi
 else
 	echo "> Don\`t start OSdog Xserver (due to settings)"
-	sudo systemctl start dog-console
+	systemctl start dog-console
 fi
 
 if [[ $REMOTESSH_USE -eq 1 ]]; then
@@ -145,7 +145,7 @@ if [[ $REMOTESSH_USE -eq 1 ]]; then
 	done
 	echo "> Waited $time seconds to get VNC active"
 	echo "> Starting RemoteSSH"
-	sudo systemctl start remotessh
+	systemctl start remotessh
 fi
 
 time_stop=`date +%s`

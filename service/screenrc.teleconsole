@@ -1,11 +1,9 @@
 sessionname teleconsole
 
-hardstatus             alwayslastline
-#hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
+hardstatus alwayslastline
 hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}[ %{W}%t%?(%u)%?%{r} ]%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
 
 deflog on
-#logfile /run/dog/teleconsole.%n
 logfile /dog/log/teleconsole.log
 logfile flush 1
 logtstamp off

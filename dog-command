@@ -75,7 +75,7 @@ case $1 in
 
 		function get_bios () {
 			adapter=$1
-			return=$(sudo atiflash -s $adapter "/tmp/amd${adapter}.rom")
+			return=`atiflash -s $adapter "/tmp/amd${adapter}.rom"`
 			exitcode=$?
 			if [[ $exitcode -eq 0 ]]; then
 				chown user:user "/tmp/amd$adapter.rom"
@@ -525,7 +525,7 @@ case $1 in
 				fi
 			;;
 			hello)
-				remotessh setup --config "$2"
+				remotessh setup --config "$data"
 			;;
 		#case "$2" in
 		#	stop|log)

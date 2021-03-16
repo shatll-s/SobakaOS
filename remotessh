@@ -98,7 +98,11 @@ case "$command" in
 		screen -r remotessh
 	;;
 	setup)
-		[[ ! -z $cfg ]] && setup || echo -e "${RED}> You need to give config to setup, exiting${WHITE}"
+		if [[ ! -z $cfg ]]; then
+			setup
+		else
+			echo -e "${RED}> You need to give config to setup, exiting${WHITE}"
+		fi
 	;;
 	cli)
 		#. $RIG_CFG

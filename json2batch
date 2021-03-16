@@ -413,10 +413,12 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
 			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --proto stratum"
 
-			[[ ! -z $dual_pool ]]&& minerexec+=" --dserver $dual_pool"
-			[[ ! -z $dual_template ]]&& minerexec+=" --duser $dual_template"
-			[[ ! -z $dual_pass ]]&& minerexec+=" --dpass $dual_pass"
-			[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
+			if [[ ! -z $dual_pool &&  -z $dual_template && ! -z $dual_pass ]]; then
+				minerexec+=" --dserver $dual_pool"
+				minerexec+=" --duser $dual_template"
+				minerexec+=" --dpass $dual_pass"
+				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
+			fi
 			minerexec+=" --api $API_port --logfile /dog/log/gminer.log"
 		;;
 		xmrig_cpu|xmrig_new)

@@ -1,0 +1,58 @@
+#!/bin/bash
+. colors
+
+installCompiled () {
+	kernel=`uname -r`
+	url="https://os.dog/downloads/opt/$kernel/8192eu.ko.tar.gz"
+	
+	file="/tmp/8192eu.ko"
+
+	rm -f $file.gz $file
+	wget -c $url -O $file.gz
+	exitcode=$?
+	[[ $exitcode -ne 0 ]] && echo -e "${RED}Something wrong while downloading. May be there is no compiled module for your kernel${WHITE}" && exit 1
+	
+	tar -xf $file.gz
+	cp 8192eu.ko /lib/modules/$kernel/kernel/drivers/net/wireless/
+	echo "blacklist rtl8xxxu" > /etc/modprobe.d/rtl8xxxu.conf
+	echo "options 8192eu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192eu.conf;
+
+	update-grub
+	update-initramfs -u
+	echo -e "${GREEN}> 8192eu module installed${WHITE}"
+}
+
+makeCompile () {
+	cd /tmp
+	git clone https://github.com/Mange/rtl8192eu-linux-driver.git
+	cd rtl8192eu-linux-driver
+	make clean
+	make
+	make install
+	echo "blacklist rtl8xxxu" > /etc/modprobe.d/rtl8xxxu.conf
+	echo "options 8192eu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/8192eu.conf 
+}
+
+case $1 in
+	"")
+		installCompiled
+	;;
+	compile)
+		echo -e "${GREEN}> Start compiling 8192eu module${WHITE}"
+		makeCompile
+		echo -e "${GREEN}> 8192eu module installed${WHITE}"
+	;;
+
+	*)
+		echo -e "${RED}What?${WHITE}"
+		exit 1
+	;;
+esac
+
+
+
+
+
+
+
+

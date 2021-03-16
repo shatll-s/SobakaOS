@@ -27,7 +27,7 @@ echo $$ > $LOCK_FILE
 echo -en "> Checking OSdog X server "
 try=0
 while [[ $try -lt 30 ]]; do
-	[[ ! -z `sudo systemctl status dogx | grep "active (running)"` ]] && break
+	[[ ! -z `systemctl status dogx | grep "active (running)"` ]] && break
 	echo -n '.'
 	sleep 1
 	((try++))	
