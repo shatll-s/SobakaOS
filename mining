@@ -60,7 +60,7 @@ while true; do
 			if [[ $(screen_check miner2) == 0 ]]; then
 				if [[ $batch2 != $batch1 ]]; then #if miner2 is set up, screen = 0, miner2 != miner1
 					#wd restart
-					screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 $port2 \"$batch2\""
+					screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 $port2 \"$batch2\" $MINER2_WAIT"
 					echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 2: miner is not changed, but closed]"
 				fi
 			else #ok, miner is set up and miner = last check and miner2 = miner1
@@ -72,7 +72,7 @@ while true; do
 		elif [[ $(screen_check miner2) == 0 ]]; then 
 			if [[ ! $batch2 == $batch1 ]]; then #miner is set up, miner != last check (changed or first run) and screen = 0 and miner1 != miner2
 				#wd restart
-				screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 $port2 \"$batch2\""
+				screen -c $SCREEN_CFG -dmS miner2.$miner2 -Logfile $MINERLOG2 bash -c "miner-loop $miner2 $port2 \"$batch2\" $MINER2_WAIT"
 				echo $(date --rfc-3339=seconds)" Started miner2 screen with $miner2 [code 0: simple start]"
 			fi
 		else #miner is set up, miner != last check, screen > 0

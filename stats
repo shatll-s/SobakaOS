@@ -79,7 +79,11 @@ case $1 in
 		fi
 		
 		local stats_template=`echo $request | nc -w $API_TIMEOUT localhost $port | jq '.result'`
-		local miner_ver=`echo $stats_template | jq -r '.[0]' | sed 's/\s.*//'`
+		if [[ $1 == 'phoenix' ]]; then
+			local miner_ver=`echo $stats_template | jq -r '.[0]' | sed 's/PM.*\s\([0-9a-zA-Z\-\.]*\)\s.*/\1/'`
+		else
+			local miner_ver=`echo $stats_template | jq -r '.[0]' | sed 's/\s.*//'`
+		fi
 		local miner_online_raw=`echo $stats_template | jq -r '.[1]'`
 		if (($miner_online_raw)); then
 			local miner_online=$(date --date "-$miner_online_raw min" +%s) #absolute time
@@ -387,7 +391,7 @@ case $1 in
 		#	miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
 		#done
 		
-		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
+		if [[ ${miner_algo^^} == "ETHASH" || ${miner_algo^^} == "ETCHASH" ]]; then #mb we need to fix other algos
 			miner_total_hr=`echo "scale=0; $miner_total_hr * 1000 / 1" | bc -l`
 			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
 				for ((i=0; i < ${#miner_hr[@]}; i++)); do
@@ -773,7 +777,15 @@ case $1 in
 			local miner_total_share=`echo $stats_template | jq -r '.shares.accepted'`
 			local miner_total_badshare=`echo $stats_template | jq -r '.shares.rejected'`
 		fi
-	
+
+		if [[ $miner_algo == "verthash" ]]; then #mb we need to fix other algos
+			miner_total_hr=`echo "scale=2; $miner_total_hr / 1000" | bc -l`
+			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
+				for ((i=0; i < ${#miner_hr[@]}; i++)); do
+					miner_hr[$i]=`echo "scale=2; ${miner_hr[$i]} / 1000" | bc -l`
+				done
+			fi
+		fi
 	;;
 	verthashminer)
 		local MINER_LOG="/dog/log/$1.log"

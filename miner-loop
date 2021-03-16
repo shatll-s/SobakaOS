@@ -1,9 +1,9 @@
 #!/bin/bash
 . colors
-
 miner="$1"
 port="$2"
 batch="$3"
+miner2Wait="$4"
 
 [[ ! `cat /etc/group | grep miner` ]] && groupadd -g 1800 miner #will remove later
 
@@ -22,6 +22,24 @@ function check_con () {
 check_con $miner
 
 while true; do
+	if [[ ! -z $miner2Wait && $miner2Wait -gt 0 ]]; then
+		miner1Start=`screen -ls | grep -E "miner1[^-]" | sed 's/.*(\(.*\))\s.*/\1/'`
+		miner1StartTimeStamp=`date -d "$miner1Start" +"%s"`
+
+		diff=`echo "$(date +%s) - $miner1StartTimeStamp" | bc -l`
+		
+		if [[ $diff -lt $miner2Wait ]]; then
+			echo -en "${BROWN}> Wait some time before start miner ${WHITE}"
+
+			while [[ $diff -lt $miner2Wait ]]; do
+				echo -en "${BROWN}.${WHITE}"
+				sleep 1
+				diff=`echo "$(date +%s) - $miner1StartTimeStamp" | bc -l`
+			done
+			echo ""
+			echo -e "${GREEN}> OK, we can start${WHITE}"
+		fi
+	fi
 	sudo -g miner bash -c "$batch"
 	exitcode=$?
 	echo -e "${RED}Error on miner start: exitcode $exitcode${WHITE}"

@@ -540,17 +540,17 @@ case $1 in
 	;;
 	settings)
 		echo $2 > /tmp/settings #just for development
-		for option in service_mode use_graphic notify_on_boot wd_kern; do
-		if [[ `echo $2 | jq ".$option"` != null ]]; then
-			option_value="`echo $2 | jq -r \".$option\"`" #double slash, because eval open it
-			eval "${option^^}=$option_value"
+		for option in service_mode use_graphic notify_on_boot wd_kern miner2_wait; do
+			if [[ `echo $2 | jq ".$option"` != null ]]; then
+				option_value="`echo $2 | jq -r \".$option\"`" #double slash, because eval open it
+				eval "${option^^}=$option_value"
 
-			if [[ ! -z `grep "${option^^}=" $RIG_CFG` ]]; then
-				sed -i "s/.*${option^^}=.*/${option^^}=$option_value/g" $RIG_CFG
-			else
-				echo "${option^^}=$option_value" >> $RIG_CFG
+				if [[ ! -z `grep "${option^^}=" $RIG_CFG` ]]; then
+					sed -i "s/.*${option^^}=.*/${option^^}=$option_value/g" $RIG_CFG
+				else
+					echo "${option^^}=$option_value" >> $RIG_CFG
+				fi
 			fi
-		fi
 		done
 		########################      RigOnline.ru SECTION      ########################
 		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg
