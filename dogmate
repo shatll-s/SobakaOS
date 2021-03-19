@@ -18,6 +18,7 @@ LOG=/dog/log/tmate.log
 
 #Args
 FORCE=
+ATTACH=
 
 showHelp () {
 	echo "Help for $0"
@@ -46,19 +47,19 @@ installTmate () {
 	[ -t 1 ] && ARG="" || ARG="-q"
 
 	wget $ARG -c $INSTALL_LINK -O $tmpfile
-	[[ $? -ne 0 ]] && echo -e "${RED}> Download failed${WHITE}" && exit 1
+	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Download failed${WHITE}" && exit 1
 	
 	echo -e "${CYAN}> Uncompressing${WHITE}"
 	rm -r -f $tmpDir
 	mkdir $tmpDir
 
 	tar -xf $tmpfile -C $tmpDir
-	[[ $? -ne 0 ]] && echo -e "${RED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
+	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
 
 	echo -e "${CYAN}> Installing${WHITE}"
 	dpkg -i $tmpDir/*.deb
 
-	[[ $? -ne 0 ]] && echo -e "${RED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
+	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
 
 	echo -e "${GREEN}> Tmate install complete${WHITE}"
 	rm -r -f $tmpDir $tmpfile
@@ -103,17 +104,43 @@ set -g pane-active-border-fg blue
 	
 	echo -e "$CFG" > $CFG_FILE	
 }
+show () {
+	$CMD -S $SOCKET display -p '#{tmate_ssh}' 
+}
+attach () {
+	$CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
+}
 
 start () {
-	if pidof tmate; then
-	   $CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
-	else
-		$CMD -f $CFG_FILE -S $SOCKET new-session -d
-		$CMD -f $CFG_FILE -S $SOCKET split-window -h 'screen -r yes'
-		$CMD -f $CFG_FILE -S $SOCKET split-window -v 'screen -r yes2'
-		$CMD -f $CFG_FILE -S $SOCKET select-pane -t 0
-		$CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
+	if [[ ! -z  `pidof tmate` ]]; then
+		echo -e "${CYAN}> Tmate is already running${WHITE}"
+		show
+		exit 1
 	fi
+	#$CMD -f $CFG_FILE -S $SOCKET split-window -h 'screen -r yes'
+	#$CMD -f $CFG_FILE -S $SOCKET split-window -v 'screen -r yes2'
+	#$CMD -f $CFG_FILE -S $SOCKET select-pane -t 0
+
+	[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
+	[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
+
+	$CMD -f $CFG_FILE -S $SOCKET new-session -d
+	
+	echo -en "${CYAN}> Waiting for connection${WHITE}"
+	try=0
+	while [[ $try -lt 100 ]]; do #30 sec
+		data=`show`
+		[[ ! -z $data ]] && break
+		echo -en "${CYAN}.${WHITE}"
+		sleep 0.3
+		((try++))	
+	done
+	echo ""
+
+	[[ $try -ge 30 ]] && echo -e "${LIGHTRED}Something goes wrong, connection can\`t be established${WHITE}" && exit 1
+	
+	echo -e "$data"
+	[[ $ATTACH -eq 1 ]] && attach
 }
 
 stop () {
@@ -122,40 +149,34 @@ stop () {
 	if [[ ! -z $PID ]]; then
 		kill -9 $PID
 	else
-		[[ $1 == 'verbose' ]] && echo -e "${RED} There is no active tmate sessions${WHITE}"
+		[[ $1 == 'verbose' ]] && echo -e "${CYAN}> There is no active tmate sessions${WHITE}"
 	fi
 }
 
 while [ -n "$1" ]; do
 	option=$1
-	
-	if [[ $option == '--help' || $option == '-h' ]]; then
-		showHelp
-		exit 0
-	elif [[ $option == '--version' || $option == '-V' ]]; then
-		checkVer verbose
-		exit 0
-	elif [[ $option == '--force' || $option == '-f' ]]; then
-		FORCE=1
-	#elif [[ $option == '--latest' || $option == '-l' ]]; then
-	#	latestVer=1
-	#elif [[ $option == '--stable' || $option == '-s' ]]; then
-	#	stableVer=1
-	elif [[ $option == 'install' ]]; then
-		command='install'
-	elif [[ $option == 'setup' ]]; then
-		command='setup'
-	elif [[ $option == 'start' ]]; then
-		command='start'
-	elif [[ $option == 'stop' ]]; then
-		command='stop'
-	elif [[ $option == 'restart' ]]; then
-		command='restart'
-	elif [[ $option == 'show' ]]; then
-		command='show'
-	else
-		echo "Uncorrect argument $option"
-	fi
+	case $option in
+		--help|-h)
+			showHelp
+			exit 0
+		;;
+		--version|-V)
+			checkVer verbose
+			exit 0
+		;;
+		--force|-v)
+			FORCE=1
+		;;
+		--attach|-a)
+			ATTACH=1
+		;;
+		install|setup|attach|start|stop|restart|go|show)
+			command=$option
+		;;
+		*)
+			echo "Uncorrect argument $option"
+		;;
+	esac
 
 	shift
 done
@@ -188,9 +209,10 @@ case $command in
 	setup)
 		setup
 	;;
+	attach)
+		attach
+	;;
 	start)
-		[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
-		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
 		start
 	;;
 	stop)
@@ -198,16 +220,18 @@ case $command in
 	;;
 	restart)
 		stop
-
-		[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
-		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
+		start
+	;;
+	go)
+		stop
+		setup
 		start
 	;;
 	show)
 		$CMD -S $SOCKET display -p '#{tmate_ssh}' 
 	;;
 	*)
-		echo -e "${RED}No command specified${WHITE}"
+		echo -e "${LIGHTRED}No command specified${WHITE}"
 		showHelp
 		exit 1
 	;;
