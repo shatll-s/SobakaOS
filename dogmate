@@ -1,0 +1,166 @@
+#!/bin/bash
+# tmate control script
+. /dog/colors
+
+T_HOST="188.127.251.99"
+T_PORT=33322
+FINGERPRINT="SHA256:2HqU8ShGUt3CwK9PCfp2PvSJbt7/BSyU2vtbtOlMHrE"
+ED25519_FINGERPRINT="SHA256:1vbzBDcT6z6yPr9hM5uozyaLj7IhzYhstVOJHEZ0a+A"
+
+SOCKET="/tmp/tmate.sock"
+#CMD="/dog/sbin/tmate"
+CMD="tmate"
+
+INSTALL_LINK="https://os.dog/downloads/other/tmate.tar.gz"
+CFG_FILE=/dog/service/tmate.conf
+LOG=/dog/log/tmate.log
+
+showHelp () {
+	echo "Help for $0"
+}
+
+installTmate () {
+ver=`upp version 2>/dev/null`
+
+exitcode=$?
+if [[ $exitcode -ne 0 ]]; then
+	uppNeedInstall=1
+else
+	echo -e "${BROWN}> Uplift Power Play is already installed, check for version${WHITE}"
+	[[ $ver != "0.0.8" ]] && uppNeedInstall=1
+fi
+
+if [[ $uppNeedInstall -eq 1 ]]; then
+
+
+	local tmpfile="/tmp/tmate.tar.gz"
+	local tmpDir="/tmp/tmate"
+	rm -f $tmpfile
+
+	[ -t 1 ] && ARG="" || ARG="-q"
+
+	wget $ARG -c $INSTALL_LINK -O $tmpfile
+	[[ $? -ne 0 ]] && echo -e "${RED}> Download failed${WHITE}" && exit 1
+	
+	echo -e "${CYAN}> Uncompressing${WHITE}"
+	rm -r -f $tmpDir
+	mkdir $tmpDir
+
+	tar -xf $tmpfile -C $tmpDir
+	[[ $? -ne 0 ]] && echo -e "${RED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
+
+	echo -e "${CYAN}> Installing${WHITE}"
+	dpkg -i $tmpDir/*.deb
+
+	[[ $? -ne 0 ]] && echo -e "${RED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
+
+	echo -e "${GREEN}> Tmate install complete${WHITE}"
+	rm -r -f $tmpDir $tmpfile
+}
+
+setup () {
+	local CFG="
+set -g tmate-server-host $T_HOST
+set -g tmate-server-port $T_PORT
+set -g tmate-server-rsa-fingerprint $FINGERPRINT
+set -g tmate-server-ed25519-fingerprint $ED25519_FINGERPRINT
+
+# set-option -g -q mouse on
+# Toggle mouse on
+bind-key M \
+  set-option -g mouse on \;\
+  display-message 'Mouse: ON'
+
+# Toggle mouse off
+bind-key m \
+  set-option -g mouse off \;\
+  display-message 'Mouse: OFF'
+
+unbind C-b 
+set -g prefix C-a
+bind -n M-Left select-pane -L 
+bind -n M-Right select-pane -R 
+bind -n M-Up select-pane -U 
+bind -n M-Down select-pane -D
+# set active-inactive window styles
+set -g window-style 'fg=colour247,bg=colour236'
+set -g window-active-style 'fg=default,bg=colour234'
+
+# Pane border
+set -g pane-border-bg default
+set -g pane-border-fg colour238
+
+# Active pane border
+set -g pane-active-border-bg default
+set -g pane-active-border-fg blue
+"
+	
+	echo -e "$CFG" > $CFG_FILE	
+}
+
+start () {
+	if pidof tmate; then
+	   $CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
+	else
+		$CMD -f $CFG_FILE -S $SOCKET new-session -d
+		$CMD -f $CFG_FILE -S $SOCKET split-window -h 'screen -r yes'
+		$CMD -f $CFG_FILE -S $SOCKET split-window -v 'screen -r yes2'
+		$CMD -f $CFG_FILE -S $SOCKET select-pane -t 0
+		$CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
+	fi
+}
+
+while [ -n "$1" ]; do
+	option=$1
+	
+	if [[ $option == '--help' || $option == '-h' ]]; then
+		showHelp
+		exit 0
+	#elif [[ $option == '--force' || $option == '-f' ]]; then
+	#	FORCE=1
+	#elif [[ $option == '--latest' || $option == '-l' ]]; then
+	#	latestVer=1
+	#elif [[ $option == '--stable' || $option == '-s' ]]; then
+	#	stableVer=1
+	elif [[ $option == 'install' ]]; then
+		command='install'
+	elif [[ $option == 'setup' ]]; then
+		command='setup'
+	elif [[ $option == 'start' ]]; then
+		command='start'
+	elif [[ $option == 'stop' ]]; then
+		command='stop'
+	elif [[ $option == 'show' ]]; then
+		command='show'
+	
+	else
+		echo "Uncorrect argument $option"
+	fi
+
+	shift
+done
+
+case $command in
+	install)
+		installTmate
+	;;
+	setup)
+		setup
+	;;
+	start)
+		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}"
+		start
+	;;
+	stop)
+		echo "$CMD -S $SOCKET kill-session -a"
+		$CMD -S $SOCKET kill-session -a
+	;;
+	show)
+		show
+	;;
+	*)
+		echo -e "${RED}No command specified${WHITE}"
+		showHelp
+		exit 1
+	;;
+esac

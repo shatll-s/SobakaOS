@@ -20,7 +20,7 @@ errorMsgAmdError+=("No response")
 
 
 errorMsgNvidiaWarning=()
-errorMsgNvidiaWarning+=("Zaglushka")
+errorMsgNvidiaWarning+=("GPU has fallen off the bus")
 
 errorMsgNvidiaError=()
 errorMsgNvidiaError+=("Graphics Exception")
