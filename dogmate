@@ -12,27 +12,33 @@ SOCKET="/tmp/tmate.sock"
 CMD="tmate"
 
 INSTALL_LINK="https://os.dog/downloads/other/tmate.tar.gz"
+NEED_VER="240"
 CFG_FILE=/dog/service/tmate.conf
 LOG=/dog/log/tmate.log
+
+#Args
+FORCE=
 
 showHelp () {
 	echo "Help for $0"
 }
 
+checkVer () {
+	ver=`tmate -V 2>/dev/null | sed 's/.*\s//'`
+	exitcode=$?
+	if [[ $exitcode -ne 0 ]]; then
+		msg="Tmate is not installed"
+		return=1
+	else
+		msg="Current version: $ver"
+		[[ `echo $ver | sed 's/\.//g'` -lt $NEED_VER ]] && return=1 || return=0
+	fi
+
+	[[ $1 == 'verbose' ]] && echo "$msg"
+	return $return
+}
+
 installTmate () {
-ver=`upp version 2>/dev/null`
-
-exitcode=$?
-if [[ $exitcode -ne 0 ]]; then
-	uppNeedInstall=1
-else
-	echo -e "${BROWN}> Uplift Power Play is already installed, check for version${WHITE}"
-	[[ $ver != "0.0.8" ]] && uppNeedInstall=1
-fi
-
-if [[ $uppNeedInstall -eq 1 ]]; then
-
-
 	local tmpfile="/tmp/tmate.tar.gz"
 	local tmpDir="/tmp/tmate"
 	rm -f $tmpfile
@@ -110,14 +116,27 @@ start () {
 	fi
 }
 
+stop () {
+	[[ $1 == 'verbose' ]] && echo -e "${GREEN}> Stopping tmate session${WHITE}"
+	PID=`pidof tmate`
+	if [[ ! -z $PID ]]; then
+		kill -9 $PID
+	else
+		[[ $1 == 'verbose' ]] && echo -e "${RED} There is no active tmate sessions${WHITE}"
+	fi
+}
+
 while [ -n "$1" ]; do
 	option=$1
 	
 	if [[ $option == '--help' || $option == '-h' ]]; then
 		showHelp
 		exit 0
-	#elif [[ $option == '--force' || $option == '-f' ]]; then
-	#	FORCE=1
+	elif [[ $option == '--version' || $option == '-V' ]]; then
+		checkVer verbose
+		exit 0
+	elif [[ $option == '--force' || $option == '-f' ]]; then
+		FORCE=1
 	#elif [[ $option == '--latest' || $option == '-l' ]]; then
 	#	latestVer=1
 	#elif [[ $option == '--stable' || $option == '-s' ]]; then
@@ -130,9 +149,10 @@ while [ -n "$1" ]; do
 		command='start'
 	elif [[ $option == 'stop' ]]; then
 		command='stop'
+	elif [[ $option == 'restart' ]]; then
+		command='restart'
 	elif [[ $option == 'show' ]]; then
 		command='show'
-	
 	else
 		echo "Uncorrect argument $option"
 	fi
@@ -142,21 +162,49 @@ done
 
 case $command in
 	install)
+		if [[ $FORCE -ne 1 ]]; then
+			if [[ `checkVer` -eq 0 ]]; then
+				checkVer verbose
+				echo "No need to reinstall tmate"
+				
+				if [[ -t 1 ]]; then 
+					echo -en "If you want to reinstall tmate, type \"yes\": "
+					read answer
+					if [[ $answer == "y" || $answer == "Y" || $answer == "yes" || $answer == "Yes" ]]; then
+						:
+					else
+						echo "Ok, bye"
+						exit 0
+					fi
+				else
+					echo "If you still want to do it, run command with \"-f\" argument"
+					exit 1
+				fi		
+			fi
+		fi
+
 		installTmate
 	;;
 	setup)
 		setup
 	;;
 	start)
-		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}"
+		[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
+		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
 		start
 	;;
 	stop)
-		echo "$CMD -S $SOCKET kill-session -a"
-		$CMD -S $SOCKET kill-session -a
+		stop verbose
+	;;
+	restart)
+		stop
+
+		[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
+		[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
+		start
 	;;
 	show)
-		show
+		$CMD -S $SOCKET display -p '#{tmate_ssh}' 
 	;;
 	*)
 		echo -e "${RED}No command specified${WHITE}"
