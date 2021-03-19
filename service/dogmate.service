@@ -1,0 +1,12 @@
+[Unit]
+Description=OSdog wrapper for Tmate
+
+[Service]
+Type=simple
+ExecStart=/dog/dogmate start-cli
+User=user
+#ExecStop=/dog/dogmate stop-cli
+
+#StandardOutput=tty
+#StandardInput=tty
+#TTYPath=/dev/tty1

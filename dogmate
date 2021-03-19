@@ -13,7 +13,7 @@ CMD="tmate"
 
 INSTALL_LINK="https://os.dog/downloads/other/tmate.tar.gz"
 NEED_VER="240"
-CFG_FILE=/dog/service/tmate.conf
+CFG_FILE=/dog/cfg/tmate.conf
 LOG=/dog/log/tmate.log
 
 #Args
@@ -21,7 +21,25 @@ FORCE=
 ATTACH=
 
 showHelp () {
-	echo "Help for $0"
+	bname=`basename $0`
+	echo -e "Usage: ${CYAN}$bname [ arg ] command${WHITE}"
+	echo ""
+	echo -e "Commands:"
+	echo -e "${GREEN}  install     ${WHITE}Install tmate"
+	echo -e "${GREEN}  setup       ${WHITE}Setup tmate configuration"
+	echo ""
+	echo -e "${GREEN}  start       ${WHITE}Install and setup if needed, than start session"
+	echo -e "${GREEN}  stop        ${WHITE}Stop session"
+	echo -e "${GREEN}  restart     ${WHITE}Restart session"
+	echo -e "${GREEN}  go          ${WHITE}Force setup and start session"
+	echo -e "${GREEN}  show        ${WHITE}Show connection information"
+	echo -e "${GREEN}  attach      ${WHITE}Attach to existing session"
+	
+	echo ""
+	echo -e "Options:"
+	echo -e "${GREEN}  -f,--force  ${WHITE}Used to force reinstall (even it is not needed)"
+	echo -e "${GREEN}  -a,--attach ${WHITE}Attach to session after starting"
+	echo -e "${GREEN}  -h,--help   ${WHITE}Show this message"
 }
 
 checkVer () {
@@ -66,7 +84,7 @@ installTmate () {
 }
 
 setup () {
-	local CFG="
+	local cfg="
 set -g tmate-server-host $T_HOST
 set -g tmate-server-port $T_PORT
 set -g tmate-server-rsa-fingerprint $FINGERPRINT
@@ -83,8 +101,8 @@ bind-key m \
   set-option -g mouse off \;\
   display-message 'Mouse: OFF'
 
-unbind C-b 
-set -g prefix C-a
+#unbind C-b 
+#set -g prefix C-a
 bind -n M-Left select-pane -L 
 bind -n M-Right select-pane -R 
 bind -n M-Up select-pane -U 
@@ -102,10 +120,11 @@ set -g pane-active-border-bg default
 set -g pane-active-border-fg blue
 "
 	
-	echo -e "$CFG" > $CFG_FILE	
+	echo -e "$cfg" > $CFG_FILE	
 }
 show () {
-	$CMD -S $SOCKET display -p '#{tmate_ssh}' 
+	$CMD -S $SOCKET display -p '#{tmate_ssh}' 2>/dev/null
+	$CMD -S $SOCKET display -p '#{tmate_web}' 2>/dev/null
 }
 attach () {
 	$CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
@@ -113,19 +132,23 @@ attach () {
 
 start () {
 	if [[ ! -z  `pidof tmate` ]]; then
-		echo -e "${CYAN}> Tmate is already running${WHITE}"
+		echo -e "${CYAN}> tmate is already running${WHITE}"
 		show
 		exit 1
 	fi
-	#$CMD -f $CFG_FILE -S $SOCKET split-window -h 'screen -r yes'
-	#$CMD -f $CFG_FILE -S $SOCKET split-window -v 'screen -r yes2'
-	#$CMD -f $CFG_FILE -S $SOCKET select-pane -t 0
-
-	[[ `checkVer` -eq 1 ]] && echo -e "${CYAN}> Need to install tmate firse${WHITE}" && installTmate
-	[[ ! -f $CFG_FILE ]] && "${CYAN}> No config file, setup first${WHITE}" && setup
-
-	$CMD -f $CFG_FILE -S $SOCKET new-session -d
 	
+	checkVer
+	checkVerExitcode=$?
+	[[ $checkVerExitcode -eq 1 ]] && echo -e "${CYAN}> Need to install tmate first${WHITE}" && installTmate
+	if [[ ! -f $CFG_FILE ]]; then
+		echo -e "${CYAN}> No config file, setup first${WHITE}"
+		setup
+	else
+		echo -e "${CYAN}> Found config file ${CFG_FILE}${WHITE}"
+	fi
+
+	systemctl restart dogmate
+
 	echo -en "${CYAN}> Waiting for connection${WHITE}"
 	try=0
 	while [[ $try -lt 100 ]]; do #30 sec
@@ -140,16 +163,19 @@ start () {
 	[[ $try -ge 30 ]] && echo -e "${LIGHTRED}Something goes wrong, connection can\`t be established${WHITE}" && exit 1
 	
 	echo -e "$data"
-	[[ $ATTACH -eq 1 ]] && attach
+	[[ $ATTACH -eq 1 ]] && attach #|| $CMD -f $CFG_FILE -S $SOCKET wait tmate-ready
 }
 
 stop () {
-	[[ $1 == 'verbose' ]] && echo -e "${GREEN}> Stopping tmate session${WHITE}"
+	[[ $1 == 'verbose' ]] && echo -e "${CYAN}> Stopping tmate service${WHITE}"
+	systemctl stop dogmate
+
+	[[ $1 == 'verbose' ]] && echo -e "${CYAN}> Stopping standalone tmate sessions${WHITE}"
 	PID=`pidof tmate`
 	if [[ ! -z $PID ]]; then
 		kill -9 $PID
 	else
-		[[ $1 == 'verbose' ]] && echo -e "${CYAN}> There is no active tmate sessions${WHITE}"
+		[[ $1 == 'verbose' ]] && echo -e "${CYAN}> There is no standalone tmate sessions${WHITE}"
 	fi
 }
 
@@ -164,13 +190,13 @@ while [ -n "$1" ]; do
 			checkVer verbose
 			exit 0
 		;;
-		--force|-v)
+		--force|-f)
 			FORCE=1
 		;;
 		--attach|-a)
 			ATTACH=1
 		;;
-		install|setup|attach|start|stop|restart|go|show)
+		install|setup|attach|start|stop|restart|go|show|start-cli)
 			command=$option
 		;;
 		*)
@@ -181,11 +207,15 @@ while [ -n "$1" ]; do
 	shift
 done
 
+[[ ! $command && $ATTACH -eq 1 ]] && command='attach' #short combination dogmate -a
+
 case $command in
 	install)
 		if [[ $FORCE -ne 1 ]]; then
-			if [[ `checkVer` -eq 0 ]]; then
-				checkVer verbose
+			checkVer
+			checkVerExitcode=$?
+			if [[ $checkVerExitcode -eq 1 ]]; then
+				checkVer verbose #just for text
 				echo "No need to reinstall tmate"
 				
 				if [[ -t 1 ]]; then 
@@ -212,23 +242,29 @@ case $command in
 	attach)
 		attach
 	;;
+	start-cli) #only for service. Don`t use in manually
+		$CMD -f $CFG_FILE -S $SOCKET -F new-session -d
+		#$CMD -f $CFG_FILE -S $SOCKET -F new-session -d -c bash
+	;;
 	start)
-		start
+		start		
 	;;
 	stop)
+		echo -e "${CYAN}> Stopping tmate service${WHITE}"
+		systemctl stop dogmate
 		stop verbose
 	;;
 	restart)
-		stop
+		stop verbose
 		start
 	;;
 	go)
-		stop
+		#stop
 		setup
-		start
+		systemctl start dogmate
 	;;
 	show)
-		$CMD -S $SOCKET display -p '#{tmate_ssh}' 
+		show
 	;;
 	*)
 		echo -e "${LIGHTRED}No command specified${WHITE}"
