@@ -84,8 +84,12 @@ function manual_setup()
 
 function setup()
 {
+	#echo "$NETWORK_CFG:"
+	#cat $NETWORK_CFG
+
 	#get config
 	if [[ ! -f $NETWORK_CFG ]]; then #if wifi is no set up
+		#echo "Verbose: No file"
 		if [[ -f $NETWORK_CFG_FLASH ]]; then #if file on flash exist
 			dos2unix -n $NETWORK_CFG_FLASH $TMP_FILE
 			. $TMP_FILE #read, if something is inside, copy
@@ -161,9 +165,31 @@ function setup()
 			wifi_iface+=${iface[$i]}
 		fi
 	done
-	echo "WIFI" >> $LOG
-	echo "@${wifi_iface[@]}@">> $LOG
+	#echo "WiFi" >> $LOG
+	#echo "@${wifi_iface[@]}@">> $LOG
 	#wifi section
+	if [[ ${#wifi_iface[@]} -eq 0 && ! -z $SSID ]]; then
+		echo -e "${BROWN}> SSID exists, but wireless interfaces are not detected${WHITE}"
+		echo -en "${BROWN}> Wait some time${WHITE}"
+		try=0
+		while [[ $try -lt 30 ]]; do
+			if [[ ! -z `ifconfig -a | grep wlan0` ]]; then
+				echo ""
+				echo -e "${GREEN}> Wireless interface detected${WHITE}"
+				#ifconfig -a
+				
+				wifi_iface[0]='wlan0'
+				sleep 5
+				break
+			fi
+			echo -en "${BROWN}.${WHITE}"
+			sleep 0.2
+			((try++))	
+		done
+		echo ""
+		[[ $try -ge 50 ]] && echo -e $(date --rfc-3339=seconds)" ${RED}Wireless interfaces are not detected${WHITE}"
+	fi
+
 	if [[ ${#wifi_iface[@]} -gt 0 ]]; then
 		[[ -t 1 ]] && echo -e "${BROWN}================================================================${WHITE}"
 		if [[ ! -z $SSID && ! -z $WIFI_PASSWORD ]]; then
@@ -234,7 +260,8 @@ function setup()
 	echo -e "$string" > $interfaces
 	#echo -e "$string" > /tmp/netsetup_test	
 	
-	netplan apply #netplan --debug apply >> $LOG
+	#netplan --debug apply #>> $LOG
+	netplan apply 
 	[[ `sudo systemctl status openvpn | grep active` ]] && sudo systemctl restart openvpn
 
 	echo -en "${GREEN}$wired_count wired "

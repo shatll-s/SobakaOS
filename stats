@@ -48,7 +48,7 @@ case $1 in
 			miner_total_badshare=$(($miner_total_badshare+${miner_badshare[$i]}))
 		done
 	;;
-	claymore|phoenix|nanominer)
+	claymore|phoenix)
 		local miner_algo="ethash" #will be changed later for some miners
 		case $1 in
 			claymore)
@@ -58,18 +58,18 @@ case $1 in
 				local pass_arg="-cdmpass"
 				[[ `. /dog/cfg/batch.cfg; echo "$batch1" | grep -E "coin etc"` ]] && miner_algo="etchash"
 			;;
-			nanominer)
-				local pass_arg="-cdmpass" #not sure, mozhet eto na hui ne nado?
-
-				miner_algo=`cat /dog/miners/nanominer/config.ini | grep -E "\[" | sed 's/.*\[\([a-z]*\)\].*/\1/'`
-
-				if [[ ! $miner_algo ]]; then
-					[[ $miner1 == "nanominer" ]] && minerId=1 || minerId=2
-					miner_algo=`cat /tmp/batch${minerId} | jq -r '.algo'`
-				fi
-
-				[[ $miner_algo == 'autolykos' ]] && miner_algo='autolykos2'
-			;;
+			# nanominer)
+			#	local pass_arg="-cdmpass" #not sure, mozhet eto na hui ne nado?
+			#
+			#	miner_algo=`cat /dog/miners/nanominer/config.ini | grep -E "\[" | sed 's/.*\[\([a-z]*\)\].*/\1/'`
+			#
+			#	if [[ ! $miner_algo ]]; then
+			#		[[ $miner1 == "nanominer" ]] && minerId=1 || minerId=2
+			#		miner_algo=`cat /tmp/batch${minerId} | jq -r '.algo'`
+			#	fi
+			#
+			#	[[ $miner_algo == 'autolykos' ]] && miner_algo='autolykos2'
+			#;;
 		esac
 
 		local request='{"id":0,"jsonrpc":"2.0","method":"miner_getstat2"}'
@@ -323,37 +323,59 @@ case $1 in
 			fi
 		fi
 	;;
-#	nanominer)
-#		#miner_ver=`echo $stats_template | jq -r '.[0]'` #no miner version in API
-#		[[ $miner1 == "nanominer" ]] && batch='/tmp/batch1' || batch='/tmp/batch2'
-#		manifest=`cat $batch`
-#		[[ `echo $manifest | jq ".fork"` != null ]]	&& miner_ver=`echo $manifest | jq -r ".fork"`
-#
-#		local stats_template=$(curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET "127.0.0.1:$port/stats")
-#		miner_online_raw=`echo $stats_template | jq -r '.WorkTime'`
-#		if (($miner_online_raw)); then
-#			miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
-#		fi
-#		miner_algo=`echo $stats_template | jq '.Algorithms[]' | jq -r 'keys[]' | tr '[:upper:]' '[:lower:]'`
-#		miner_total_hr_raw=`echo $stats_template | jq -r '.Algorithms[][].Total.Hashrate' | jq '.'`
-#		miner_total_hr=$(echo "scale=0; `echo $miner_total_hr_raw | jq '.'`/1000" | bc -l)
-#		miner_total_share=`echo $stats_template | jq -r '.Algorithms[][].Total.Accepted'`
-#		miner_total_badshare=`echo $stats_template | jq -r '.Algorithms[][].Total.Denied'`
-#
-#		miner_busid=(`echo $stats_template | jq -r '.Devices[][].Pci'`)
-#		miner_temp=(`echo $stats_template | jq -r '.Devices[][].Temperature'`)
-#		miner_fan=(`echo $stats_template | jq -r '.Devices[][].Fan'`)
-#		miner_power=(`echo $stats_template | jq -r '.Devices[][].Power' | sed 's/\.[0-9]*//g'`)
-#
-#		devices=`echo $stats_template | jq ".Algorithms[][]" | jq 'del(.CurrentPool)' | jq 'del(.Total)' | jq 'del(.ReconnectionCount)'`
-#
-#		miner_hr_raw=(`echo $devices | jq -r '.[].Hashrate' | jq '.'`)
-#		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
-#			miner_hr[$i]=$(echo "scale=0; ${miner_hr_raw[$i]}/1000" | bc -l)
-#		done
-#		miner_share=(`echo $devices | jq -r '.[].Accepted'`)
-#		miner_badshare=(`echo $devices | jq -r '.[].Denied'`)
-#	;;
+	nanominer)
+		#miner_ver=`echo $stats_template | jq -r '.[0]'` #no miner version in API
+		[[ $miner1 == "nanominer" ]] && local batch='/tmp/batch1' || local batch='/tmp/batch2'
+		local manifest=`cat $batch`
+		[[ `echo $manifest | jq ".fork"` != null ]]	&& local miner_ver=`echo $manifest | jq -r ".fork"`
+
+		local stats_template=`curl --connect-timeout $API_TIMEOUT -s --max-time $API_TIMEOUT -X GET "127.0.0.1:$port/stats"`
+
+		local miner_online_raw=`echo $stats_template | jq -r '.WorkTime'`
+		if (($miner_online_raw)); then
+			local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		fi
+
+		local miner_busid=(`echo $stats_template | jq -r '.Devices[][].Pci'`)
+		local miner_temp=(`echo $stats_template | jq -r '.Devices[][].Temperature'`)
+		local miner_fan=(`echo $stats_template | jq -r '.Devices[][].Fan'`)
+		local miner_power=(`echo $stats_template | jq -r '.Devices[][].Power' | sed 's/\.[0-9]*//g'`)
+
+		local algoArr=(`echo $stats_template | jq '.Algorithms[]' | jq -r 'keys[]'`)
+		if [[ ! -z $algoArr ]]; then
+			for ((algoNum=0; $algoNum < ${#algoArr[@]}; algoNum++)); do
+				[[ $algoNum == 0 ]] && local prefix='miner' || local prefix='miner_dual'
+				#local prefix='miner'
+				local algoRaw=${algoArr[$algoNum]}
+				local total_hr_raw=`echo $stats_template | jq -r ".Algorithms[].$algoRaw.Total.Hashrate"`
+
+				local total_hr=$(echo "scale=0; `echo $total_hr_raw | jq '.'`/1000" | bc -l)
+				local total_share=`echo $stats_template | jq -r ".Algorithms[].$algoRaw.Total.Accepted"`
+				local total_badshare=`echo $stats_template | jq -r ".Algorithms[].$algoRaw.Total.Denied"`
+
+				local devices=`echo $stats_template | jq ".Algorithms[].$algoRaw" | jq 'del(.CurrentPool)' | jq 'del(.Total)' | jq 'del(.ReconnectionCount)'`
+
+				local hr_raw=(`echo $devices | jq -r '.[].Hashrate' | jq '.'`)
+				for ((i=0; i < ${#hr_raw[@]}; i++)); do
+					local hr[$i]=$(echo "scale=0; ${hr_raw[$i]}/1000" | bc -l)
+				done
+				local share=(`echo $devices | jq -r '.[].Accepted'`)
+				local badshare=(`echo $devices | jq -r '.[].Denied'`)
+				local algo=`echo $algoRaw | tr '[:upper:]' '[:lower:]'`
+				
+				for option in total_hr total_share total_badshare algo; do
+					eval "${prefix}_${option}=\$$option"
+				done
+
+				for option in hr share badshare; do
+					eval "local count=\${#$option[@]}"
+					for ((i=0; i < $count; i++)); do
+						eval "${prefix}_${option}[$i]=\${$option[$i]}"
+					done
+				done
+			done
+		fi
+	;;
 	lolminer)
 		local stats_template=`curl --connect-timeout 2 --silent --max-time $API_TIMEOUT --noproxy '*' http://127.0.0.1:$port/summary`
 		

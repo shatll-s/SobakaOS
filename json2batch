@@ -354,24 +354,64 @@ function make_batch () {
 		nanominer)
 			minerexec+=" /dog/miners/nanominer/config.ini "
 			config="logPath=/dog/log/nanominer.log\n"
-			config+="webPort=0\n"
-			config+="mport=-${API_port}\n"
+			#config+="webPort=0\n"
+			config+="webPort=${API_port}\n"
+			config+="mport=0\n"
+			#config+="mport=-${API_port}\n"
 			config+="rigName = $name\n"
 
-			if [[ ! -z $algo ]]; then
-				if [[ *${algo^^}* == "ETHASH ETCHASH RANDOMX UBQHASH CUCKAROO30 KAWPOW" ]]; then
-					config+="[$algo]\n"
-				else
-					[[ ! $coin ]] && coin=$algo
-				fi
+			if [[ $algo == *"_"* ]]; then #dual
+				algoArray[0]=`echo $algo | sed 's/_.*//'`
+				algoArray[1]=`echo $algo | sed 's/.*_//'`
+				#config+="full: $algo\n"
+				#config+="1: $algo1\n"
+				#config+="2: $algo2\n"
+			else
+				algoArray[0]=$algo
 			fi
 
-			[[ ! -z $coin ]]&& config+="coin=$coin\n"
-			config+="wallet = $wallet\n"
-			config+="pool1 = $pool\n"
-			[[ ! -z $pass ]]&& config+="rigPassword = $pass\n"
-			[[ ! -z $addition ]]&& config+="$addition"
+			for ((i=0; i < ${#algoArray[@]}; i++)); do
+				algoVal=${algoArray[$i]}
+				#config+=$algoVal
+				#config+="\n"
+				if [[ "ETHASH ETCHASH RANDOMX UBQHASH CUCKAROO30 KAWPOW AUTOLYKOS ZIL" == *${algoVal^^}* ]]; then
+					config+="[$algoVal]\n"
+				else
+					[[ ! $coin ]] && coin=$algoVal
+					[[ ! -z $coin ]]&& config+="coin=$coin\n"
+					:
+				fi
 
+				[[ $i -eq 0 ]] && walletVal=$wallet || walletVal=$dual_wallet
+				[[ $i -eq 0 ]] && poolVal=$pool || poolVal=$dual_pool
+				[[ $i -eq 0 ]] && passVal=$pass || passVal=$dual_pass
+				
+				config+="wallet = $walletVal\n"
+				config+="pool1 = $poolVal\n"
+				[[ ! -z $passVal ]]&& config+="rigPassword = $passVal\n"
+				[[ ! -z $addition ]]&& config+="$addition"
+			done
+
+#
+#if [[ ! -z $algo ]]; then
+#				minerexec+=" -a $algo"
+#				if [[ $algo == *"_ethash" ]]; then
+#					#main and dual are reverted
+#					[[ ! -z $dual_pool ]]&& minerexec+=" -o $dual_pool"
+#					[[ ! -z $dual_template ]]&& minerexec+=" -u $dual_template"
+#					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
+#
+#					[[ ! -z $pool ]]&& minerexec+=" -do $pool"
+#					[[ ! -z $template ]]&& minerexec+=" -du $template"
+#					[[ ! -z $pass ]]&& minerexec+=":$pass"
+#				else
+#					[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+#					[[ ! -z $template ]]&& minerexec+=" -u $template"
+#					[[ ! -z $pass ]]&& minerexec+=":$pass"
+#				fi
+#			fi
+#
+			
 			mkdir -p /dog/miners/nanominer
 			echo -e "$config" > /dog/miners/nanominer/config.ini
 		;;
