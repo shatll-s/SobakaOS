@@ -1,5 +1,6 @@
 #!/bin/bash
 . colors
+
 while [ -n "$1" ]; do
 	option=$1
 	shift
@@ -26,10 +27,13 @@ done
 [[ ! $brand || ! $bus ]] && echo -e "Not enough arguments" && exit 1
 [[ ! $time ]] && time=10
 
+[[ ! -f /run/dog/gpuStats ]] && echo -e "There is no /run/dog/gpuStats" && exit 1
+
 if [[ $brand == 'amd' ]]; then
-	coreAddr=`amd-info | grep "0000:$bus" | sed "s/.*\(\/sys\/class\/drm.*device\).*/\1/"`
-	[[ ! $coreAddr ]] && echo "Wrong bus or amd-info error" && exit 1
-	fanAddr=`ls -d $coreAddr/hwmon/hwmon[0-9]*`
+	gpu=`cat /run/dog/gpuStats | jq '.gpu[] | select(.brand == "A") | select(.b == "05")'`
+	[[ ! $gpu ]] && echo "Can not find gpu with bus $bus" && exit 1
+	fanAddr=`echo $gpu | jq -r '.fanAddr'`
+	
 	pwmEnable=`cat $fanAddr/pwm1_enable`
 	pwm1=`cat $fanAddr/pwm1`
 	#echo "$fanAddr $pwmEnable $pwm1"

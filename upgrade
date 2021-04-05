@@ -70,7 +70,7 @@ if [[ $exitcode -ne 0 ]]; then
 	uppNeedInstall=1
 else
 	echo -e "${BROWN}> Uplift Power Play is already installed, check for version${WHITE}"
-	[[ $ver != "0.0.8" ]] && uppNeedInstall=1
+	[[ $ver != "0.0.9" ]] && uppNeedInstall=1
 fi
 
 if [[ $uppNeedInstall -eq 1 ]]; then

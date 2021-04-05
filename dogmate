@@ -2,16 +2,20 @@
 # tmate control script
 . /dog/colors
 
-T_HOST="188.127.251.99"
-T_PORT=33322
-FINGERPRINT="SHA256:2HqU8ShGUt3CwK9PCfp2PvSJbt7/BSyU2vtbtOlMHrE"
-ED25519_FINGERPRINT="SHA256:1vbzBDcT6z6yPr9hM5uozyaLj7IhzYhstVOJHEZ0a+A"
+#old
+#T_HOST="188.127.251.99"
+#T_PORT=33322
+#FINGERPRINT="SHA256:2HqU8ShGUt3CwK9PCfp2PvSJbt7/BSyU2vtbtOlMHrE"
+#ED25519_FINGERPRINT="SHA256:1vbzBDcT6z6yPr9hM5uozyaLj7IhzYhstVOJHEZ0a+A"
+
+T_HOST="sobaka.group"
+T_PORT=2200
+FINGERPRINT="SHA256:pj6jMtCIgg26eJtHUro6KEmVOkVGmLdclArInW9LyLg"
+ED25519_FINGERPRINT="SHA256:ltQuqZqoF1GHYrrAVd99jW8W7vj/1gwoBwBF/FC9iuU" 
+
 
 SOCKET="/tmp/tmate.sock"
-#CMD="/dog/sbin/tmate"
-CMD="tmate"
 
-INSTALL_LINK="https://os.dog/downloads/other/tmate.tar.gz"
 NEED_VER="240"
 CFG_FILE=/dog/cfg/tmate.conf
 LOG=/dog/log/tmate.log
@@ -20,6 +24,17 @@ LOG=/dog/log/tmate.log
 FORCE=
 ATTACH=
 
+CMD="tmate"
+system=`lsb_release -r | sed "s/.*\s\([.0-9]*\)/\1/"`
+
+if [[ $system == '18.04' ]]; then
+	INSTALL_LINK="https://os.dog/downloads/other/tmate-deb-18.04.tar.gz"
+	#CMD="tmate"
+else
+	INSTALL_LINK="https://os.dog/downloads/other/tmate-deb-20.04.tar.gz"
+	#CMD="/dog/sbin/tmate"
+fi
+	
 showHelp () {
 	bname=`basename $0`
 	echo -e "Usage: ${CYAN}$bname [ arg ] command${WHITE}"
@@ -49,8 +64,14 @@ checkVer () {
 		msg="Tmate is not installed"
 		return=1
 	else
-		msg="Current version: $ver"
-		[[ `echo $ver | sed 's/\.//g'` -lt $NEED_VER ]] && return=1 || return=0
+		msg="Current version: $ver. "
+		if [[ `echo $ver | sed 's/\.//g'` -lt $NEED_VER ]]; then
+			msg+="Need to upgrade"
+			return=1
+		else
+			msg+="No need to upgrade"
+			return=0
+		fi
 	fi
 
 	[[ $1 == 'verbose' ]] && echo "$msg"
@@ -65,6 +86,7 @@ installTmate () {
 	[ -t 1 ] && ARG="" || ARG="-q"
 
 	wget $ARG -c $INSTALL_LINK -O $tmpfile
+	
 	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Download failed${WHITE}" && exit 1
 	
 	echo -e "${CYAN}> Uncompressing${WHITE}"
@@ -75,10 +97,17 @@ installTmate () {
 	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
 
 	echo -e "${CYAN}> Installing${WHITE}"
-	dpkg -i $tmpDir/*.deb
+	if [[ `ls -l $tmpDir | grep .deb` ]]; then
+		dpkg -i $tmpDir/*.deb
+		[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while installing${WHITE}" && rm -r -f $tmpDir && exit 1
+	fi
 
-	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
-
+	#if [[ $system == '20.04' ]]; then
+	#	chmod 777 $tmpDir/tmate
+	#	cp $tmpDir/tmate /dog/sbin/tmate
+	#	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while installing${WHITE}" && rm -r -f $tmpDir && exit 1
+	#fi
+		
 	echo -e "${GREEN}> Tmate install complete${WHITE}"
 	rm -r -f $tmpDir $tmpfile
 }
@@ -118,6 +147,8 @@ set -g pane-border-fg colour238
 # Active pane border
 set -g pane-active-border-bg default
 set -g pane-active-border-fg blue
+
+#send-keys q
 "
 	
 	echo -e "$cfg" > $CFG_FILE	
@@ -211,10 +242,11 @@ done
 
 case $command in
 	install)
+		echo $FORCE
 		if [[ $FORCE -ne 1 ]]; then
 			checkVer
 			checkVerExitcode=$?
-			if [[ $checkVerExitcode -eq 1 ]]; then
+			if [[ $checkVerExitcode -eq 0 ]]; then #if version is OK, may be no need to upgrade?
 				checkVer verbose #just for text
 				echo "No need to reinstall tmate"
 				
@@ -234,6 +266,12 @@ case $command in
 			fi
 		fi
 
+		echo -e "${CYAN}> Stopping tmate service${WHITE}"
+		systemctl stop dogmate
+		stop verbose
+
+		echo -e "${CYAN}> Remove previos versions${WHITE}"
+		[[ `dpkg -l | grep -c tmate` -ne 0 ]] && apt remove -y --purge tmate
 		installTmate
 	;;
 	setup)
@@ -243,7 +281,13 @@ case $command in
 		attach
 	;;
 	start-cli) #only for service. Don`t use in manually
-		$CMD -f $CFG_FILE -S $SOCKET -F new-session -d
+		echo "$CMD -f $CFG_FILE -S $SOCKET new-session -d"
+		#if [[ $system == '18.04' ]]; then
+			$CMD -f $CFG_FILE -S $SOCKET new-session -d
+		#else
+		#	$CMD -f $CFG_FILE -S $SOCKET new-session -d	
+		#fi
+
 		#$CMD -f $CFG_FILE -S $SOCKET -F new-session -d -c bash
 	;;
 	start)

@@ -257,7 +257,7 @@ function autofan () {
 				#sometimes we can`t put new value, so need to refresh pwm1_enable:
 				if [[ ! -z ${last_fan[i]} && ${last_fan[i]} == ${new_fan[i]} && ${last_fan[i]} -gt $fan_min  ]]; then 
 					last_fan[i]=${new_fan[i]}					
-					[[ -z freezeCount[$i] ]] && freezeCount[$i]=0
+					[[ -z freezeCount[$i] ]] && local freezeCount[$i]=0
 					(( freezeCount[$i]++ ))
 					[[ $tempTrigger == 'high' || $tempMemTrigger == 'high' ]] && local sign='+' || local sign='-'
 					new_fan[i]=`echo "scale=0; ${new_fan[$i]} $sign 3 * ${freezeCount[$i]}" | bc -l`

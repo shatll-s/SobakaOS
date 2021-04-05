@@ -78,7 +78,7 @@ function get_variables () {
 		fi
 	done
 
-	for option in template addition epools; do
+	for option in template addition epools pass; do
 		if [[ `echo $manifest | jq ".$option"` != null ]]; then
 			option_value="`echo $manifest | jq -r \".$option\" | sed "s/\\\$WORKER/$name/" | sed "s/\\\$ADDRESS/$wallet/"`" #double slash, because eval open it
 			eval "$option=\"$option_value\""
@@ -283,7 +283,7 @@ function make_batch () {
 			fi
 			minerexec+="$template:$pass@$cleanpool" #USERNAME.WORKERNAME:WORKERPWD
 			#echo $brand	
-			minerexec+=" --farm-recheck 500 --report-hashrate --api-port $API_port --HWMON 1 $brand"
+			minerexec+=" --report-hashrate --api-port $API_port --HWMON 1 $brand"
 		;;
 #		claymore_c) #Dead
 #			minerexec+=" -xpool $pool -xwal $template"
@@ -421,7 +421,7 @@ function make_batch () {
 			fi
 			minerexec+=" --api $API_port --logfile /dog/log/gminer.log"
 		;;
-		xmrig_cpu|xmrig_new)
+		xmrig_cpu|xmrig_new|xlarig)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"

@@ -76,6 +76,8 @@ function driver_install () {
 			echo -e "${RED}Error: you need to enter number here${WHITE}"
 			exit 1
 		fi
+	
+		[[ $i -lt 4 ]] && opencl="legacy,pal" || opencl="legacy,rocr" #from 20.45
 		
 		local newDriver=`echo $versions | jq ".[$i]"`
 		local name=`echo $newDriver | jq -r ".name"`
@@ -144,7 +146,7 @@ function driver_install () {
 	[[ -f /usr/bin/amdgpu-pro-uninstall ]] && yes | /usr/bin/amdgpu-pro-uninstall
 
 	echo -e "${CYAN}> Installing${WHITE}"
-	yes | $tmpDir/*/amdgpu-install --opencl=legacy,pal --headless $dkmsOption
+	yes | $tmpDir/*/amdgpu-install --opencl="$opencl" --headless $dkmsOption
 	[[ $? -ne 0 ]] && echo -e "${RED}> Error while installing new driver${WHITE}" &&  rm -r -f $tmpDir && exit 1
 	
 	rm -r -f $tmpDir &&

@@ -1,7 +1,6 @@
 README.md
 setup.py
 src/upp/__init__.py
-src/upp/decode.WIP.py
 src/upp/decode.py
 src/upp/upp.py
 src/upp.egg-info/PKG-INFO
