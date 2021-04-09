@@ -179,7 +179,7 @@ function setup()
 				#ifconfig -a
 				
 				wifi_iface[0]='wlan0'
-				sleep 5
+				sleep 30
 				break
 			fi
 			echo -en "${BROWN}.${WHITE}"

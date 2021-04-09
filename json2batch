@@ -389,7 +389,7 @@ function make_batch () {
 				config+="wallet = $walletVal\n"
 				config+="pool1 = $poolVal\n"
 				[[ ! -z $passVal ]]&& config+="rigPassword = $passVal\n"
-				[[ ! -z $addition ]]&& config+="$addition"
+				[[ ! -z $addition ]]&& config+="$addition\n"
 			done
 
 #
