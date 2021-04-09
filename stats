@@ -955,7 +955,7 @@ gpuCount=`echo $list | jq '.|length'`
 [[ $VERBOSE -eq 1 ]] && echo "> Nvidia count check"
 if [[ `gpu-detect NVIDIA` -gt 0 && ! -f $NV_STOP_TRIGGER ]]; then
 	[[ $VERBOSE -eq 1 ]] && echo "> Nvidia stats requesting"
-	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
+	timeout -s9 30 nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu,pstate --format=csv,noheader,nounits > $NVIDIASMI_FILE
 	exitcode=$?
 	[[ $VERBOSE -eq 1 ]] && echo "> Nvidia stats request success"
 	if [[ $exitcode -eq 0 ]]; then
@@ -1035,6 +1035,7 @@ for (( i=0; i < $gpuCount; i++ )); do
 			local CoreClock[$i]=`awk -F ', ' '{print $10}' <<< $nvidiainfo`
 			local MemClock[$i]=`awk -F ', ' '{print $11}' <<< $nvidiainfo`
 			local Utilisation[$i]=`awk -F ', ' '{print $13}' <<< $nvidiainfo`
+			local CoreState[$i]=`awk -F ', ' '{print $14}' <<< $nvidiainfo`
 		fi
 	fi
 done

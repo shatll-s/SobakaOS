@@ -8,7 +8,7 @@ LOCK_FILE="/tmp/.nvidia-oc.lock"
 listNV=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "N") | select(.status != "1")]'`
 
 function getdata () {
-	for option in core_clock memory_clock power_limit pill pill_args light fan; do
+	for option in core_clock lock_clock memory_clock power_limit pill pill_args light fan; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
 			eval "${option^^}=\"$option_value\""
@@ -38,7 +38,11 @@ echo -e "${GREEN}OSdog X server is active (running)${WHITE}"
 #Check end
 
 export DISPLAY=:0
-NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
+
+echo -en "> Touching nvidia-settings to get fans count"
+timeout -s9 30 nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d' > /tmp/nvFansList
+NV_FANS_LIST=`cat /tmp/nvFansList`
+#NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
 
 screen-kill pill
 pkill -f '/dog/sbin/nvidia-pill'
@@ -70,6 +74,7 @@ fi
 
 #Making arrays
 CORE_CLOCK=($CORE_CLOCK)
+LOCK_CLOCK=($LOCK_CLOCK)
 MEMORY_CLOCK=($MEMORY_CLOCK)
 FAN=($FAN)
 POWER_LIMIT=($POWER_LIMIT)
@@ -83,6 +88,7 @@ done
 
 echo "Trying to apply next settings:"
 echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
+echo -e ${CYAN}"Fix Clock:${WHITE}\t${LOCK_CLOCK[@]}"
 echo -e ${CYAN}"Memory:${WHITE}\t\t${MEMORY_CLOCK[@]}"
 echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
 echo -e ${CYAN}"Power limit:${WHITE}\t${POWER_LIMIT[@]}"
@@ -123,8 +129,12 @@ for (( i=0; i < $n; i++ )); do
 	fi
 
 	args=
-	[[ ! -z ${CORE_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUGraphicsClockOffset[$x]=${CORE_CLOCK[$i]}"
+	args+=" -a [gpu:$i]/GPUPowerMizerMode=1"
+
 	[[ ! -z ${MEMORY_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUMemoryTransferRateOffset[$x]=${MEMORY_CLOCK[$i]}"
+
+	[[ ! -z ${CORE_CLOCK[$i]} ]] && args+=" -a [gpu:$i]/GPUGraphicsClockOffset[$x]=${CORE_CLOCK[$i]}"
+
 	if [[ ! -z ${FAN[$i]} && ${FAN[$i]} != "A" ]]; then
 		args+=" -a [gpu:$i]/GPUFanControlState=1"
 		for ((z=$allFanCount; z < $allFanCount + $fanCount; z++)); do
@@ -137,6 +147,7 @@ for (( i=0; i < $n; i++ )); do
 	#echo $args
 	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
 	[[ ! -z ${POWER_LIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${POWER_LIMIT[$i]}
+	[[ ! -z ${LOCK_CLOCK[$i]} && ${LOCK_CLOCK[$i]} -ne 0 ]] && nvidia-smi -i $i --lock-gpu-clocks=${LOCK_CLOCK[$i]},${LOCK_CLOCK[$i]}
 	[[ $i -lt $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE
 
 	((allFanCount = $allFanCount + $fanCount))

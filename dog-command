@@ -540,7 +540,7 @@ case $1 in
 	;;
 	settings)
 		echo $2 > /tmp/settings #just for development
-		for option in service_mode use_graphic notify_on_boot wd_kern miner2_wait; do
+		for option in service_mode use_graphic notify_on_boot wd_kern miner2_wait force_p0; do
 			if [[ `echo $2 | jq ".$option"` != null ]]; then
 				option_value="`echo $2 | jq -r \".$option\"`" #double slash, because eval open it
 				eval "${option^^}=$option_value"
@@ -552,6 +552,9 @@ case $1 in
 				fi
 			fi
 		done
+
+		nvidia-tool $FORCE_P0
+
 		########################      RigOnline.ru SECTION      ########################
 		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg
 		if [[ `echo $2 | jq ".rigonlineru"` != null ]]; then

@@ -260,7 +260,51 @@ function driver_install () {
 	fi
 }
 
-function showHelp () {
+function forceCudaP0State() {
+	mkdir -p /etc/nvidia
+	
+	if [[ $1 -eq 1 ]]; then
+		echo -e "${BROWN}> Set maximum Performance level to P0${WHITE}"
+		local p2state=0
+	else
+		echo -e "${BROWN}> Set maximum Performance level to P2${WHITE}"
+		local p2state=1
+	fi
+
+	local json=$(
+		jq -n --argjson p2state $p2state \
+		'{	
+			"profiles": [
+				{
+					"name" : "CUDA",
+					"settings" : 
+						[ "0x166c5e", $p2state ]
+				}
+			],
+			"rules" : [
+		    	{
+					"pattern" : {
+						"feature" : "dso",
+						"matches" : "libcuda.so"
+					},
+					"profile" : "CUDA"
+		    	},
+				{
+					"pattern" : {
+						"feature" : "dso",
+						"matches" : "libnvidia-opencl.so"
+					},
+					"profile" : "CUDA"
+				}
+			]
+		}'
+	)
+
+	echo $json | jq '.' > /etc/nvidia/nvidia-application-profiles-rc
+	
+}
+
+function showHelp() {
 	bname=`basename $0`
 	echo -e "Usage: ${CYAN}$bname [arg1 arg2 ...] command [url]${WHITE}"
 	echo -e "  update\t\tUpdate driver to latest or argument version"
@@ -268,6 +312,7 @@ function showHelp () {
 	echo -e "  stop\t\t\tStop mining, X-server, unload Nvidia modules"
 	echo -e "  get-bios gpu_id\tGet bios version"
 	echo -e "  save-bios gpu_id file\tSave Nvidia GPU bios to file"
+	echo -e "  forceP0 0|1\t\tForces Nvidia P0 state"
 	echo ""
 	echo -e "Common options:"
 	echo -e "${GREEN}  -y|--yes                ${WHITE}Do not ask for confirmation, answer yes to all questions"
@@ -353,6 +398,15 @@ while [ -n "$1" ]; do
 		command='install'
 		shift
 		[[ ! -z $1 ]] && url=$1	
+	elif [[ $option == 'forceCudaP0State' || $option == 'forceP0' ]]; then
+		command='forceCudaP0State'
+		shift
+		if [[ ! -z $1 ]]; then
+			p0value=$1
+		else
+			echo -e "${RED}Not enough arguments for command $option${WHITE}"
+			exit 1
+		fi
 	else
 		echo "Uncorrect argument $option"
 	fi
@@ -378,6 +432,9 @@ case $command in
 	;;
 	install)
 		driver_install $url
+	;;
+	forceCudaP0State)
+		forceCudaP0State $p0value
 	;;
 	*)
 		echo -e "${RED}No command specified${WHITE}"
