@@ -23,6 +23,9 @@ echo -e "$n "$LIGHTRED"AMD"$WHITE" GPU detected "$(date --rfc-3339=seconds)"\n"
 #	done
 #done
 #y=0
+
+atitoolData=`atitool -i=* -pciestatus`
+
 for (( i=0; i < $n; i++ )); do
 		unset name navi coreAddr fan_addr temp_raw temp fan_raw fan voltTable memTable vram meminfo info coreState perfLevel memState
 		name=`echo $listAMD | jq -r ".[$i].name"`
@@ -42,19 +45,25 @@ for (( i=0; i < $n; i++ )); do
 		coreState=`cat "$coreAddr/pp_dpm_sclk" | grep \* | sed 's/*//'`
 		perfLevel=`cat "$coreAddr/power_dpm_force_performance_level"`
 		memState=`cat "$coreAddr/pp_dpm_mclk" | grep \* | sed 's/*//'`
+
+		atitoolStr=`echo "$atitoolData" | grep "$bus" -A4`
+		pcieWidth=`echo "$atitoolStr" | grep "PCIE Link Width" | sed 's/.*PCIE Link Width = //'`
+		pcieSpeed=`echo "$atitoolStr" | grep "PCIE Link Speed" | sed 's/.*PCIE Link Speed = //'`
+
 		#First line: PCI bus, address, temp, fan
 		echo -e "GPU $i ${LIGHTRED}${name}${WHITE} $bus\t $coreAddr"
 
 		#Second line: Core state, mem state
 		echo -e "Core state\t${LIGHTCYAN}$coreState${WHITE} ($perfLevel)\t"
 		echo -e "Mem state\t${LIGHTCYAN}$memState${WHITE}"
-		echo -e "Temp\t\t${LIGHTCYAN}$temp${WHITE} °C"
+		echo -e "Temp\t\t${LIGHTCYAN}$temp °C${WHITE}"
 		if [[ $navi -eq 1 ]]; then
 			temp_raw2=`cat "$fanAddr/temp3_input"` #temp1_input - current temp 
 			temp2=`expr $temp_raw / 1000` #temp format is something like 65000
-			echo -e "Mem Temp\t${LIGHTCYAN}$temp${WHITE} °C"
+			echo -e "Mem Temp\t${LIGHTCYAN}$temp °C${WHITE}"
 		fi
-		echo -e "Fan\t\t${LIGHTCYAN}${fan}${WHITE} %"
+		echo -e "Fan\t\t${LIGHTCYAN}${fan} %${WHITE}"
+		echo -e "PCIE\t\t${LIGHTCYAN}${pcieWidth} ${pcieSpeed}${WHITE}"
 		
 		#Core clocks (cut, change place, etc)
 		if [[ $name == *"Vega"* ]]; then
