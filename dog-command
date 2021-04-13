@@ -553,7 +553,7 @@ case $1 in
 			fi
 		done
 
-		nvidia-tool $FORCE_P0
+		nvidia-tool forceCudaP0State $FORCE_P0
 
 		########################      RigOnline.ru SECTION      ########################
 		echo $2 | jq ".rigonlineru" > /dog/cfg/rigonlineru.cfg

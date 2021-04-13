@@ -81,6 +81,7 @@ POWER_LIMIT=($POWER_LIMIT)
 
 for (( i=0; i < $n; ++i )); do
 	[[ ! ${CORE_CLOCK[$i]} && ! -z ${CORE_CLOCK[0]} ]]&& CORE_CLOCK[$i]=${CORE_CLOCK[-1]}
+	[[ ! ${LOCK_CLOCK[$i]} && ! -z ${LOCK_CLOCK[0]} ]]&& LOCK_CLOCK[$i]=${LOCK_CLOCK[-1]}
 	[[ ! ${MEMORY_CLOCK[$i]} && ! -z ${MEMORY_CLOCK[0]} ]]&& MEMORY_CLOCK[$i]=${MEMORY_CLOCK[-1]}
 	[[ ! ${FAN[$i]} && ! -z ${FAN[0]} ]]&& FAN[$i]=${FAN[-1]}
 	[[ ! ${POWER_LIMIT[$i]} && ! -z ${POWER_LIMIT[0]} ]]&& POWER_LIMIT[$i]=${POWER_LIMIT[-1]}
