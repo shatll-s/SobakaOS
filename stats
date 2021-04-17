@@ -249,6 +249,22 @@ case $1 in
 		miner_fan=(`echo $stats_template | jq '.devs[0].DEVS[]."Fan Percent"'`)
 		miner_share=(`echo $stats_template | jq '.devs[0].DEVS[]."Accepted"'`)
 		miner_badshare=(`echo $stats_template | jq '.devs[0].DEVS[]."Rejected"'`)
+
+		local scale=0
+		local x=1
+		if [[ "mtp" == *$miner_algo* ]]; then
+			local x=1000
+			scale=2
+		#	[[ $miner_algo == "nimiq" ]] && scale=2
+		#elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
+		#	local x=1000000
+		fi
+		if [[ $x -ne 1 ]]; then
+			for ((i=0; i < ${#miner_hr[@]}; i++)); do
+				miner_hr[$i]=$(echo "scale=$scale; ${miner_hr[$i]}*$x/1" | bc -l) #without /1 it gives value like 4635.000
+			done
+			miner_total_hr=$(echo "scale=$scale; $miner_total_hr*$x/1" | bc -l)
+		fi
 	;;
 	teamredminer)
 		#stupid BASED ON sgminer API doesn`t give algo, let`s get it from config
@@ -310,11 +326,12 @@ case $1 in
 			miner_share=(`echo $stats_template | jq '.gpus[].shares.accepted_count'`)
 			miner_badshare=(`echo $stats_template | jq '.gpus[].shares.rejected_count'`)
 			miner_invshare=(`echo $stats_template | jq '.gpus[].shares.invalid_count'`)
-			miner_total_badshare=`echo $stats_template | jq -r '.invalid_count'`
+			miner_total_invshare=`echo $stats_template | jq -r '.invalid_count'`
 		else
 			miner_share=(`echo $stats_template | jq '.stat_by_gpu[].accepted_count'`)
 			miner_badshare=(`echo $stats_template | jq '.stat_by_gpu[].rejected_count'`)
 		fi
+
 		miner_temp=(`echo $stats_template | jq '.gpus[].temperature'`)
 		miner_fan=(`echo $stats_template | jq '.gpus[].fan_speed'`)
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
@@ -482,7 +499,7 @@ case $1 in
 			miner_dual_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares2'`
 		fi
 
-		if [[ $miner_algo == "Ethash" ]]; then #mb we need to fix other algos
+		if [[ ${miner_algo^^} == "ETHASH" || ${miner_algo^^} == "ETCHASH" ]]; then #mb we need to fix other algos
 			miner_total_hr=`echo "scale=0; $miner_total_hr / 1000" | bc -l`
 			if [[ ! -z $miner_hr ]]; then #if miner hashrate stats exist
 				for ((i=0; i < ${#miner_hr[@]}; i++)); do
@@ -658,7 +675,7 @@ case $1 in
 		miner_total_hr=0
 
 		for ((i=0; i < ${#miner_hr_raw[@]}; i++)); do
-			[[ $miner_dual_algo == "ethash" || $miner_algo == 'ethash' || $miner_algo == 'kawpow' ]] && delimiter=1000 || delimiter=1
+			[[ $miner_dual_algo == "ethash" || ${miner_algo^^} == "ETHASH" || ${miner_algo^^} == "ETCHASH" || ${miner_algo^^} == 'KAWPOW' ]] && delimiter=1000 || delimiter=1
 			miner_hr[i]=`echo "scale=2; ${miner_hr_raw[i]} / $delimiter" | bc -l`
 			miner_total_hr=`echo "$miner_total_hr + ${miner_hr[$i]}" | bc -l`
 		done
