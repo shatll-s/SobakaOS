@@ -293,7 +293,7 @@ case $1 in
 		local scale=0
 		if [[ "phi2 ethash nimiq kawpow trtl" == *$miner_algo* ]]; then
 			local x=1000
-			[[ $miner_algo == "nimiq trtl" ]] && scale=2
+			[[ "nimiq trtl" == *$miner_algo* ]] && scale=2
 		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
 			local x=1000000
 		else
