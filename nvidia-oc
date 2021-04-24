@@ -146,7 +146,11 @@ for (( i=0; i < $n; i++ )); do
 	fi
 	[[ ! -z $LIGHT ]] && args+=" -a [gpu:$i]/GPULogoBrightness=0"
 	#echo $args
-	[[ ! -z $args ]] &&	nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
+	if [[ ! -z $args ]]; then
+		result=`timeout -s9 15 nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"`
+		[[ ! -z $result ]] && echo -e "$result" || echo -e "${RED}GPU is idle, can not apply overclocking settings${WHITE}"
+		#nvidia-settings$args | sed -e "/^\s*$/d; s/'//g"
+	fi
 	[[ ! -z ${POWER_LIMIT[$i]} ]] && echo -n "  " && nvidia-smi -i $i -pl ${POWER_LIMIT[$i]}
 	[[ ! -z ${LOCK_CLOCK[$i]} && ${LOCK_CLOCK[$i]} -ne 0 ]] && nvidia-smi -i $i --lock-gpu-clocks=${LOCK_CLOCK[$i]},${LOCK_CLOCK[$i]}
 	[[ $i -lt $n ]] && echo -e $BROWN"----------------------------------------------------------------"$WHITE

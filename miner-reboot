@@ -21,7 +21,8 @@ function get_lastmsg () {
 			keywords="DEAD"
 		;;
 		t_rex*)
-			keywords="is idle|Can't find nonce|can't get"
+			
+			keywords="is idle|Can't find nonce|can't get|Can't initialize device"
 		;;
 	esac
 	
@@ -37,6 +38,7 @@ function get_lastmsg () {
 		t_rex)
 			#WARN: GPU #4: Gigabyte P106-100 is idle, last activity was 59 secs ago
 			#TREX: Can't find nonce with device [ID=4, GPU #4], cuda exception in [synchronize, 51], an illegal instruction was encountered, try to reduce overclock to stabilize GPU state
+			#TREX: Can't initialize device [ID=9, GPU #9], cuda exception in [initialize_device, 93], CUDA_ERROR_OUT_OF_MEMORY
 			local msg=`echo "$raw_msg" | sed -e 's/.*GPU #\([0-9]*\).*/GPU \1 error/' | tr -dc '[:print:]'`
 		;;
 	esac
