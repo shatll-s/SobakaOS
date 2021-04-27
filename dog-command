@@ -102,9 +102,9 @@ case $1 in
 
 		function get_bios () {
 			adapter=$1
-			bios_ver=`nvidia-tool bios_ver $adapter`
+			bios_ver=`nvidia-tool get-bios $adapter`
 			file="/tmp/${bios_ver}.rom"
-			return=`nvidia-tool save_bios $adapter $file`
+			return=`nvidia-tool save-bios $adapter $file`
 			exitcode=$?
 			if [[ $exitcode -eq 0 ]]; then
 				chown user:user $file
