@@ -35,8 +35,8 @@ if [[ $1 == "--help" || $1 == "-h" ]]; then
 	echo "$0 upgrades OSdog to the latest available version."&&
 	echo "At first, it\`s trying to download package, so if you have weak speed, it may take much time." &&
 	echo "You can install specified version by typing upgrade -v [version here]" &&
-	echo "F.e. upgrade -v 0.9 will upgrade to version 0.9, even current version is higher;" &&
-	echo "upgrade -v full-0.8 will upgrade to version 0.8. While installing full package, miners and drivers will be provided too." &&
+	echo "F.e. upgrade -v 1.86 will upgrade to version 1.86, even current version is higher;" &&
+	#echo "upgrade -v full-0.8 will upgrade to version 0.8. While installing full package, miners and drivers will be provided too." &&
 	exit 0
 fi
 #end of help section
@@ -47,7 +47,7 @@ cd $tmp_dir
 [[ -f $tmp_dir/dog-$VER.deb ]] && rm $tmp_dir/dog-$VER.deb
 DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/dog-$VER.deb"
 wget -q $DOWNLOAD
-[[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)" && exit 1
+[[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)${WHITE}" && exit 1
 
 echo -e "${GREEN}> Upgrade files downloaded${WHITE}"
 dpkg -i --force-confold "dog-$VER.deb"

@@ -152,6 +152,27 @@ function make_batch () {
 	minerexec+="${miner_dir}miner" #now all miners need to have name "miner"
 	
 	case $miner in
+		bminer)
+			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
+			minerexec+=" -uri "
+			[[ -z $algo || $algo == "equihash" ]]&& minerexec+="stratum" || minerexec+=$algo
+			minerexec+="://"
+			[[ ! -z $template ]]&& minerexec+=$template
+			[[ ! -z $pass ]]	&& minerexec+=":"$pass
+			minerexec+="@$pool"
+			minerexec+=" -api 127.0.0.1:$API_port -logfile=/dog/log/$miner.log -watchdog=false"
+		;;
+		ccminer)
+			#minerexec+="$fork -o $pool"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind 127.0.0.1:$API_port"
+		;;
 		claymore)
 			minerexec+=" -epool $pool"
 			[[ ! -z $template ]]&& minerexec+=" -ewal $template"
@@ -195,6 +216,178 @@ function make_batch () {
 			[[ $addition != *"-mport"* ]] && minerexec+=" -mport $apiport" || API_port=`echo $addition | sed "s/.*-mport [-]*\([0-9]*\).*/\1/"`
 			minerexec+=" -r 1 -logfile /dog/log/$miner.log" #noappend
 		;;
+#		claymore_c) #Dead
+#			minerexec+=" -xpool $pool -xwal $template"
+#			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
+#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
+#		;;
+#		claymore_z) #Dead
+#			minerexec+=" -zpool $pool -zwal $template"
+#			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
+#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
+#		;;
+		cpuminer*)
+			minerexec+=" -o "
+			[[ $pool != *://* ]]&& minerexec+="stratum+tcp://"
+			minerexec+="$pool -u $template"
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind 127.0.0.1:$API_port"
+		;;
+		cryptodredge)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind $API_port --log /dog/log/$miner.log"
+		;;
+
+		ethminer)
+			minerexec+=" -P"
+			if [[ $pool != *://* ]]; then
+				minerexec+=" stratum://"
+				cleanpool=$pool
+			elif [[ $pool == *ssl://* ]]; then
+				minerexec+=" stratum1+ssl://"
+				cleanpool=`echo $pool | sed  's/^.*ssl:\/\///'`
+			fi
+			minerexec+="$template:$pass@$cleanpool" #USERNAME.WORKERNAME:WORKERPWD
+			#echo $brand	
+			minerexec+=" --report-hashrate --api-port $API_port --HWMON 1 $brand"
+		;;
+
+		ewbf)
+			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
+			port=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/.*://')
+			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
+			minerexec+=" --server $raw_pool --port $port"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
+			minerexec+=" --api 127.0.0.1:$API_port --logfile /dog/log/$miner.log"
+		;;
+		gminer)
+			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
+			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" --server $pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" --port $port"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
+			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --proto stratum"
+
+			if [[ ! -z $dual_pool &&  -z $dual_template && ! -z $dual_pass ]]; then
+				minerexec+=" --dserver $dual_pool"
+				minerexec+=" --duser $dual_template"
+				minerexec+=" --dpass $dual_pass"
+				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
+			fi
+			minerexec+=" --api $API_port --logfile /dog/log/gminer.log"
+		;;
+		lolminer)
+			coinsArray=("AION AUTO144_5 AUTO192_7 BEAM BTCZ BTG CTXC EXCC GRIN-C29M GRIN-C32 MWC-C29D MWC-C31 XSG YEC ZCL ZER")
+
+			if [[ ! -z $coin && " ${coinsArray[@]} " =~ " ${coin} " ]]; then
+				minerexec+=" --coin $coin"
+			elif [[ ! -z $algo ]]; then
+				minerexec+=" --algo $algo"
+			fi
+			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
+			[[ $addition != *"--tls"* && `echo $pool | grep -c "nicehash"` -eq 1 ]] && minerexec+=" --tls off" #NiceHash
+			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
+			[[ ! -z $template ]]&& minerexec+=" --user $template"
+
+
+			if [[ $addition != *"--watchdog "* ]]; then
+				minerexec+=" --watchdog script"
+				[[ -f ${miner_dir}watchdog.sh && $addition != *"--watchdogscript"* ]] && minerexec+=" --watchdogscript=${miner_dir}watchdog.sh"
+			fi
+			minerexec+=" --apiport $API_port --log on --logfile /dog/log/lolminer.log"
+		;;
+		miniz)
+	  		[[ ! -z $algo ]]&& minerexec+=" --par=$algo"
+			[[ ! -z $coin ]]&& minerexec+=" --symbol=$coin" || minerexec+=" --smart-pers"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
+			
+			minerexec+=" --telemetry=$API_port --log-file=/dog/log/$miner.log"
+		;;
+		nanominer)
+			minerexec+=" /dog/miners/nanominer/config.ini "
+			config="logPath=/dog/log/nanominer.log\n"
+			config+="webPort=${API_port}\n"
+			config+="mport=0\n"
+			config+="rigName = $name\n"
+
+			if [[ $algo == *"_"* ]]; then #dual
+				algoArray[0]=`echo $algo | sed 's/_.*//'`
+				algoArray[1]=`echo $algo | sed 's/.*_//'`
+			else
+				algoArray[0]=$algo
+			fi
+
+			for ((i=0; i < ${#algoArray[@]}; i++)); do
+				algoVal=${algoArray[$i]}
+				#config+=$algoVal
+				#config+="\n"
+				if [[ "ETHASH ETCHASH RANDOMX UBQHASH CUCKAROO30 KAWPOW AUTOLYKOS ZIL" == *${algoVal^^}* ]]; then
+					config+="[$algoVal]\n"
+				else
+					[[ ! $coin ]] && coin=$algoVal
+					[[ ! -z $coin ]]&& config+="coin=$coin\n"
+					:
+				fi
+
+				[[ $i -eq 0 ]] && walletVal=$wallet || walletVal=$dual_wallet
+				[[ $i -eq 0 ]] && poolVal=$pool || poolVal=$dual_pool
+				[[ $i -eq 0 ]] && passVal=$pass || passVal=$dual_pass
+				
+				config+="wallet = $walletVal\n"
+				config+="pool1 = $poolVal\n"
+				[[ ! -z $passVal ]]&& config+="rigPassword = $passVal\n"
+				[[ ! -z $addition ]]&& config+="$addition\n"
+			done
+
+			
+			mkdir -p /dog/miners/nanominer
+			echo -e "$config" > /dog/miners/nanominer/config.ini
+		;;
+		nbminer)
+			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
+			if [[ ! -z $pool && `echo $pool | grep -c "://"` -eq 0 ]]; then
+				[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool="nicehash+tcp://$pool" || pool="stratum+tcp://$pool"
+			fi
+			if [[ ! -z $dual_pool && `echo $dual_pool | grep -c "://"` -eq 0 ]]; then
+				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] && dual_pool="nicehash+tcp://$dual_pool" || dual_pool="stratum+tcp://$dual_pool"
+			fi
+				
+			if [[ ! -z $algo ]]; then
+				minerexec+=" -a $algo"
+				if [[ $algo == *"_ethash" ]]; then
+					#main and dual are reverted
+					[[ ! -z $dual_pool ]]&& minerexec+=" -o $dual_pool"
+					[[ ! -z $dual_template ]]&& minerexec+=" -u $dual_template"
+					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
+
+					[[ ! -z $pool ]]&& minerexec+=" -do $pool"
+					[[ ! -z $template ]]&& minerexec+=" -du $template"
+					[[ ! -z $pass ]]&& minerexec+=":$pass"
+				else
+					[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+					[[ ! -z $template ]]&& minerexec+=" -u $template"
+					[[ ! -z $pass ]]&& minerexec+=":$pass"
+				fi
+			fi
+			
+			minerexec+=" --api 127.0.0.1:$API_port --log-file /dog/log/$miner.log"
+		;;
+		noncerpro_cuda)
+			#[[ ! -z $template ]]&& minerexec+=" --address $template"
+			[[ ! -z $wallet ]]&& minerexec+=" --address='$wallet'"
+			[[ ! -z $name ]]&& minerexec+=" --name=$name"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" --server=$pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" --port=$port"
+
+			minerexec+=" --o=$API_port"
+		;;
 		phoenix)
 			#./PhoenixMiner -pool ssl://eu1.ethermine.org:5555 -pool2 ssl://us1.ethermine.org:5555 -wal 0x008c26f3a2Ca8bdC11e5891e0278c9436B6F5d1E.Rig001
 			[[ ! -z $pool ]]&& minerexec+=" -pool $pool"
@@ -234,35 +427,13 @@ function make_batch () {
 		
 			minerexec+=" -rmode 2 -log 1 -logfile /dog/log/phoenix.log -logsmaxsize 5"
 		;;
-		ewbf)
-			raw_pool=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/:.*//')
-			port=$(echo `echo $manifest | jq -r ".pool"` | sed -s 's/.*://')
-			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
-			minerexec+=" --server $raw_pool --port $port"
-			[[ ! -z $template ]]&& minerexec+=" --user $template"
-			[[ `echo $manifest | jq ".pass"` != null ]]		&& minerexec+=" --pass $pass"
-			minerexec+=" --api 127.0.0.1:$API_port --logfile /dog/log/$miner.log"
-		;;
-		bminer)
-			#./bminer -uri ethash://DDXKDhq73GRM3hjh6uee57fJ3LS2ctNtyi.workername@$vg.blake2s.com:8888  -api 127.0.0.1:1880
-			minerexec+=" -uri "
-			[[ -z $algo || $algo == "equihash" ]]&& minerexec+="stratum" || minerexec+=$algo
-			minerexec+="://"
-			[[ ! -z $template ]]&& minerexec+=$template
-			[[ ! -z $pass ]]	&& minerexec+=":"$pass
-			minerexec+="@$pool"
-			minerexec+=" -api 127.0.0.1:$API_port -logfile=/dog/log/$miner.log -watchdog=false"
-		;;
-		ccminer)
-			#minerexec+="$fork -o $pool"
-			if [[ ! -z $pool ]]; then
-				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
-				minerexec+=" -o $pool"
-			fi
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind 127.0.0.1:$API_port"
+		qitmeer)
+	  		[[ ! -z $algo ]]&& minerexec+=" --pow=$algo"
+			[[ ! -z $coin ]]&& minerexec+=" --symbol=$coin"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -m $template"
+			[[ ! -z $pass ]]&& minerexec+=" -n $pass"
+			minerexec+=" --stats_server=127.0.0.1:$API_port --log_level=info --minerlog=/dog/log/$miner.log"
 		;;
 		sgminer)
 			#minerexec+="$fork -o $pool"
@@ -272,37 +443,95 @@ function make_batch () {
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api-listen --api-port $API_port"
 		;;
-		ethminer)
-			minerexec+=" -P"
-			if [[ $pool != *://* ]]; then
-				minerexec+=" stratum://"
-				cleanpool=$pool
-			elif [[ $pool == *ssl://* ]]; then
-				minerexec+=" stratum1+ssl://"
-				cleanpool=`echo $pool | sed  's/^.*ssl:\/\///'`
+		srbminer)
+			if [[ ! -z $algo ]]; then
+				if [[ $algo == *"_"* ]]; then #dual
+					dualAlgo=`echo $algo | sed 's/.*_//'`
+					algo=`echo $algo | sed 's/_.*//'`
+				fi
+				minerexec+=" --algorithm '$algo"
+				
+				[[ ! -z $dualAlgo ]] && minerexec+=";$dualAlgo"
+				minerexec+="'"
 			fi
-			minerexec+="$template:$pass@$cleanpool" #USERNAME.WORKERNAME:WORKERPWD
-			#echo $brand	
-			minerexec+=" --report-hashrate --api-port $API_port --HWMON 1 $brand"
+
+			if [[ ! -z $pool ]]; then
+				minerexec+=" --pool '$pool"
+				[[ ! -z $dualAlgo && ! -z $dual_pool ]] && minerexec+=";$dual_pool"
+
+				[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool=" --nicehash true"
+				minerexec+="'"
+			fi
+			
+			if [[ ! -z $template ]]; then
+				minerexec+=" --wallet '$template"
+				[[ ! -z $dualAlgo && ! -z $dual_wallet ]] && minerexec+=";$dual_wallet"
+				minerexec+="'"
+			fi
+
+			if [[ ! -z $pass ]]; then
+				minerexec+=" --password '$pass"
+				[[ ! -z $dualAlgo && ! -z $dual_pass ]] && minerexec+=";$dual_pass"
+				minerexec+="'"
+			fi
+			
+			[[ -f ${miner_dir}watchdog_osdog.sh && $addition != *"--reboot-script-gpu-watchdog"* ]] && minerexec+=" --reboot-script-gpu-watchdog ${miner_dir}watchdog_osdog.sh"
+			
+			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
 		;;
-#		claymore_c) #Dead
-#			minerexec+=" -xpool $pool -xwal $template"
-#			[[ ! -z $pass ]]&& minerexec+=" -xpsw $pass"
-#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
-#		;;
-#		claymore_z) #Dead
-#			minerexec+=" -zpool $pool -zwal $template"
-#			[[ ! -z $pass ]]&& minerexec+=" -zpsw $pass"
-#			minerexec+=" -r 1 -mport -$API_port -logfile /dog/log/$miner.log"
-#		;;
-		cpuminer*)
-			minerexec+=" -o "
-			[[ $pool != *://* ]]&& minerexec+="stratum+tcp://"
-			minerexec+="$pool -u $template"
+		sushiminer)
+			dog_json=$(
+				jq -n \
+				--arg address "$wallet" \
+				--arg host "$pool" \
+				--arg port "$port" \
+				--arg name "$name" \
+				'{
+					$address, $host, $port, $name
+				}'
+			)
+
+			#looking for keys in json
+			if [[ $config != "{null}" ]]; then
+				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
+				for ((y=0; y < ${#keys[@]}; y++)); do
+					#echo "Check ${keys[$y]}"
+					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
+						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
+
+					value=`echo $config | jq ".\"${keys[$y]}\""`
+					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
+				done
+			fi	
+				echo -e "$dog_json" | jq '.' > "${miner_dir}miner.conf"	  		
+		;;
+		teamredminer)
+			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
+			fi
+			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind 127.0.0.1:$API_port"
+			if [[ $addition != *"--api_listen="* ]]; then
+				minerexec+=" --api_listen=$API_port"
+			else
+				API_portRaw=`echo "$addition" | sed "s/.*--api_listen=[-]*\([.0-9:]*\)[\s]*.*/\1/"` #may be with IPaddr, 127.0.0.1:3333
+				API_port=`echo "$API_portRaw" | sed "s/.*:\([0-9]*\)$/\1/"`
+			fi
+			
+			minerexec+=" --bus_reorder --watchdog_script=watchdog.sh" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
 		;;
+		ttminer)
+	  		[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $coin ]]&& minerexec+=" -coin $coin"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $wallet ]]&& minerexec+=" -u $wallet"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			[[ ! -z $name ]]&& minerexec+=" -w $name"
+			minerexec+=" --api-bind 127.0.0.1:$API_port --log"
+		;;	
 		t_rex)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
 			[[ ! -z $coin ]]&& minerexec+=" --coin $coin"
@@ -317,149 +546,25 @@ function make_batch () {
 			[[ -f ${miner_dir}watchdog_exit.sh && $addition != *"--script-exit"* ]] && minerexec+=" --script-exit ${miner_dir}watchdog_exit.sh"
 			[[ -f ${miner_dir}watchdog_crash.sh && $addition != *"--script-crash"* ]] && minerexec+=" --script-crash ${miner_dir}watchdog_crash.sh"
 
-			#[[ $addition != *"--no-watchdog"* && $addition != *"--fork-at"* ]] && minerexec+=" --no-watchdog"
 			minerexec+=" --pci-indexing --log-path /dog/log/t_rex.log --api-bind-http 0.0.0.0:$API_port"
 
-
-
-			#OLD METHOD			
-			#minerexec+=" -c config"
-			#make config file
-			#dog_json=`cat "${miner_dir}config_global.json"` #it will be json based on global, but with user changes
-			#
-			#[[ ! -z $template ]]&& dog_json=`jq '.pools[0].user = $newvalue' --arg newvalue "$template" <<< $dog_json`
-			#[[ ! -z $pool ]]&& dog_json=`jq '.pools[0].url = $newvalue' --arg newvalue "$pool" <<< $dog_json`
-			#[[ ! -z $pass ]]&& dog_json=`jq '.pools[0].pass = $newvalue' --arg newvalue "$pass" <<< $dog_json`
-			#[[ ! -z $algo ]]&& dog_json=`jq '.algo = $newvalue' --arg newvalue "$algo" <<< $dog_json`
-			#
-			#looking for keys in json
-			#if [[ $config != "{null}" ]]; then
-			#	keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
-			#	for ((y=0; y < ${#keys[@]}; y++)); do
-			#		[[ $keys[$y] == "api-bind-http" ]] && local api_trigger=1
-					#echo "Check ${keys[$y]}"
-			#		[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
-			#			dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
-
-			#		value=`echo $config | jq ".\"${keys[$y]}\""`
-			#		dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
-			#	done
-			#fi
-			#if [[ $api_trigger -ne 1 ]]; then
-			#	dog_json=`jq "del(.\"api-bind-http\")" <<< "$dog_json"` #if key exist, delete it
-			#	dog_json=`jq ". + { \"api-bind-http\": \"127.0.0.1:$API_port\" }" <<< "$dog_json"`
-			#fi
-			#echo -e "$dog_json" | jq '.' > "${miner_dir}config"
 		;;
-		nanominer)
-			minerexec+=" /dog/miners/nanominer/config.ini "
-			config="logPath=/dog/log/nanominer.log\n"
-			#config+="webPort=0\n"
-			config+="webPort=${API_port}\n"
-			config+="mport=0\n"
-			#config+="mport=-${API_port}\n"
-			config+="rigName = $name\n"
-
-			if [[ $algo == *"_"* ]]; then #dual
-				algoArray[0]=`echo $algo | sed 's/_.*//'`
-				algoArray[1]=`echo $algo | sed 's/.*_//'`
-				#config+="full: $algo\n"
-				#config+="1: $algo1\n"
-				#config+="2: $algo2\n"
-			else
-				algoArray[0]=$algo
+		verthashminer)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			if [[ ! -z $pool ]]; then
+				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
+				minerexec+=" -o $pool"
 			fi
-
-			for ((i=0; i < ${#algoArray[@]}; i++)); do
-				algoVal=${algoArray[$i]}
-				#config+=$algoVal
-				#config+="\n"
-				if [[ "ETHASH ETCHASH RANDOMX UBQHASH CUCKAROO30 KAWPOW AUTOLYKOS ZIL" == *${algoVal^^}* ]]; then
-					config+="[$algoVal]\n"
-				else
-					[[ ! $coin ]] && coin=$algoVal
-					[[ ! -z $coin ]]&& config+="coin=$coin\n"
-					:
-				fi
-
-				[[ $i -eq 0 ]] && walletVal=$wallet || walletVal=$dual_wallet
-				[[ $i -eq 0 ]] && poolVal=$pool || poolVal=$dual_pool
-				[[ $i -eq 0 ]] && passVal=$pass || passVal=$dual_pass
-				
-				config+="wallet = $walletVal\n"
-				config+="pool1 = $poolVal\n"
-				[[ ! -z $passVal ]]&& config+="rigPassword = $passVal\n"
-				[[ ! -z $addition ]]&& config+="$addition\n"
-			done
-
-#
-#if [[ ! -z $algo ]]; then
-#				minerexec+=" -a $algo"
-#				if [[ $algo == *"_ethash" ]]; then
-#					#main and dual are reverted
-#					[[ ! -z $dual_pool ]]&& minerexec+=" -o $dual_pool"
-#					[[ ! -z $dual_template ]]&& minerexec+=" -u $dual_template"
-#					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
-#
-#					[[ ! -z $pool ]]&& minerexec+=" -do $pool"
-#					[[ ! -z $template ]]&& minerexec+=" -du $template"
-#					[[ ! -z $pass ]]&& minerexec+=":$pass"
-#				else
-#					[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-#					[[ ! -z $template ]]&& minerexec+=" -u $template"
-#					[[ ! -z $pass ]]&& minerexec+=":$pass"
-#				fi
-#			fi
-#
-			
-			mkdir -p /dog/miners/nanominer
-			echo -e "$config" > /dog/miners/nanominer/config.ini
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 		;;
-		noncerpro_cuda)
-			#[[ ! -z $template ]]&& minerexec+=" --address $template"
-			[[ ! -z $wallet ]]&& minerexec+=" --address='$wallet'"
-			[[ ! -z $name ]]&& minerexec+=" --name=$name"
-			[[ ! -z $pool_without_port ]]&& minerexec+=" --server=$pool_without_port"
-			[[ ! -z $port ]]&& minerexec+=" --port=$port"
-
-			minerexec+=" --o=$API_port"
-		;;
-		lolminer)
-			coinsArray=("AION AUTO144_5 AUTO192_7 BEAM BTCZ BTG CTXC EXCC GRIN-C29M GRIN-C32 MWC-C29D MWC-C31 XSG YEC ZCL ZER")
-
-			if [[ ! -z $coin && " ${coinsArray[@]} " =~ " ${coin} " ]]; then
-				minerexec+=" --coin $coin"
-			elif [[ ! -z $algo ]]; then
-				minerexec+=" --algo $algo"
-			fi
-			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
-			[[ $addition != *"--tls"* && `echo $pool | grep -c "nicehash"` -eq 1 ]] && minerexec+=" --tls off" #NiceHash
-			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
-			[[ ! -z $template ]]&& minerexec+=" --user $template"
-
-
-			if [[ $addition != *"--watchdog "* ]]; then
-				minerexec+=" --watchdog script"
-				[[ -f ${miner_dir}watchdog.sh && $addition != *"--watchdogscript"* ]] && minerexec+=" --watchdogscript=${miner_dir}watchdog.sh"
-			fi
-			minerexec+=" --apiport $API_port --log on --logfile /dog/log/lolminer.log"
-		;;
-		gminer)
-			#lolMiner.exe --coin BEAM --pool beam-eu.leafpool.com --port 3333 --user wallet.name
-			[[ ! -z $algo ]]&& minerexec+=" --algo $algo"
-			[[ ! -z $pool_without_port ]]&& minerexec+=" --server $pool_without_port"
-			[[ ! -z $port ]]&& minerexec+=" --port $port"
-			[[ ! -z $template ]]&& minerexec+=" --user $template"
-			[[ ! -z $pass ]]&& minerexec+=" --pass $pass"
-			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --proto stratum"
-
-			if [[ ! -z $dual_pool &&  -z $dual_template && ! -z $dual_pass ]]; then
-				minerexec+=" --dserver $dual_pool"
-				minerexec+=" --duser $dual_template"
-				minerexec+=" --dpass $dual_pass"
-				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] &&  minerexec+=" --dproto stratum"
-			fi
-			minerexec+=" --api $API_port --logfile /dog/log/gminer.log"
+		wildrig_multi)
+			#./wildrig-multi --algo algo --opencl-threads auto --opencl-launch auto --url pool:port --user wallet --pass password
+			[[ ! -z $algo && $fork != "0.10.5" ]]&& minerexec+=" -a $algo" #0.10.5 - old wildrig
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
+			[[ ! -z $template ]]&& minerexec+=" -u $template"
+			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-port=$API_port --log-file=/dog/log/$miner.log"
 		;;
 		xmrig_cpu|xmrig_new|xlarig)
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
@@ -474,36 +579,6 @@ function make_batch () {
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
 			minerexec+=" --api-port $API_port"
-		;;
-		xpm_amd)
-			[[ -f "${miner_dir}config.txt" ]] && rm "${miner_dir}config.txt"
-			configFile=`cat "${miner_dir}configDefault.txt"` #it will be json based on default, but with user changes
-			#cp "${miner_dir}configDefault.txt" "${miner_dir}config.txt" #it will be json based on default, but with user changes
-			#echo "$configFile"
-			#echo "==="
-			[[ ! -z $pool_without_port ]] && configFile=`echo "$configFile" | sed "/^server.*$/d"` && configFile+="\nserver=\"$pool_without_port\";"
-			[[ ! -z $port ]] && configFile=`echo "$configFile" | sed "/^port.*$/d"` && configFile+="\nport=\"$port\";"
-			[[ ! -z $template ]] && configFile=`echo "$configFile" | sed "/^address.*$/d"` && configFile+="\naddress=\"$template\";"
-			if [[ ! -z $config ]]; then
-				configTr=`echo -e "$config" | sed -e 's/^{//; s/}$//; s/\s//g'` # s/\s/)@(/g #remove all spaces
-				configStrings=(`echo $configTr`)
-				for string in "${configStrings[@]}"; do
-					option=`echo $string | sed 's/=.*//'`
-					#configFile=`echo "$configFile" | sed "s/^$option.*$/$string/"`
-					configFile=`echo "$configFile" | sed "/^$option.*$/d"`
-					configFile+="\n$string"
-				done
-				#echo "$configFile"
-				#echo -e "${config[0]}"
-			fi
-			echo -e "$configFile" > "${miner_dir}config.txt"
-		;;
-		z_enemy)
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind=$API_port --log=/dog/log/z_enemy.log"
 		;;
 		xmr_stak)
 			minerexec+=" -c ${miner_dir}config.txt -C ${miner_dir}pools.txt"
@@ -571,143 +646,35 @@ function make_batch () {
 				[[ ! -z $config_cpu ]] && echo -e "$config_cpu" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/cpu.txt"
 			#end of nvidia.txt, amd.txt, cpu.txt section
 		;;
-		wildrig_multi)
-			#./wildrig-multi --algo algo --opencl-threads auto --opencl-launch auto --url pool:port --user wallet --pass password
-			[[ ! -z $algo && $fork != "0.10.5" ]]&& minerexec+=" -a $algo" #0.10.5 - old wildrig
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-port=$API_port --log-file=/dog/log/$miner.log"
-		;;
-		teamredminer)
-			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			if [[ ! -z $pool ]]; then
-				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
-				minerexec+=" -o $pool"
-			fi
-			[[ ! -z $template ]]&& minerexec+=" -u '$template'"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			if [[ $addition != *"--api_listen="* ]]; then
-				minerexec+=" --api_listen=$API_port"
-			else
-				API_portRaw=`echo "$addition" | sed "s/.*--api_listen=[-]*\([.0-9:]*\)[\s]*.*/\1/"` #may be with IPaddr, 127.0.0.1:3333
-				API_port=`echo "$API_portRaw" | sed "s/.*:\([0-9]*\)$/\1/"`
-			fi
-			
-			minerexec+=" --bus_reorder --watchdog_script=watchdog.sh" #--watchdog_script" #t=${miner_dir}reboot.sh" #--log_file=/dog/log/$miner.log
-		;;
-		cryptodredge)
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -u $template"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			minerexec+=" --api-bind $API_port --log /dog/log/$miner.log"
-		;;
-		nbminer)
-			#./nbminer -a ethash -o ethproxy+tcp://eth.f2pool.com:8008 -u 0x4296116d44a4a7259B52B1A756e19083e675062A.default -log
-			if [[ ! -z $pool && `echo $pool | grep -c "://"` -eq 0 ]]; then
-				[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool="nicehash+tcp://$pool" || pool="stratum+tcp://$pool"
-			fi
-			if [[ ! -z $dual_pool && `echo $dual_pool | grep -c "://"` -eq 0 ]]; then
-				[[ `echo $dual_pool | grep -c "nicehash"` -eq 1 ]] && dual_pool="nicehash+tcp://$dual_pool" || dual_pool="stratum+tcp://$dual_pool"
-			fi
-				
-			if [[ ! -z $algo ]]; then
-				minerexec+=" -a $algo"
-				if [[ $algo == *"_ethash" ]]; then
-					#main and dual are reverted
-					[[ ! -z $dual_pool ]]&& minerexec+=" -o $dual_pool"
-					[[ ! -z $dual_template ]]&& minerexec+=" -u $dual_template"
-					[[ ! -z $dual_pass ]]&& minerexec+=":$dual_pass"
-
-					[[ ! -z $pool ]]&& minerexec+=" -do $pool"
-					[[ ! -z $template ]]&& minerexec+=" -du $template"
-					[[ ! -z $pass ]]&& minerexec+=":$pass"
-				else
-					[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-					[[ ! -z $template ]]&& minerexec+=" -u $template"
-					[[ ! -z $pass ]]&& minerexec+=":$pass"
-				fi
-			fi
-			
-			minerexec+=" --api 127.0.0.1:$API_port --log-file /dog/log/$miner.log"
-		;;
-		ttminer)
-	  		[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			[[ ! -z $coin ]]&& minerexec+=" -coin $coin"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $wallet ]]&& minerexec+=" -u $wallet"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			[[ ! -z $name ]]&& minerexec+=" -w $name"
-			minerexec+=" --api-bind 127.0.0.1:$API_port --log"
-		;;	
-		qitmeer)
-	  		[[ ! -z $algo ]]&& minerexec+=" --pow=$algo"
-			[[ ! -z $coin ]]&& minerexec+=" --symbol=$coin"
-			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
-			[[ ! -z $template ]]&& minerexec+=" -m $template"
-			[[ ! -z $pass ]]&& minerexec+=" -n $pass"
-			minerexec+=" --stats_server=127.0.0.1:$API_port --log_level=info --minerlog=/dog/log/$miner.log"
-		;;
-		sushiminer)
-			dog_json=$(
-				jq -n \
-				--arg address "$wallet" \
-				--arg host "$pool" \
-				--arg port "$port" \
-				--arg name "$name" \
-				'{
-					$address, $host, $port, $name
-				}'
-			)
-
-			#looking for keys in json
-			if [[ $config != "{null}" ]]; then
-				keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
-				for ((y=0; y < ${#keys[@]}; y++)); do
-					#echo "Check ${keys[$y]}"
-					[[ `echo $dog_json | jq ".\"${keys[$y]}\""` != null ]] &&
-						dog_json=`jq "del(.\"${keys[$y]}\")" <<< "$dog_json"` #if key exist, delete it
-
-					value=`echo $config | jq ".\"${keys[$y]}\""`
-					dog_json=`jq ". + { \"${keys[$y]}\": $value }" <<< "$dog_json"`
+		xpm_amd)
+			[[ -f "${miner_dir}config.txt" ]] && rm "${miner_dir}config.txt"
+			configFile=`cat "${miner_dir}configDefault.txt"` #it will be json based on default, but with user changes
+			#cp "${miner_dir}configDefault.txt" "${miner_dir}config.txt" #it will be json based on default, but with user changes
+			#echo "$configFile"
+			#echo "==="
+			[[ ! -z $pool_without_port ]] && configFile=`echo "$configFile" | sed "/^server.*$/d"` && configFile+="\nserver=\"$pool_without_port\";"
+			[[ ! -z $port ]] && configFile=`echo "$configFile" | sed "/^port.*$/d"` && configFile+="\nport=\"$port\";"
+			[[ ! -z $template ]] && configFile=`echo "$configFile" | sed "/^address.*$/d"` && configFile+="\naddress=\"$template\";"
+			if [[ ! -z $config ]]; then
+				configTr=`echo -e "$config" | sed -e 's/^{//; s/}$//; s/\s//g'` # s/\s/)@(/g #remove all spaces
+				configStrings=(`echo $configTr`)
+				for string in "${configStrings[@]}"; do
+					option=`echo $string | sed 's/=.*//'`
+					#configFile=`echo "$configFile" | sed "s/^$option.*$/$string/"`
+					configFile=`echo "$configFile" | sed "/^$option.*$/d"`
+					configFile+="\n$string"
 				done
-			fi	
-				echo -e "$dog_json" | jq '.' > "${miner_dir}miner.conf"
-
-
-	  		
-		;;
-		miniz)
-	  		[[ ! -z $algo ]]&& minerexec+=" --par=$algo"
-			[[ ! -z $coin ]]&& minerexec+=" --symbol=$coin" || minerexec+=" --smart-pers"
-			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
-			[[ ! -z $pool && ! -z $template ]]&&  minerexec+=" --url=$template@$pool"
-			
-			minerexec+=" --telemetry=$API_port --log-file=/dog/log/$miner.log"
-		;;
-		srbminer)
-			[[ ! -z $algo ]]&& minerexec+=" --algorithm $algo"
-			[[ ! -z $pool ]]&& minerexec+=" --pool $pool"
-			[[ `echo $pool | grep -c "nicehash"` -eq 1 ]] && pool=" --nicehash true"
-			#echo "@"$template"@"
-			[[ ! -z $template ]]&& minerexec+=" --wallet $template"
-			#[[ ! -z $name ]]&& minerexec+=" --worker $name"
-			[[ ! -z $pass ]]&& minerexec+=" --password $pass"
-			
-			[[ -f ${miner_dir}watchdog_osdog.sh && $addition != *"--reboot-script-gpu-watchdog"* ]] && minerexec+=" --reboot-script-gpu-watchdog ${miner_dir}watchdog_osdog.sh"
-			
-			minerexec+=" --api-enable --api-port $API_port --enable-opencl-cleanup --log-file=/dog/log/$miner.log"
-		;;
-		verthashminer)
-			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
-			if [[ ! -z $pool ]]; then
-				[[ `echo $pool | grep -c "://"` -eq 0 ]] && pool="stratum+tcp://$pool"
-				minerexec+=" -o $pool"
+				#echo "$configFile"
+				#echo -e "${config[0]}"
 			fi
+			echo -e "$configFile" > "${miner_dir}config.txt"
+		;;
+		z_enemy)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool ]]&& minerexec+=" -o $pool"
 			[[ ! -z $template ]]&& minerexec+=" -u $template"
 			[[ ! -z $pass ]]&& minerexec+=" -p $pass"
+			minerexec+=" --api-bind=$API_port --log=/dog/log/z_enemy.log"
 		;;
 		*)
 			: #do nothing

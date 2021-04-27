@@ -818,6 +818,16 @@ case $1 in
 			local miner_total_hr=`echo $stats_template | jq -r '.algorithms[0].hashrate.now'`
 			local miner_total_share=`echo $stats_template | jq -r '.algorithms[0].shares.accepted'`
 			local miner_total_badshare=`echo $stats_template | jq -r '.algorithms[0].shares.rejected'`
+			
+			if [[ `echo $stats_template | jq -r '.algorithms[1].name'` != 'null' ]]; then
+				local miner_dual_algo=`echo $stats_template | jq -r '.algorithms[1].name'`
+				local miner_dual_hr_raw=`echo $stats_template | jq '.algorithms[1].hashrate.gpu'`
+				local miner_dual_hr=(`echo $miner_dual_hr_raw | jq -r 'del(.total)[]'`)
+				local miner_dual_total_hr=`echo $stats_template | jq -r '.algorithms[1].hashrate.now'`
+				local miner_dual_total_share=`echo $stats_template | jq -r '.algorithms[1].shares.accepted'`
+				local miner_dual_total_badshare=`echo $stats_template | jq -r '.algorithms[1].shares.rejected'`
+
+			fi
 		else #old API
 			local miner_algo=`echo $stats_template | jq -r '.algorithm'`
 			local miner_hr_raw=`echo $stats_template | jq '.gpu_hashrate[]'` # | jq 'del(total)'`
