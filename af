@@ -54,29 +54,32 @@ function set_fan_amd () {
 	local navi=$3
 
 	[[ `cat $fanAddr/pwm1_enable` -ne 1 ]] && echo 1 > $fanAddr/pwm1_enable
-	#if [[ $navi -eq 0 ]]; then
+
+	#if [[ $navi -ne 22 && $navi -ne 21 && $navi -ne 1 ]]; then
+	if true; then
 		let local fan_adapted=$fan*255/100+2 #fan power is beetween 0 and 255
 		[[ $fan_adapted -gt 255 ]] && fan_adapted=255
 		[[ $fan_adapted -lt 0 ]] && fan_adapted=0
 		echo $fan_adapted > $fanAddr/pwm1
 	
-	#else #this is VEGA / Navi
-	#	[[ `cat $fanAddr/fan1_enable` -ne 1 ]] && echo 1 > $fanAddr/fan1_enable
-	#	[[ `cat $fanAddr/pwm1_enable` -ne 1 ]] && echo 1 > $fanAddr/pwm1_enable
-
-	#	[[ -f $fanAddr/fan1_min ]] && local rpm_min=`cat $fanAddr/fan1_min` || rpm_min=0
-	#	[[ -f $fanAddr/fan1_max ]] && local rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
+	else #this is VEGA / Navi
+		
+		[[ `cat $fanAddr/fan1_enable` -ne 1 ]] && echo 1 > $fanAddr/fan1_enable
+		#[[ `cat $fanAddr/pwm1_enable` -ne 1 ]] && echo 1 > $fanAddr/pwm1_enable
+		[[ ! -f /tmp/.afPatch ]] && echo 170 > $fanAddr/pwm1 && sleep 5 && touch /tmp/.afPatch
+		[[ -f $fanAddr/fan1_min ]] && local rpm_min=`cat $fanAddr/fan1_min` || rpm_min=0
+		[[ -f $fanAddr/fan1_max ]] && local rpm_max=`cat $fanAddr/fan1_max` || rpm_max=3400
 
 		#local rpm_min=`cat $fanAddr/fan1_min`
 		#[[ rpm_min -lt 600 ]] && rpm_min=600 #mb it will fix freezes...
 		#local rpm_max=`cat $fanAddr/fan1_max`
-	#	local fan_target=`echo "scale=0; ($fan * $rpm_max + 5) / 100" | bc -l`
-	#	[[ $fan_target -ge $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
-	#	[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
-	#	echo "$fan_target > $fanAddr/fan1_target"
-	#	echo $fan_target > $fanAddr/fan1_target
-	#	#echo $rpm_min $rpm_max
-	#fi
+		local fan_target=`echo "scale=0; ($fan * $rpm_max + 5) / 100" | bc -l`
+		[[ $fan_target -gt $rpm_max ]] && fan_target=`echo "$rpm_max - 1" | bc -l`
+		[[ $fan_target -lt $rpm_min ]] && fan_target=`echo "$rpm_min + 1" | bc -l`
+		#echo "$fan_target > $fanAddr/fan1_target"
+		echo $fan_target > $fanAddr/fan1_target
+		#echo $rpm_min $rpm_max
+	fi
 }
 
 function prepare_nvidia_args () {

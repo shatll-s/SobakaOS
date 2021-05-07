@@ -268,7 +268,8 @@ case $1 in
 	;;
 	teamredminer)
 		#stupid BASED ON sgminer API doesn`t give algo, let`s get it from config
-		miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
+		local miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
+		[[ $miner_algo == 'ethash' && `echo $batch | grep -c "-eth_variant_mode=etchash"` ]] && miner_algo='etchash'
 		#ok, we got it
 
 		local stats_template=`echo "{\"command\":\"summary+devs+devdetails\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
@@ -291,7 +292,7 @@ case $1 in
 		done		
 
 		local scale=0
-		if [[ "phi2 ethash nimiq kawpow trtl" == *$miner_algo* ]]; then
+		if [[ "phi2 ethash etchash nimiq kawpow trtl" == *$miner_algo* ]]; then
 			local x=1000
 			[[ "nimiq trtl" == *$miner_algo* ]] && scale=2
 		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then
@@ -337,7 +338,7 @@ case $1 in
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
 		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
 			multiplier=1000000
-		elif [[ $miner_algo == "ethash" || $miner_algo == "kawpow" ]]; then
+		elif [[ $miner_algo == "ethash" ||  $miner_algo == "etchash" || $miner_algo == "kawpow" ]]; then
 			multiplier=1000
 		fi
 

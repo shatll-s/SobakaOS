@@ -1,0 +1,46 @@
+#!/bin/bash
+. /dog/colors
+
+function fixRo() {
+	echo -e "${GREEN}> Trying to fix read-only filesystem${WHITE}"
+	PART_UUID=`cat /proc/cmdline | tr " " "\n" | grep "UUID" | sed 's/\(^root=UUID=\)//'`
+	DISK_PART=`blkid | grep -m1 $PART_UUID | awk '{ print $1 }' | sed 's/://' | sed 's/\(^\/dev\/\)//'`
+
+	fsck.ext4 -y -f /dev/$DISK_PART
+	exitcode=$?
+
+	if [[ $exitcode -ne 0 ]]; then
+		echo -e "${RED}> Something goes wrong. Exiting...${WHITE}"
+		exit 1
+	else
+		echo -e "${GREEN}> I hope read-only filesystem is fixed${WHITE}"
+		echo -en "${BROWN}Reboot in ${WHITE}"
+		for (( i=10; i > 0; i-- )); do
+			sleep 1
+			echo -en "${BROWN}$i ${WHITE}"
+		done
+		echo ""
+		echo -e "${BROWN}> Rebooting now${WHITE}"
+		sreboot
+	fi
+}
+
+function showHelp {
+	echo -e "${CYAN}Usage: dog-tool command${WHITE}"
+	echo -e
+	echo -e "Commands:"
+	echo -e "${GREEN}  fix-ro		${WHITE}Try to fix read-only filesystem"
+}
+
+case $1 in
+	fix-ro)
+		fixRo
+	;;
+	help)
+		showHelp
+	;;
+	*)
+		showHelp
+		exit 1
+	;;
+esac
