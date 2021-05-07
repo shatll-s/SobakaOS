@@ -130,7 +130,7 @@ function start () {
 			if [[ -f $AF_CFG ]]; then
 				local afCfg=`cat $AF_CFG`
 				local afEnabled=`echo $cfg | jq -r '.af_enabled'`
-				if [[ $enabled -eq 1 ]]; then
+				if [[ $afEnabled -eq 1 ]]; then
 					if [[ -f $AF_LOG ]]; then
 					#	local afLogUpdate=`stat -c %Y $AF_LOG`
 					#	local afLogRefresh=$(($now - $afLogUpdate))
