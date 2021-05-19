@@ -21,8 +21,10 @@ function get_lastmsg () {
 			keywords="DEAD"
 		;;
 		t_rex*)
-			
 			keywords="is idle|Can't find nonce|can't get|Can't initialize device"
+		;;
+		srbminer)
+			keywords="DEAD"
 		;;
 	esac
 	
@@ -41,6 +43,10 @@ function get_lastmsg () {
 			#TREX: Can't initialize device [ID=9, GPU #9], cuda exception in [initialize_device, 93], CUDA_ERROR_OUT_OF_MEMORY
 			local msg=`echo "$raw_msg" | sed -e 's/.*GPU #\([0-9]*\).*/GPU \1 error/' | tr -dc '[:print:]'`
 		;;
+		srbminer)
+			local msg=`echo "$raw_msg" | sed 's/.*\(GPU[a-zA-Z0-9]* \[BUS:[a-zA-Z0-9]*\] DEAD\).*/\1/' | tr -dc '[:print:]'`
+		;;
+	esac
 	esac
 
 

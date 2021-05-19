@@ -269,7 +269,7 @@ case $1 in
 	teamredminer)
 		#stupid BASED ON sgminer API doesn`t give algo, let`s get it from config
 		local miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
-		[[ $miner_algo == 'ethash' && `echo $batch | grep -c "-eth_variant_mode=etchash"` ]] && miner_algo='etchash'
+		[[ $miner_algo == 'ethash' && `echo $batch | grep -c "-eth_variant_mode=etchash"` -ne 0 ]] && miner_algo='etchash'
 		#ok, we got it
 
 		local stats_template=`echo "{\"command\":\"summary+devs+devdetails\"}" | nc -w $API_TIMEOUT localhost $port | tr -d '\0'`;
@@ -292,7 +292,7 @@ case $1 in
 		done		
 
 		local scale=0
-		if [[ "phi2 ethash etchash nimiq kawpow trtl" == *$miner_algo* ]]; then
+		if [[ "phi2 ethash etchash nimiq kawpow trtl autolykos2" == *$miner_algo* ]]; then
 			local x=1000
 			[[ "nimiq trtl" == *$miner_algo* ]] && scale=2
 		elif [[  "cnv8 cnr" == *$miner_algo* ]]; then

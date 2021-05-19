@@ -3,6 +3,7 @@
 
 #echo -e $BROWN"================================================================"$WHITE
 [[ $1 == 'show' ]] && SHOW=1
+[[ $1 == '-f' || $2 == '-f' ]] && FULL=1
 file="/tmp/xorg.conf"
 connected_monitor=`nvidia-smi --query-gpu=gpu_bus_id,display_mode --format=csv,noheader | grep -c Enabled `
 echo "Connected monitors: $connected_monitor"
@@ -26,7 +27,7 @@ if [[ $n -gt 0 || ! -z $internal ]]; then
 		echo -e "\tIdentifier\t\"Layout0\"" >> $file
 		[[ ! -z $internal ]] && echo -e "\tScreen\t\t0 \"Screen0\" 0 0" >> $file
 		for ((i=1; i <= $n; i++)); do
-			[[ $i -ge 16 ]] && echo "#Sorry, xorg does not work for $i GPU" >> $file && continue
+			[[ $i -ge 16 && $FULL -ne 1 ]] && echo "#Sorry, xorg does not work for $i GPU" >> $file && continue
 			echo -e "\tScreen\t\t$i \"Screen$i\" 0 0" >> $file
 		done
 		echo -e "\tInputDevice \"Keyboard0\" \"CoreKeyboard\"" >> $file
@@ -101,7 +102,7 @@ if [[ $n -gt 0 || ! -z $internal ]]; then
 	for ((y=1; y <= ${#bus[@]}; y++)); do
 		let i=y-1 #$i for array index, $y for device number
 		echo "#--- GPU $i Bus_ID ${bus[$i]} --- ${name[$i]}----------------------------------------" >> $file
-		[[ $i -ge 16 ]] && echo "#Sorry, xorg does not work for $i GPU" >> $file && continue
+		[[ $i -ge 16 && $FULL -ne 1 ]] && echo "#Sorry, xorg does not work for $i GPU" >> $file && continue
 		echo -e "Section \"Device\"" >> $file
 			echo -e "\tIdentifier\t\"Device$y\"" >> $file
 			echo -e "\tDriver\t\t\"nvidia\"" >> $file
