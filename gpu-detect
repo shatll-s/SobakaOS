@@ -55,7 +55,7 @@ function listJS () {
             #fi
 			local info="$vbios"
 			(( nv++ )) #nvidia gpus
-		elif [[ $string =~ "Advanced Micro Devices" && $string != *"BeaverCreek"* && $string != *"Picasso"* ]]; then
+		elif [[ $string =~ "Advanced Micro Devices" && $string != *"BeaverCreek"* && $string != *"Picasso"* && $string != *"Wani"* ]]; then
 			local brand="A"
 			#local color="$LIGHTRED"
 			
