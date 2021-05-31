@@ -121,9 +121,16 @@ function start () {
 		fi
 		
 		local tempArray=(`echo $temp | jq '.'`)
-		for ((i=0; i < ${#tempArray[@]}; i++)); do
+		local gpuInfo=''
+		for ((i=0; i < ${#tempArray[@]}; i++)); do	
 			if [[ ${tempArray[$i]} -ge $WD_TEMP_CRIT ]]; then
-				[[ ! $highCount ]] && local highCount=1 || (( highCount++ ))
+				if [[ ! $highCount ]]; then
+					local highCount=1
+				else
+					(( highCount++ ))
+					gpuInfo+="\n"
+				fi
+				gpuInfo+="GPU#$i: ${tempArray[$i]}°C"
 				showMsg warning "High temp ${tempArray[$i]} > $WD_TEMP_CRIT on GPU $i"
 
 			fi
@@ -132,10 +139,10 @@ function start () {
 
 		if [[ $highCount -gt 0 ]]; then
 			local message="High temp on $highCount GPU(s). Action: ${WD_TEMP_ACTION}" 
-			showMsg info "$message"
+			showMsg info "$message\n$gpuInfo"
 			if [[ ! -f $LOCKFILE ]]; then
 				touch $LOCKFILE
-				[[ $WD_TEMP_NOTIFICATIONS -eq 1 ]] && msg "Temp WD: ${maxTemp}°C $WD_TEMP_ACTION" warning "`date -R`${LF}${message}" > /dev/null 2>&1
+				[[ $WD_TEMP_NOTIFICATIONS -eq 1 ]] && msg "Temp WD: ${maxTemp}°C $WD_TEMP_ACTION" warning "`date -R`${LF}${message}${LF}${gpuInfo}" > /dev/null 2>&1
 			fi
 			case $WD_TEMP_ACTION in
 				pause)

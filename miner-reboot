@@ -47,7 +47,6 @@ function get_lastmsg () {
 			local msg=`echo "$raw_msg" | sed 's/.*\(GPU[a-zA-Z0-9]* \[BUS:[a-zA-Z0-9]*\] DEAD\).*/\1/' | tr -dc '[:print:]'`
 		;;
 	esac
-	esac
 
 
 	echo "$msg" 

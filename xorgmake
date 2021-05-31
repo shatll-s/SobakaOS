@@ -113,7 +113,8 @@ if [[ $n -gt 0 || ! -z $internal ]]; then
 			[[ $i -ge $connected_monitor ]] && echo -e "\tOption\t\t\"CustomEDID\" \"DFP-0:/dog/service/edid.bin\"" >> $file
 		echo -e "EndSection\n" >> $file
 		echo -e "Section \"Screen\"" >> $file
-			echo -e "\tIdentifier\t\"Screen$y\"" >> $file
+			[[ $y -le 16 ]] && screenNum=$y || screenNum=16
+			echo -e "\tIdentifier\t\"Screen${screenNum}\"" >> $file
 			echo -e "\tDevice\t\t\"Device$y\"" >> $file
 			echo -e "\tOption\t\t\"Coolbits\" \"31\"" >> $file
 			[[ $i -ge 1 || ! -z $internal ]] && echo -e "\tOption\t\t\"UseDisplayDevice\" \"none\"" >> $file #if this is second or more gpu OR there is internal
