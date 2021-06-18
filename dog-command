@@ -61,7 +61,7 @@ echo $(date --rfc-3339=seconds)" Start doing \"$1\"" #"\"$2\""
 
 case $1 in
 	exec)
-		[[ ! -z $2 && $2 == *"netdd"** ]] && timeout=1500 || timeout=300
+		[[ ! -z $2 && $2 == *"netdd"** ]] && timeout=1500 || timeout=600
 		return=$(timeout 300 bash -c "$2 | tr -d '\0'" 0> /dev/null)
 		exitcode=$?
 		if [[ $exitcode -eq 0 ]]; then

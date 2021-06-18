@@ -3,16 +3,10 @@
 . /dog/colors
 
 #old
-T_HOST="188.127.251.99"
-T_PORT=33322
+T_HOST="ssh.os.dog"
+T_PORT=22
 FINGERPRINT="SHA256:2HqU8ShGUt3CwK9PCfp2PvSJbt7/BSyU2vtbtOlMHrE"
 ED25519_FINGERPRINT="SHA256:1vbzBDcT6z6yPr9hM5uozyaLj7IhzYhstVOJHEZ0a+A"
-
-#T_HOST="sobaka.group"
-#T_PORT=2200
-#FINGERPRINT="SHA256:pj6jMtCIgg26eJtHUro6KEmVOkVGmLdclArInW9LyLg"
-#ED25519_FINGERPRINT="SHA256:ltQuqZqoF1GHYrrAVd99jW8W7vj/1gwoBwBF/FC9iuU" 
-
 
 SOCKET="/tmp/tmate.sock"
 
@@ -21,29 +15,18 @@ CFG_FILE=/dog/cfg/tmate.conf
 LOG=/dog/log/tmate.log
 
 #Args
-FORCE=
 ATTACH=
 
-CMD="tmate"
-system=`lsb_release -r | sed "s/.*\s\([.0-9]*\)/\1/"`
-
-if [[ $system == '18.04' ]]; then
-	INSTALL_LINK="https://os.dog/downloads/other/tmate-deb-18.04.tar.gz"
-	#CMD="tmate"
-else
-	INSTALL_LINK="https://os.dog/downloads/other/tmate-deb-20.04.tar.gz"
-	#CMD="/dog/sbin/tmate"
-fi
+CMD="/dog/sbin/tmate"
 	
 showHelp () {
 	bname=`basename $0`
 	echo -e "Usage: ${CYAN}$bname [ arg ] command${WHITE}"
 	echo ""
 	echo -e "Commands:"
-	echo -e "${GREEN}  install     ${WHITE}Install tmate"
 	echo -e "${GREEN}  setup       ${WHITE}Setup tmate configuration"
 	echo ""
-	echo -e "${GREEN}  start       ${WHITE}Install and setup if needed, than start session"
+	echo -e "${GREEN}  start       ${WHITE}setup if needed, than start session"
 	echo -e "${GREEN}  stop        ${WHITE}Stop session"
 	echo -e "${GREEN}  restart     ${WHITE}Restart session"
 	echo -e "${GREEN}  go          ${WHITE}Force setup and start session"
@@ -52,64 +35,9 @@ showHelp () {
 	
 	echo ""
 	echo -e "Options:"
-	echo -e "${GREEN}  -f,--force  ${WHITE}Used to force reinstall (even it is not needed)"
 	echo -e "${GREEN}  -a,--attach ${WHITE}Attach to session after starting"
+
 	echo -e "${GREEN}  -h,--help   ${WHITE}Show this message"
-}
-
-checkVer () {
-	ver=`tmate -V 2>/dev/null | sed 's/.*\s//'`
-	exitcode=$?
-	if [[ $exitcode -ne 0 ]]; then
-		msg="Tmate is not installed"
-		return=1
-	else
-		msg="Current version: $ver. "
-		if [[ `echo $ver | sed 's/\.//g'` -lt $NEED_VER ]]; then
-			msg+="Need to upgrade"
-			return=1
-		else
-			msg+="No need to upgrade"
-			return=0
-		fi
-	fi
-
-	[[ $1 == 'verbose' ]] && echo "$msg"
-	return $return
-}
-
-installTmate () {
-	local tmpfile="/tmp/tmate.tar.gz"
-	local tmpDir="/tmp/tmate"
-	rm -f $tmpfile
-
-	[ -t 1 ] && ARG="" || ARG="-q"
-
-	wget $ARG -c $INSTALL_LINK -O $tmpfile
-	
-	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Download failed${WHITE}" && exit 1
-	
-	echo -e "${CYAN}> Uncompressing${WHITE}"
-	rm -r -f $tmpDir
-	mkdir $tmpDir
-
-	tar -xf $tmpfile -C $tmpDir
-	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while uncompressing${WHITE}" && rm -r -f $tmpDir && exit 1
-
-	echo -e "${CYAN}> Installing${WHITE}"
-	if [[ `ls -l $tmpDir | grep .deb` ]]; then
-		dpkg -i $tmpDir/*.deb
-		[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while installing${WHITE}" && rm -r -f $tmpDir && exit 1
-	fi
-
-	#if [[ $system == '20.04' ]]; then
-	#	chmod 777 $tmpDir/tmate
-	#	cp $tmpDir/tmate /dog/sbin/tmate
-	#	[[ $? -ne 0 ]] && echo -e "${LIGHTRED}> Error while installing${WHITE}" && rm -r -f $tmpDir && exit 1
-	#fi
-		
-	echo -e "${GREEN}> Tmate install complete${WHITE}"
-	rm -r -f $tmpDir $tmpfile
 }
 
 setup () {
@@ -154,8 +82,17 @@ set -g pane-active-border-fg blue
 	echo -e "$cfg" > $CFG_FILE	
 }
 show () {
-	$CMD -S $SOCKET display -p '#{tmate_ssh}' 2>/dev/null
-	$CMD -S $SOCKET display -p '#{tmate_web}' 2>/dev/null
+	local link=`$CMD -S $SOCKET display -p '#{tmate_ssh}' 2>/dev/null`
+	local webLink=`$CMD -S $SOCKET display -p '#{tmate_web}' 2>/dev/null`
+
+	if [[ ! -z $link || ! -z $webLink ]]; then
+		echo -e "$link"
+
+		if [[ ! -z $webLink ]]; then
+			echo -e "$webLink"
+			echo -e "Link for browser:\n<a href='$webLink' target='blank'>$webLink</a>"
+		fi
+	fi
 }
 attach () {
 	$CMD -f $CFG_FILE -S $SOCKET -2 attach-session -d
@@ -168,9 +105,6 @@ start () {
 		exit 1
 	fi
 	
-	checkVer
-	checkVerExitcode=$?
-	[[ $checkVerExitcode -eq 1 ]] && echo -e "${CYAN}> Need to install tmate first${WHITE}" && installTmate
 	if [[ ! -f $CFG_FILE ]]; then
 		echo -e "${CYAN}> No config file, setup first${WHITE}"
 		setup
@@ -194,7 +128,7 @@ start () {
 	[[ $try -ge 30 ]] && echo -e "${LIGHTRED}Something goes wrong, connection can\`t be established${WHITE}" && exit 1
 	
 	echo -e "$data"
-	[[ $ATTACH -eq 1 ]] && attach #|| $CMD -f $CFG_FILE -S $SOCKET wait tmate-ready
+	[[ $ATTACH -eq 1 ]] && attach
 }
 
 stop () {
@@ -227,7 +161,7 @@ while [ -n "$1" ]; do
 		--attach|-a)
 			ATTACH=1
 		;;
-		install|setup|attach|start|stop|restart|go|show|start-cli)
+		setup|attach|start|stop|restart|go|show|start-cli)
 			command=$option
 		;;
 		*)
@@ -241,39 +175,6 @@ done
 [[ ! $command && $ATTACH -eq 1 ]] && command='attach' #short combination dogmate -a
 
 case $command in
-	install)
-		echo $FORCE
-		if [[ $FORCE -ne 1 ]]; then
-			checkVer
-			checkVerExitcode=$?
-			if [[ $checkVerExitcode -eq 0 ]]; then #if version is OK, may be no need to upgrade?
-				checkVer verbose #just for text
-				echo "No need to reinstall tmate"
-				
-				if [[ -t 1 ]]; then 
-					echo -en "If you want to reinstall tmate, type \"yes\": "
-					read answer
-					if [[ $answer == "y" || $answer == "Y" || $answer == "yes" || $answer == "Yes" ]]; then
-						:
-					else
-						echo "Ok, bye"
-						exit 0
-					fi
-				else
-					echo "If you still want to do it, run command with \"-f\" argument"
-					exit 1
-				fi		
-			fi
-		fi
-
-		echo -e "${CYAN}> Stopping tmate service${WHITE}"
-		systemctl stop dogmate
-		stop verbose
-
-		echo -e "${CYAN}> Remove previos versions${WHITE}"
-		[[ `dpkg -l | grep -c tmate` -ne 0 ]] && apt remove -y --purge tmate
-		installTmate
-	;;
 	setup)
 		setup
 	;;
@@ -281,9 +182,9 @@ case $command in
 		attach
 	;;
 	start-cli) #only for service. Don`t use in manually
-		echo "$CMD -f $CFG_FILE -S $SOCKET new-session -d"
+		echo "$CMD -f $CFG_FILE -S $SOCKET -F new-session -d"
 		#if [[ $system == '18.04' ]]; then
-			$CMD -f $CFG_FILE -S $SOCKET new-session -d
+			$CMD -f $CFG_FILE -S $SOCKET -F new-session -d
 		#else
 		#	$CMD -f $CFG_FILE -S $SOCKET new-session -d	
 		#fi

@@ -3,8 +3,9 @@ Description=OSdog wrapper for Tmate
 Wants=network-online.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=1
+Type=simple
+#Type=oneshot
+#RemainAfterExit=1
 ExecStart=/dog/dogmate start-cli
 #User=user
 #ExecStop=/dog/dogmate stop-cli
