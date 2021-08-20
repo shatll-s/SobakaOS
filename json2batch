@@ -12,6 +12,9 @@ name=`cat /etc/hostname`
 function convert_algo () { #for nicehash
 	local input_algo=${1^^}
 	case $input_algo in
+		AUTOLYKOS2)
+			local output_algo="AUTOLYKOS"
+		;;
 		BEAM-III|144,5S|BEAMHASHIII|BEAMHASH)
 			local output_algo="BEAMV3"
 		;;
@@ -620,7 +623,7 @@ function make_batch () {
 
 			#config.txt section
 				config_txt="{"`cat "$miner_dir/global_config.cfg"`"}" #it will be based on global, but with user changes
-
+				
 				#looking for keys in json
 				if [[ $config != "{null}" ]]; then
 					keys=(`echo $config | jq 'to_entries[].key' | jq -r '.'`) #keys in config, such as "devices", "log-path", e.t.c.
@@ -635,8 +638,9 @@ function make_batch () {
 				fi
 				if [[ $api_trigger -ne 1 ]]; then
 					config_txt=`jq "del(.\"httpd_port\")" <<< "$config_txt"` #if key exist, delete it
-					config_txt=`jq ". + { \"httpd_port\": $apiport }" <<< "$config_txt"`
+					config_txt=`jq ". + { \"httpd_port\": $API_port }" <<< "$config_txt"`
 				fi
+				#echo $config_txt
 				echo -e "$config_txt" | jq '.' | sed '/[{}]/d; s/^\s*//g' > "$miner_dir/config.txt"
 			#end of config.txt section
 

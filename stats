@@ -435,7 +435,7 @@ case $1 in
 		done
 
 		local miner_fan=(`echo $stats_template | jq -r '.GPUs[]."Fan Speed (%)"'`)
-		local miner_temp=(`echo $stats_template | jq -r '.GPUs[]."Temps (deg C)"'`)
+		local miner_temp=(`echo $stats_template | jq -r '.GPUs[]."Temp (deg C)"'`)
 		local miner_busid_10=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
 		for ((i=0; i < ${#miner_busid_10[@]}; i++)); do
 			#echo "obase=16; ${miner_busid_10[$i]}"
@@ -479,13 +479,25 @@ case $1 in
 		miner_algo=`echo $stats_template | jq -r '.algorithm' | sed 's/\"//g'`
 		miner_total_share=`echo $stats_template | jq -r '.total_accepted_shares'`
 		miner_total_badshare=`echo $stats_template | jq -r '.total_rejected_shares'`
+		local totalInvalidShares=`echo $stats_template | jq -r '.total_invalid_shares'`
+		local totalStaleShares=`echo $stats_template | jq -r '.total_stale_shares'`
+		miner_total_invshare=`echo "scale=0; $totalInvalidShares + $totalStaleShares" | bc -l`
+
 		miner_busid=(`echo $stats_template | jq -r '.devices[].bus_id' | awk -F ':' '{print $2}'`)
-		
 		miner_temp=(`echo $stats_template | jq -r '.devices[].temperature'`)
 		miner_hr=(`echo $stats_template | jq -r '.devices[].speed'`)
+		miner_share=(`echo $stats_template | jq -r '.devices[].accepted_shares'`)
+		miner_badshare=(`echo $stats_template | jq -r '.devices[].rejected_shares'`)
+		local invalidShare=(`echo $stats_template | jq -r '.devices[].invalid_shares'`)
+		local staleShare=(`echo $stats_template | jq -r '.devices[].stale_shares'`)
 		miner_total_hr=0
+		
 		for ((i=0; i < ${#miner_hr[@]}; i++)); do
 			miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+		done
+
+		for ((i=0; i < ${#invalidShare[@]}; i++)); do
+			miner_invshare[$i]=`echo "scale=0; ${invalidShare[$i]} + ${staleShare[$i]}" | bc -l`
 		done
 		
 		local dual_trigger=`echo $stats_template | jq -r '.total_accepted_shares2'`

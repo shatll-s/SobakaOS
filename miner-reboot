@@ -26,6 +26,9 @@ function get_lastmsg () {
 		srbminer)
 			keywords="DEAD"
 		;;
+		lolminer)
+			keywords="crashed"
+		;;
 	esac
 	
 	local raw_msg=`echo "$logtext" | grep -m1 -E "$keywords"`
@@ -45,6 +48,9 @@ function get_lastmsg () {
 		;;
 		srbminer)
 			local msg=`echo "$raw_msg" | sed 's/.*\(GPU[a-zA-Z0-9]* \[BUS:[a-zA-Z0-9]*\] DEAD\).*/\1/' | tr -dc '[:print:]'`
+		;;
+		lolminer)
+			local msg=`echo "$raw_msg" | sed 's/Device \([0-9]*\).*/GPU \1 crashed/'`
 		;;
 	esac
 

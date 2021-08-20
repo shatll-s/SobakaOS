@@ -77,7 +77,7 @@ function driver_install () {
 			exit 1
 		fi
 	
-		[[ $i -lt 4 ]] && opencl="legacy,pal" || opencl="legacy,rocr" #from 20.45
+		
 		
 		local newDriver=`echo $versions | jq ".[$i]"`
 		local name=`echo $newDriver | jq -r ".name"`
@@ -99,7 +99,9 @@ function driver_install () {
 			name=`basename $url`
 		fi
 	fi
-	
+
+	[[ $i -lt 4 ]] && opencl="legacy,pal" || opencl="legacy,rocr" #from 20.45
+
 	echo -e "New driver:\t${GREEN}${name}${WHITE}"
 	if [[ $yes -ne 1 ]]; then
 		echo -e "Are you really want to update driver? y/n"

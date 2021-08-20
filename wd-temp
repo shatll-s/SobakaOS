@@ -71,9 +71,9 @@ function start () {
 			echo "" #To switch line
 		fi
 
-		if [[ ! $WD_TEMP_CRIT || $WD_TEMP_CRIT -gt 95 || $WD_TEMP_CRIT -lt 50 ]]; then
+		if [[ ! $WD_TEMP_CRIT || $WD_TEMP_CRIT -lt 50 ]]; then
 			[[ $firstTimeTrigger2 -ne 1 ]] && firstTimeTrigger2=1 && echo -e "Something wrong with Crit Temp, using default value ${CYAN}${defaultCritTemp}${WHITE}"
-			WD_TEMP_CRIT=$defaultMaxTemp
+			WD_TEMP_CRIT=$defaultCritTemp
 		elif [[ firstTimeTrigger2 -ne 0 ]]; then
 			firstTimeTrigger2=0
 		fi

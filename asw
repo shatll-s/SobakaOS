@@ -246,7 +246,7 @@ function main () {
 					if [[ ! -z `echo $as_cfg | jq ".nvidia_oc.$best_algo"` && `echo $as_cfg | jq ".nvidia_oc.$best_algo"` != null ]]; then
 						msg+="\nWe have NVIDIA OC settings for this algo.\n"
 						string="\nApplying NVIDIA OC settings"
-						msg+=$(amd-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
+						msg+=$(nvidia-oc "`echo $as_cfg | jq \".nvidia_oc.$best_algo\"`")
 					fi
 				fi
 				[[ $notifications -eq 1 && $1 != 'check' ]] && msg "Algo switch: ${best_algo}" info "$msg"
