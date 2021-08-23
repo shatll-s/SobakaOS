@@ -2,9 +2,89 @@
 RIG_CFG="/dog/cfg/rig.cfg"
 FLASH_CFG="/dog-flash/rig.cfg"
 TMP_FILE="/tmp/conv.cfg"
+defaultHost="https://os.dog/message.php"
 . colors
 
-if [[ ! -z $RIG_CFG ]]; then #what is it???
+FULL=0
+HOST_OPTION=0
+
+function showHelp {
+	echo -e "${CYAN}Usage: newdog [option]${WHITE}"
+	echo -e "Descr: setup rig credentials (rig id, password) and optionally host"
+	echo -e
+	echo -e "Common options:"
+	echo -e "${GREEN}  --host arg		${WHITE} set new host"
+	echo -e "${GREEN}  -f|--full		${WHITE} setup all credentials include host"
+	echo -e "\nExamples:"
+	echo -e "${GREEN}  newdog${WHITE}"
+	echo -e "${GREEN}  newdog -f${WHITE}"
+	echo -e "${GREEN}  newdog --host os.dog/api/v2/rigStats${WHITE}"
+}
+
+function hostErrorMsg {
+	echo -e "You need to setup id and password at first"
+	echo -e "Run newdog -f to setup id, password and host at once"
+	echo -e "Or run newdog, and then newdog --host <new host here>"
+}
+
+while [ -n "$1" ]; do
+	option=$1
+	
+	if [[ $option == '--help' || $option == '-h' ]]; then
+		showHelp
+		exit 0
+	elif [[ $option == '--full' || $option == '-f' ]]; then
+		FULL=1
+	elif [[ $option == '--host' ]]; then
+		shift
+		[[ -z $1 ]] && echo "Uncorrect argument value" && exit 1
+		HOST_OPTION=1
+		newHost=$1
+	else
+		echo "Uncorrect argument $option"
+	fi
+
+	shift
+done
+
+# processing --host
+if [[ $HOST_OPTION -eq 1 ]]; then
+	# no rig.cfg
+	if [[ ! -f $RIG_CFG ]]; then
+		echo -e "${RED}There is no ${RIG_CFG}${WHITE}"
+		hostErrorMsg
+		exit 1
+	fi
+
+	. $RIG_CFG
+
+	# no id or password
+	if [[ -z $RIG_ID || -z $HOST ]]; then
+		echo -e "${RED}There is no id or password in config file${WHITE}"
+		hostErrorMsg
+		exit 1
+	fi
+
+	
+	if [[ ! -z `grep "$HOST=" $RIG_CFG` ]]; then
+		sed -i "s#.*HOST=.*#HOST=$newHost#g" $RIG_CFG
+		exitcode=$?
+	else
+		echo "HOST=$newHost" >> $RIG_CFG
+		exitcode=$?
+	fi
+
+	if [[ $exitcode -ne 0 ]]; then
+		echo -e "${RED}Error while setting HOST in $RIG_CFG${WHITE}"
+		exit 1
+	fi
+
+	echo -e "${GRENN}Host changed to ${YELLOW}$newHost${WHITE}"
+	exit 0
+fi
+# END of processing --host
+
+if [[ ! -f $RIG_CFG ]]; then
 	mkdir -p /dog/cfg
 fi
 
@@ -20,24 +100,39 @@ if [[ ! -f $RIG_CFG && -f $FLASH_CFG ]]; then
 		echo -e "HOST: ${CYAN}${HOST}${WHITE}"
 		echo "Use this data? (y/n)"
 		read answer
-		[[ $answer == "y" ]]&& rig_id=${RIG_ID} && rig_password=${PASSWD} && rig_host=}${HOST} && OS="0.0" && flashdata=1 && echo "Ok!"
+		if [[ $answer == "y" ]]; then
+			FLASHDATA=1
+
+			rig_id=${RIG_ID}
+			rig_password=${PASSWD}
+			rig_host=${HOST}
+			
+			echo "Ok!"
+		fi
 	fi
 fi
 
-if [[ $flashdata != 1 ]]; then
+if [[ $FLASHDATA -ne 1 ]]; then
 	[[ -f $RIG_CFG ]] && . $RIG_CFG
+
 	echo -e "This is simple registration form.\nEnter your ${CYAN}RIG_ID${WHITE}:"
 	read rig_id
 	echo -e "Enter ${CYAN}RIG_PASSWORD${WHITE}:"
 	read rig_password
-	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}"https://os.dog/message.php${WHITE}"\nType another host or hit Enter to use default:"
-	read rig_host
-	[[ -z $rig_host ]]&& rig_host="https://os.dog/message.php"
+
+	echo -e "Default ${CYAN}HOST${WHITE} is ${YELLOW}${defaultHost}${WHITE}"
+	rig_host="$defaultHost"
+
+	if [[ $FULL -eq 1 ]]; then
+		echo -e "Type another host or hit Enter to use default:"
+		read rig_host
+	fi
+
 	echo -e "Thank you, trying to apply changes.\nIf something goes wrong, you can change rig ID & password manually, just type \"nano /dog/cfg/rig.cfg\""
 fi
 
-cfg="#This is rig configuration file\n"
-cfg+="OS=\"$OS\"\n"
+cfg="#Rig configuration file\n"
+cfg+="#`date -R`\n"
 cfg+="HOST=\"$rig_host\"\n"
 cfg+="RIG_ID=\"$rig_id\"\n"
 cfg+="PASSWD=\"$rig_password\"\n"
