@@ -167,12 +167,14 @@ function firststats {
 	[[ $VERBOSE -eq 1 ]] && echo $request | jq '.' 
 	echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/statsHello #save stats for watchdogs
 	try=0
+	url="$HOST/$RIG_ID"
+	#"${HOST}?id=${RIG_ID}&method=hello2"
+	echo -e "${GREEN}> Trying to say \"hello\" to server side $url${WHITE}"
 
-	echo -e "${GREEN}> Trying to say \"hello\" to server ${WHITE}"
 	while [[ $try -lt 5 ]]; do
 		response=$(echo $request | curl -s --data @- \
 			--connect-timeout 7 --max-time 15 \
-			"${HOST}?id=${RIG_ID}&method=hello2" -H "Content-Type: application/json; charset=utf-8\r\n")
+			"$url" -H "Content-Type: application/json; charset=utf-8\r\n")
 		#echo $response
 		if [[ $? -eq 0 ]]; then
 			[[ $VERBOSE -eq 1 ]] && echo $response | jq '.' 

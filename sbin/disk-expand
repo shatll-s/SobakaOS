@@ -3,7 +3,7 @@
 FREE_SPACE_LIMIT=100
 
 [ -t 1 ] && . colors
-
+[[ $1 == '-v' ]] && VERBOSE=1 || VERBOSE=0
 part_expand(){
 	[[ -z $1 ]] && echo -e "${YELLOW}No drive name given${WHITE}" && return 1
 	local dev_name="/dev/$1"
@@ -56,7 +56,6 @@ function install-deps() {
 install-deps
 
 PART_UUID=`cat /proc/cmdline | tr " " "\n" | grep "UUID" | sed 's/\(^root=UUID=\)//'`
-#echo $PART_UUID
 DISK_PART=`blkid | grep -m1 $PART_UUID | awk '{ print $1 }' | sed 's/://' | sed 's/\(^\/dev\/\)//'`
 
 DISK_NAME=`echo ${DISK_PART} | sed 's/\([[:digit:]]\)//'`
@@ -66,8 +65,17 @@ PART_SIZE=`cat /proc/partitions | grep -w "${DISK_PART}" | awk '{ printf("%.f",$
 echo -e "OSdog booted from ${GREEN}$DISK_NAME${WHITE} and whole drive size is ${WHITE}$DISK_SIZE${WHITE} MB"
 echo -e "OSdog partition is ${YELLOW}$DISK_PART${WHITE} and it's size is ${WHITE}$PART_SIZE${WHITE} MB"
 
-
 EXPAND_SIZE=$((DISK_SIZE-PART_SIZE-28))
+
+if [[ $VERBOSE -eq 1 ]]; then
+	echo -e "PART_UUID $PART_UUID"
+	echo -e "DISK_PART $DISK_PART"
+	echo -e "DISK_NAME $DISK_NAME"
+	echo -e "DISK_SIZE $DISK_SIZE"
+	echo -e "PART_SIZE $PART_SIZE"
+	echo -e "EXPAND_SIZE $EXPAND_SIZE"
+fi
+
 if [ $EXPAND_SIZE -le ${FREE_SPACE_LIMIT} ]; then
 	echo -e "${RED}Free disk space less then ${FREE_SPACE_LIMIT} MB. Stopped${WHITE}"
 	exit 1
