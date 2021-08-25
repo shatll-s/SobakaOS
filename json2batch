@@ -549,7 +549,7 @@ function make_batch () {
 			[[ -f ${miner_dir}watchdog_exit.sh && $addition != *"--script-exit"* ]] && minerexec+=" --script-exit ${miner_dir}watchdog_exit.sh"
 			[[ -f ${miner_dir}watchdog_crash.sh && $addition != *"--script-crash"* ]] && minerexec+=" --script-crash ${miner_dir}watchdog_crash.sh"
 
-			minerexec+=" --pci-indexing --log-path /dog/log/t_rex.log --api-bind-http 0.0.0.0:$API_port"
+			minerexec+=" --pci-indexing --api-bind-http 0.0.0.0:$API_port"
 
 		;;
 		verthashminer)
