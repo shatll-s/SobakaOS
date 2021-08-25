@@ -12,6 +12,7 @@ for arg in $@; do
 	[[ $arg == '--initial' ]] && INITIAL=1
 	[[ $arg == '-v' || $arg == '--verbose' ]] && VERBOSE=1
 	[[ $arg == '-b' || $arg == '--boot' ]] && BOOT=1
+	[[ $arg == '-t' || $arg == '--test' ]] && TEST=1
 done
 
 ###########################################################################################
@@ -127,6 +128,9 @@ function firststats {
 		}'
 	)
 
+	internal=`gpu-detect internal show`
+	[[ ! -z $internal ]] && sysinfo=`jq ".internal += \"$internal\"" <<< "$sysinfo"`
+
 	local request=$(
 		jq -n \
 		--arg password "$PASSWD" \
@@ -162,13 +166,20 @@ function firststats {
 		}'
 	)
 	[[ $plJson != '{}' ]] && request=`jq ".stats += {\"pl\": $plJson}" <<< "$request"`
+
 	#[[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 
+	
 	[[ $VERBOSE -eq 1 ]] && echo $request | jq '.' 
+	# Just for development
+	if [[ $TEST -eq 1 ]]; then
+		[[ $VERBOSE -ne 1 ]] && echo $request | jq '.' 
+		exit 0
+	fi
+
 	echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/statsHello #save stats for watchdogs
 	try=0
-	url="$HOST/$RIG_ID"
-	#"${HOST}?id=${RIG_ID}&method=hello2"
+	url="$HOST/$RIG_ID/hello"
 	echo -e "${GREEN}> Trying to say \"hello\" to server side $url${WHITE}"
 
 	while [[ $try -lt 5 ]]; do
@@ -179,14 +190,14 @@ function firststats {
 		if [[ $? -eq 0 ]]; then
 			[[ $VERBOSE -eq 1 ]] && echo $response | jq '.' 
 			#echo $response | jq '.'
-			answer=$(echo $response | jq -r '.hello_answer')
+			message=$(echo $response | jq -r '.message')
 			#answer=$(echo $response) #just for debug
-			[ -t 1 ] && echo -e "${GREEN}> First stats (GPU names, memory, bus ID) sent ${CYAN}[$answer]${WHITE}" ||
-				echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$answer]"
+			[ -t 1 ] && echo -e "${GREEN}> First stats (GPU names, memory, bus ID) sent ${CYAN}[$message]${WHITE}" ||
+				echo $(date --rfc-3339=seconds)" First stats (GPU names, memory, bus ID) sent [$message]"
 			
 			#  echo $response | jq '.'
 			
-			if [[ $answer == "Data received" ]]; then
+			if [[ $message == "Data received" ]]; then
 				#name
 				name=$(echo $response | jq ".name" -r)
 				if [[ ! -z $name && $name != 'null' ]]; then
@@ -249,20 +260,23 @@ function firststats {
 		
 	done
 }
+
 if [[ $BOOT -eq 1 ]]; then
 	try=0
 	#echo "HOST $HOST"
-	echo -e "${GREEN}> Trying to get boot parametres from server${WHITE}"
+	url="$HOST/$RIG_ID/boot"
+	echo -e "${GREEN}> Trying to get boot parametres from server side${WHITE}"
 	while [[ $try -lt 5 ]]; do
 		request=`jq -n --arg password "$PASSWD" '{	"jsonrpc": "2.0", "stats": { $password } }'`
 		response=`echo $request | curl -s --data @- --connect-timeout 7 --max-time 15 \
-			"${HOST}?id=${RIG_ID}&method=boot" -H "Content-Type: application/json; charset=utf-8\r\n"`
+			"$url" -H "Content-Type: application/json; charset=utf-8\r\n"`
 		exitcode=$?
+		#echo $response
 		if [[ $exitcode -eq 0 ]]; then
-			status=`echo $response | jq -r '.status'`
+			message=`echo $response | jq -r '.message'`
 			
-			if [[ $status == "success" ]]; then
-				echo -e "${GREEN}> Boot parametres successfully received${WHITE}"
+			if [[ $message == "OK" ]]; then
+				echo -e "${GREEN}> Boot parametres successfully received [$message]${WHITE}"
 				
 				command_argument=`echo $response | jq ".settings" --raw-output`
 				dog-command settings "$command_argument" --hello

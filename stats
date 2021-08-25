@@ -1207,9 +1207,10 @@ echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
 echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/stats #save stats for watchdogs
 [[ ! -z $SHOW ]] && exit 0
 #get server answer
+url="$HOST/$RIG_ID"
 local response=$(echo $request | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
-	"${HOST}?id=${RIG_ID}&method=sendstats" -H "Content-Type: application/json; charset=utf-8\r\n")
+	"$url" -H "Content-Type: application/json; charset=utf-8\r\n")
 
 if [[ $? -eq 0 ]]; then
 	if [[ $msg_count -eq 1 ]]; then 

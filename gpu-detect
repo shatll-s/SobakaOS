@@ -1,20 +1,16 @@
 #!/bin/bash
 . colors
+. /dog/service/pci.ids
 AMDMEMINFO_FILE=/tmp/amdmeminfo
 NVIDIASMI_FILE=/tmp/nvidiaGpuDetect
-NAVI_ID="1002:7310|1002:7312|1002:7318|1002:7319|1002:731A|1002:731B|1002:731F|1002:7340"
-NAVI21_ID="1002:73BF"
-NAVI22_ID="1002:73DF"
+
+GPU_DETECT_STRING="VGA|3D controller|Display controller"
 
 function listJS () {
 	local listJS='{}'
-	local list=`lspci | grep -E "VGA|3D controller|Display controller"`
+	local list=`lspci | grep -E "VGA|3D controller|Display controller" | grep -E "NVIDIA|Advanced Micro Devices" | grep -Ev "$INTERNAL"`
 	local coreAddrArray=(`ls -d /sys/class/drm/card[0-9]*/device | egrep 'card[0-9]{1,2}/'`)
 
-	#if [[ `echo $list | grep -c "NVIDIA"` -ge 1 ]]; then
-	#	export DISPLAY=:0
-	#	local NV_FANS_LIST=`nvidia-settings -q fans -V 2>/dev/null | sed -e '/^$/d; /Has the following name:.*/d; /FAN-.*/d; /Is connected/d'`
-	#fi
 	local nv=0
 
 	while read -r string; do
@@ -32,9 +28,8 @@ function listJS () {
 			fi
 		done
 
-		if [[ $string =~ "NVIDIA" && ! $string =~ "nForce" ]]; then
+		if [[ $string =~ "NVIDIA" && `echo "$string" | grep -Ec "$INTERNAL_NVIDIA"` -eq 0 ]]; then
 			local brand="N"
-
 			[[ ! -f $NVIDIASMI_FILE ]] &&
 				nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
 			local nvidiainfo=`cat $NVIDIASMI_FILE | grep -i "$b:00.0"`
@@ -48,19 +43,9 @@ function listJS () {
 				local name=`echo $string | sed 's/.*controller: //'`
 				local status=1
 			fi
-			#if [[ ! $name =~ "GTX" || $name =~ "1660" ]]; then #non-GTX and GTX 1660 GPUs
-            #    local fanCount=`echo "$NV_FANS_LIST" | grep -c "gpu:$nv"`
-            #else
-            #    local fanCount=1
-            #fi
 			local info="$vbios"
 			(( nv++ )) #nvidia gpus
-		elif [[ $string =~ "Advanced Micro Devices" &&
-			$string != *"BeaverCreek"* &&
-			$string != *"Picasso"* &&
-			$string != *"Wani"* &&
-			$string != *"Raven"* ]]; then
-
+		elif [[ $string =~ "Advanced Micro Devices" && `echo "$string" | grep -Ec "$INTERNAL_AMD"` -eq 0 ]]; then
 			local brand="A"
 			#local color="$LIGHTRED"
 			
@@ -97,10 +82,7 @@ function listJS () {
 				local status=1
 			fi
 		else
-			local brand="I"
-			local name=`lspci -s "$bus" | sed 's/.*controller: //'`
-			local info=" "
-			unset coreAddr bus b #no need
+			local internal=`lspci -s "$bus" | sed 's/.*controller: //'`
 		fi
 		
 		if [[ $1 == "list" ]]; then
@@ -128,7 +110,8 @@ function listJS () {
 
 case $1 in
 	all)
-		lspci | grep -Ec "VGA|3D controller|Display controller"
+		list=`lspci | grep -E "VGA|3D controller|Display controller"`
+		echo "$list" | grep -E "NVIDIA|Advanced Micro Devices" | grep -Evc "$INTERNAL"
 	;;
 	listJS)
 		[[ `gpu-detect NVIDIA` -gt 0 ]] && nvidia-smi --query-gpu=gpu_bus_id,name,temperature.gpu,fan.speed,power.draw,power.min_limit,power.default_limit,power.max_limit,memory.total,clocks.gr,clocks.mem,vbios_version,utilization.gpu --format=csv,noheader,nounits > $NVIDIASMI_FILE
@@ -166,10 +149,25 @@ case $1 in
 			echo "No GPU detected. May be you need to wait some time"
 		fi
 	;;
-	NVIDIA|AMD)
-		[[ -z $2 ]] && lspci | grep -E "VGA|3D controller|Display controller" | grep -c "$1" && exit 0
-		#[[ ! -z $2 && $1 == "NVIDIA" && $2 == "list" ]] &&  nvidia-smi --query-gpu=gpu_bus_id,name --format=csv,noheader | sed -e 's/[0]*://; s/^0//'
-		[[ ! -z $2 && $1 == "NVIDIA" && $2 == "list" ]] &&  nvidia-smi --query-gpu=gpu_bus_id,name --format=csv,noheader | sed -e 's/[0]*://' 
+	AMD|Amd|amd)
+		list=`lspci | grep -E "VGA|3D controller|Display controller"`
+		echo "$list" | grep -E "Advanced Micro Devices" | grep -Evc "$INTERNAL_AMD"
+	;;
+	NVIDIA|Nvidia|nvidia)
+		if [[ $2 == "list" ]]; then
+			nvidia-smi --query-gpu=gpu_bus_id,name --format=csv,noheader | sed -e 's/[0]*://' 
+		else
+			list=`lspci | grep -E "VGA|3D controller|Display controller"`
+			echo "$list" | grep -E "NVIDIA" | grep -Evc "$INTERNAL_NVIDIA"
+		fi
+	;;
+	internal)
+		list=`lspci | grep -E "VGA|3D controller|Display controller"`
+		if [[ $2 == "show" ]]; then
+			echo "$list" | grep -Ev "NVIDIA|Advanced Micro Devices" | sed 's/.*controller: //'
+		else
+			echo "$list" | grep -Evc "NVIDIA|Advanced Micro Devices"
+		fi
 	;;
 	*)
 		bname=`basename $0`
