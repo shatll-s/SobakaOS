@@ -100,5 +100,19 @@ fi
 
 systemctl restart cron
 
-[[ -f $RIG_CFG ]] && hello
+if [[ -f $RIG_CFG ]]; then
+	osdogVer=`apt-cache policy osdog | grep Installed | sed 's/Installed://; s/\s*//'`
+	if [[ ! -z $osdogVer && `echo "$osdogVer >= 2.00" | bc` -eq 1  ]]; then
+		newHost="https://os.dog/api/v2/rigStats"
+		echo -e "> os.dog version is > 2.00, check for right API"
+		. $RIG_CFG
+		if [[ -z $HOST || $HOST != $newHost ]]; then
+			echo -e "> Need to change old HOST $HOST to $newHost, otherwise rig will be not visible on server"
+			newdog --host $newHost
+		fi
+	fi
+	
+	
+	hello
+fi
 echo -e "${CYAN}> Reboot is recommended after upgrade${WHITE}"
