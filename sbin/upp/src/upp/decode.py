@@ -361,7 +361,7 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
             cs = getattr(pp_module, resolve_cstruct(name))
             entries_class = cs._fields_[-1][-1]
             entry_name, entry_type = cs._fields_[-1]
-            assert entry_type._length_ == 1
+            assert entry_type._length_ == 0
             record_struct = 'ATOM_Vega10_GFXCLK_Dependency_Record_V2'
             entry_type = getattr(pp_module, record_struct)
 
@@ -373,8 +373,10 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
         else:
             cs = getattr(pp_module, resolve_cstruct(name))
     elif name == 'FanTable':
-        if revid == 9:                   # ATOM_Tonga_Fan_Table (v9)
+        if revid == 8:                   # ATOM_Tonga_Fan_Table (v8)
             cs = getattr(pp_module, resolve_cstruct(name))
+        elif revid == 9:                 # ATOM_Polaris_Fan_Table (v9)
+            cs = getattr(pp_module, resolve_cstruct(name, 'Polaris'))
         elif revid == 10:                # ATOM_Vega10_Fan_Table (v10)
             cs = getattr(pp_module, resolve_cstruct(name))
         elif revid == 11:                # ATOM_Vega10_Fan_Table_V2 (v11)
@@ -389,8 +391,8 @@ def _get_ofst_cstruct(module, name, header_bytes, debug=False):
     elif name in 'PPMTable':             # ATOM_Tonga_PowerTune_Table (v1)
         cs = getattr(pp_module, resolve_cstruct(name))
     elif name in 'PowerTuneTable':
-        if revid == 4:                   # ATOM_Fiji_PowerTune_Table (v4)
-            cs = getattr(pp_module, resolve_cstruct(name, 'Fiji'))
+        if revid == 4:                   # ATOM_Polaris_PowerTune_Table (v4)
+            cs = getattr(pp_module, resolve_cstruct(name, 'Polaris'))
         elif revid == 5:                 # ATOM_Vega10_PowerTune_Table (v5)
             cs = getattr(pp_module, resolve_cstruct(name))
         elif revid == 6:                 # ATOM_Vega10_PowerTune_Table_V2 (v6)
@@ -603,30 +605,35 @@ def select_pp_struct(rawbytes, rawdump=False, debug=False):
     pp_header = common_hdr.from_buffer(rawbytes[:4])
     pp_ver = validate_pp(pp_header, len(rawbytes), rawdump)
 
-    if pp_ver == (7, 1):        # Polaris
+    # Polaris aka RX470/RX480/RX570/RX580/RX590
+    if pp_ver == (7, 1):
         gpugen = 'Polaris'
         from upp.atom_gen import pptable_v1_0 as pp_struct
         ctypes_strct = pp_struct.struct__ATOM_Tonga_POWERPLAYTABLE
-    elif pp_ver == (8, 1):      # Vega 10
+    # Vega 10 aka Vega 56/64
+    elif pp_ver == (8, 1):
         gpugen = 'Vega 10'
         from upp.atom_gen import vega10_pptable as pp_struct
         ctypes_strct = pp_struct.struct__ATOM_Vega10_POWERPLAYTABLE
-    elif pp_ver == (11, 0):     # Vega 20 aka Radeon 7
+    # Vega 20 aka Radeon VII
+    elif pp_ver == (11, 0):
         gpugen = 'Vega 20'
         from upp.atom_gen import vega20_pptable as pp_struct
         ctypes_strct = pp_struct.struct__ATOM_VEGA20_POWERPLAYTABLE
-    elif pp_ver == (12, 0):     # Navi 10, 14
+    # Navi 10 aka RX5700/RX5600(XT,M), Navi 14 aka RX5500/RX5300(XT,M)
+    elif pp_ver == (12, 0):
         gpugen = 'Navi 10 or 14'
         from upp.atom_gen import smu_v11_0_navi10 as pp_struct
         ctypes_strct = pp_struct.struct_smu_11_0_powerplay_table
-    elif pp_ver == (15, 0):     # Navi 21
-        gpugen = 'Navi 21'
+    # Navi 21 (Sienna Cichlid) aka RX6900XT/RX6800(XT)
+    # Navi 22 (Navy Flounder) aka RX6700(XT)/RX6800M
+    # Navi 23 (Dimgrey Cavefish) aka RX6600(XT)/RX6600M
+    elif ((pp_ver[0] == 15 or pp_ver[0] == 16 or pp_ver[0] == 18) and
+          pp_ver[1] == 0):
+        gpugen = 'Navi 21 or 22 or 23'
         from upp.atom_gen import smu_v11_0_7_navi20 as pp_struct
         ctypes_strct = pp_struct.struct_smu_11_0_7_powerplay_table
-    elif pp_ver == (16, 0):     # Navi 22, 23?
-        gpugen = 'Navi 22/23'
-        from upp.atom_gen import smu_v11_0_7_navi20 as pp_struct
-        ctypes_strct = pp_struct.struct_smu_11_0_7_powerplay_table
+    # Navi 24? (Beige Goby?) aka RX6300(XT)?
     elif pp_ver is not None:
         msg = 'Can not decode PowerPlay table version {}.{}'
         print(msg.format(pp_ver[0], pp_ver[1]))
