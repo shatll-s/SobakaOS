@@ -68,12 +68,16 @@ function listJS () {
 				local status=0
 				if [[ -f $coreAddr/uevent ]]; then
 					. $coreAddr/uevent
-					if [[ `echo $PCI_ID | grep -E "$NAVI_ID"` ]]; then
-						local navi=1
-					elif [[ `echo $PCI_ID | grep -E "$NAVI21_ID"` ]]; then
-						local navi=21
-					elif [[ `echo $PCI_ID | grep -E "$NAVI22_ID"` ]]; then
-						local navi=22
+					if [[ `echo $PCI_ID | grep -E "$NAVI_10_IDS"` ]]; then
+						local navi=10
+					elif [[ `echo $PCI_ID | grep -E "$NAVI_20_IDS"` ]]; then
+						if [[ `echo $PCI_ID | grep -E "$NAVI_21"` ]]; then
+							local navi=21
+						elif [[ `echo $PCI_ID | grep -E "$NAVI_22"` ]]; then
+							local navi=22
+						elif [[ `echo $PCI_ID | grep -E "$NAVI_23"` ]]; then
+							local navi=23
+						fi
 					else
 						local navi=0
 					fi

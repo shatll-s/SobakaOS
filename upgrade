@@ -3,7 +3,11 @@
 RIG_CFG="/dog/cfg/rig.cfg"
 tmp_dir="/tmp"
 [[ -f $RIG_CFG ]] && . $RIG_CFG
-[[ -z $HOST ]] && HOST="https://os.dog/message.php"
+
+baseUrl="https://os.dog"
+if [[ ! -z $HOST ]]; then
+	baseUrl=`echo $HOST | tr [:upper:] [:lower:] | sed 's|\(http.*://\)\([.a-z0-9]*\)\/.*|\1\2|'`
+fi
 . colors
 
 function upgrade_deb () {
@@ -45,7 +49,8 @@ fi
 
 cd $tmp_dir
 [[ -f $tmp_dir/dog-$VER.deb ]] && rm $tmp_dir/dog-$VER.deb
-DOWNLOAD=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/dog-$VER.deb"
+DOWNLOAD="$baseUrl/downloads/dog-$VER.deb"
+echo -e "> Trying download from $DOWNLOAD"
 wget -q $DOWNLOAD
 [[ $? -ne 0 ]] && echo -e "${RED}No such file on server (may be wrong version?)${WHITE}" && exit 1
 
@@ -70,7 +75,7 @@ if [[ $exitcode -ne 0 ]]; then
 	uppNeedInstall=1
 else
 	echo -e "${BROWN}> Uplift Power Play is already installed, check for version${WHITE}"
-	[[ $ver != "0.0.9" ]] && uppNeedInstall=1
+	[[ $ver != "$upp" ]] && uppNeedInstall=1
 fi
 
 if [[ $uppNeedInstall -eq 1 ]]; then

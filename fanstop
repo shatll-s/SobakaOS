@@ -30,7 +30,7 @@ done
 [[ ! -f /run/dog/gpuStats ]] && echo -e "There is no /run/dog/gpuStats" && exit 1
 
 if [[ $brand == 'amd' ]]; then
-	gpu=`cat /run/dog/gpuStats | jq '.gpu[] | select(.brand == "A") | select(.b == "05")'`
+	gpu=`cat /run/dog/gpuStats | jq ".gpu[] | select(.brand == \"A\") | select(.b == \"$bus\")"`
 	[[ ! $gpu ]] && echo "Can not find gpu with bus $bus" && exit 1
 	fanAddr=`echo $gpu | jq -r '.fanAddr'`
 	
