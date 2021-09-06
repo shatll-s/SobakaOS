@@ -51,7 +51,7 @@ function listJS () {
 			
 			[[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 			local name=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $3 }'`
-			local info=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5", " $4 }'`
+			#local info=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5", " $4 }'`
 			
 			if [[ ! -z $coreAddr ]]; then
 				local iCard=`echo $coreAddr | sed "s/.*card\([0-9]*\).*/\1/"`
@@ -66,6 +66,11 @@ function listJS () {
 					local mem=`dmesg | grep ".*VRAM.*used" | grep "amdgpu 0000:${gpu_busid_sys[$i]}:00.0" | sed -n 's/.*VRAM:\s\([0-9MG]\+\).*/\1/p'`
 				fi
 				local status=0
+				if [[ -f $coreAddr/mem_info_vram_vendor ]]; then
+					local memVendor=`cat $coreAddr/mem_info_vram_vendor | sed 's/[[:alpha:]]/\u&/'`
+				fi
+					
+				local info=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $4 }'`
 				if [[ -f $coreAddr/uevent ]]; then
 					. $coreAddr/uevent
 					if [[ `echo $PCI_ID | grep -E "$NAVI_10_IDS"` ]]; then
@@ -85,6 +90,8 @@ function listJS () {
 			else
 				local status=1
 			fi
+			# Can not receive vram vendor from sysfs (old gpus)
+			[[ ! $memVendor ]] && local memVendor=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5 }'`
 		else
 			local internal=`lspci -s "$bus" | sed 's/.*controller: //'`
 		fi
@@ -95,7 +102,7 @@ function listJS () {
 		fi
 		
 		local json='{}'
-		for option in bus b brand name mem info vendor status coreAddr fanAddr vbios pl navi; do
+		for option in bus b brand name mem memVendor info vendor status coreAddr fanAddr vbios pl navi; do
 			eval "[[ -z \$$option ]] && continue"
 			eval "local value=\"\${$option}\""
 			
@@ -106,6 +113,7 @@ function listJS () {
 		done
 		local listJS=`jq -c "{gpu:(.gpu + [$json])}" <<< "$listJS"`
 		((i++))
+		unset bus b brand name mem info vendor status coreAddr fanAddr vbios pl navi memVendor
 	done <<< "$list"
 	[[ $1 == "list" ]] && echo -e "$text"
 	

@@ -1207,7 +1207,15 @@ echo $request | jq '.stats' | jq 'del(.password)' -c #echo in screen
 echo $request | jq '.stats' | jq 'del(.password)' > /run/dog/stats #save stats for watchdogs
 [[ ! -z $SHOW ]] && exit 0
 #get server answer
-url="$HOST/$RIG_ID"
+
+# API change
+#! -z $osdogVer && `echo "$osdogVer >= 2.00" | bc` -eq 1
+if [[ $HOST == 'https://os.dog/message.php' ]]; then # old API
+	url="${HOST}?id=${RIG_ID}&method=sendstats"
+else
+	url="$HOST/$RIG_ID"
+fi
+
 local response=$(echo $request | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
 	"$url" -H "Content-Type: application/json; charset=utf-8\r\n")

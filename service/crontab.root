@@ -26,3 +26,4 @@
 
 #*/5 * * * * sudo /dog/hello
 #*/1 * * * * /dog/msg "`date -R`" info "Just time: `date -R`"
+*/30 * * * * /dog/logs-cut

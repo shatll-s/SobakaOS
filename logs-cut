@@ -1,0 +1,74 @@
+#!/bin/bash
+logsDir="/dog/log"
+minSize_H=100 # min size in Mb
+oldAge=14 # all files not accesed for X days will be deleted
+maxFileSize=50 # max file size in Mb
+##########
+minSize=`echo "scale=0;$minSize_H * 1024" | bc -l`
+
+. colors
+function cutOldFiles {
+	local period=$oldAge 
+	[[ $1 ]] && period=$1
+	echo -e "> Check ${CYAN}${logsDir}${WHITE} for old (> ${CYAN}${period}${WHITE} days) files"
+	local files="`find $logsDir -type f -mtime +$period`"
+	if [[ $files ]]; then
+		local count=`echo "$files" | wc -l`
+		echo -e "> Found ${CYAN}${count}${WHITE} files, deleting"
+		rm $files
+		exitcode=$?
+		[[ $exitcode -eq 0 ]] && echo -e "${GREEN}> Successfully deleted ${CYAN}${count}${WHITE} files${WHITE}" || echo -e "${RED}> Error occured while deleting files${WHITE}"
+	else
+		echo -e "> Found ${CYAN}0${WHITE} files"
+	fi
+}
+
+function cutFatFiles {
+	#local delta=$1
+	echo -e "> Check ${CYAN}${logsDir}${WHITE} for fat (> ${CYAN}${maxFileSize} Mb${WHITE}) files"
+	local files="`find $logsDir -type f -size +${maxFileSize}M -print | xargs -r -d '\n' stat -c "%n %Y"`"
+
+	if [[ $files ]]; then
+		local count=`echo "$files" | wc -l`
+		echo -e "> Found ${CYAN}${count}${WHITE} files, cutting to ${maxFileSize} Mb"
+		while read -r string; do
+			fileName=`echo "$string" | awk '{print $1}'`
+			fileSize=`echo "$string" | awk '{print $1}'`
+			fileSize_H=`echo "scale=2;$total / (1024 * 1024)" | bc -l`
+			
+			echo "Cutting $fileName ($fileSize_H Mb)"
+			local buffer=`tail -c $(( $maxFileSize * 1024 * 1024 )) $fileName`
+			echo -e "$buffer" > $fileName
+		done <<< "$files"
+	else
+		echo -e "> Found ${CYAN}0${WHITE} files"
+	fi
+}
+
+function check {
+	$LINE
+	total=`df | grep "/$" | awk '{print $2}'`
+	free=`df | grep "/$" | awk '{print $4}'`
+
+	total_H=`echo "scale=2;$total / (1024*1024)" | bc -l`
+	free_H=`echo "scale=2;$free / (1024*1024)" | bc -l`
+	[[ ${free_H:0:1} == '.' ]] && free_H="0$free_H"  # .16 Gb => 0.16 Gb
+
+	echo -e "Total size:\t${CYAN}${total_H}\tGb${WHITE}"
+	echo -e "Free size:\t${CYAN}${free_H}\tGb${WHITE}"
+	echo -e "Min. size:\t${CYAN}${minSize_H}\tMb${WHITE}"
+
+	[[ $free -gt $minSize ]] && echo -e "$free_H Gb > $minSize_H Mb (min free size), all right" && exit 0
+
+	delta=`echo "scale=0; $minSize - $free" | bc -l`
+	delta_H=`echo "scale=0; $delta / (1024)" | bc -l`
+
+	#echo -e "$free_H Gb > $minSize_H Mb (min free size)"
+	echo -e "Need to get extra free ${CYAN}${delta_H} Mb${WHITE}"
+	$LINE
+}
+
+check
+cutOldFiles
+cutFatFiles
+check

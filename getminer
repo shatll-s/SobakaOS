@@ -3,6 +3,10 @@
 . colors
 VERSION_FILE='/dog/cfg/miner_versions.json'
 RIG_CFG="/dog/cfg/rig.cfg"
+baseUrl="https://os.dog" # default
+if [[ ! -z $HOST ]]; then
+	baseUrl=`echo $HOST | tr [:upper:] [:lower:] | sed 's|\(http.*://\)\([.a-z0-9]*\)\/.*|\1\2|'`
+fi
 
 [[ ! -f $VERSION_FILE ]] && echo "{}" > $VERSION_FILE
 miner_ver=`cat $VERSION_FILE`
@@ -28,12 +32,13 @@ function make_reboot_script () {
 function getminer () {
 	[[ ! -f $RIG_CFG ]] && echo -e "${RED}There is no $RIG_CFG. Exiting...${WHITE}" && exit 1
 	. $RIG_CFG
-	[[ -z $HOST ]] && HOST="https://os.dog/message.php"
 	#echo -e "${RED}Host is not set in $RIG_CFG. Exiting...${WHITE}" && exit 1
-	file="$miner@$ver.tar.gz"	
-	link=`echo $HOST | sed "s/message\.php/downloads\/miners\/$file/"`
+	file="$miner@$ver.tar.gz"
+
+	DOWNLOAD="$baseUrl/downloads/miners/$file"
+	echo -e "> Trying download from $DOWNLOAD"
 	cd /tmp
-	[ -t 1 ] && wget $link -O $file || wget -q $link -O $file
+	[ -t 1 ] && wget $DOWNLOAD -O $file || wget -q $DOWNLOAD -O $file
 	
 	if [[ $? -ne 0 ]]; then
 		echo -e "${RED}No file ${GREEN}$link${RED} on server. Exiting...${WHITE}"

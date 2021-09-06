@@ -6,17 +6,35 @@ LOCK_FILE="/tmp/.amd-oc.lock"
 
 [[ ! -f $AMDMEMINFO_FILE ]] && amdmeminfo -q -s -n > $AMDMEMINFO_FILE
 [[ ! -f /run/dog/gpuStats ]] && gpu-detect listJS > /run/dog/gpuStats
-#cat /run/dog/gpuStats
-#cat $AMDMEMINFO_FILE
+DEBUG=0
 
 NAVI_VDDCI_MIN=650
 NAVI_VDDCI_MAX=850
 NAVI_MVDD_MIN=1100
 NAVI_MVDD_MAX=1350
 
+# Navi 20 limits
+LIMIT_NAVI20_SOC_VDD_MIN=650 
+LIMIT_NAVI20_SOC_VDD_MAX=1200
+
+LIMIT_NAVI20_VDDCI_MIN=650
+LIMIT_NAVI20_VDDCI_MAX=850
+
+LIMIT_NAVI20_CVDDC_MIN=600
+LIMIT_NAVI20_CVDDC_MAX=1200
+
+LIMIT_NAVI20_MVDD_MIN=1100
+LIMIT_NAVI20_MVDD_MAX=1350
+
+LIMIT_NAVI20_CORE_CLOCK_MIN=900
+
+DEFAULT_NAVI20_CORE_CLOCK=1300
+DEFAULT_NAVI20_CORE_VOLTAGE=850
+#####
+
 listAMD=`cat /run/dog/gpuStats | jq '[.gpu[] | select(.brand == "A")]'`
 
-function getdata () {
+function getdata() {
 	for option in core_clock core_state core_voltage memory_clock memory_state memory_voltage vddci soc_vdd_max soc_clk_max memory_tweak_type fan enhanced alt; do
 		if [[ `echo $1 | jq ".$option"` != null ]]; then
 			option_value="`echo $1 | jq -r \".$option\"`" #double slash, because eval open it
@@ -35,6 +53,211 @@ function getdata () {
 			MEMORY_TWEAK=($memory_tweak)
 			IFS="$oldIFS"
 		fi
+	fi
+}
+
+function PWMfan() {
+	local fan=$1
+	local fanAddr=$2
+	#echo 0 > $fanAddr/pwm1_enable
+	if [[ ! $fanAddr || ! -f  $fanAddr/pwm1_enable ]]; then
+		echo "${RED}Unable to set fan speed"
+	else
+		if [[ $fan == "A" || $fan == 0 ]]; then
+			echo 2 > $fanAddr/pwm1_enable
+			echo -e "Applying ${BROWN}Fan${WHITE}\t\t${CYAN}Auto${WHITE} mode (GPU controlled)"
+		else
+			local range
+			local fanAdapted
+			echo -e "Applying ${BROWN}Fan${WHITE}\t\t${CYAN}$fan${WHITE} (${CYAN}Manual${WHITE} mode)"
+			echo 1 > $fanAddr/pwm1_enable
+			[[ -f  $fanAddr/pwm1_min ]] && fanMin=`cat $fanAddr/pwm1_min` || fanMin=0
+			[[ -f  $fanAddr/pwm1_max ]] && fanMax=`cat $fanAddr/pwm1_max` || fanMax=255
+			let range=$fanMax-$fanMin
+			fanAdapted=`echo "scale=0; $fan * $range / 100 + $fanMin" | bc -l`
+			echo $fanAdapted > $fanAddr/pwm1
+		fi
+	fi
+}
+
+function getDefaultDataNavi20() {
+	#local upp=/dog/sbin/upp/upp.py
+	local upp=/dog/sbin/upp/upp.py
+	[[ ! $1 || ! -f $1 ]] && echo -e "${RED}Something wrong with pp_table${WHITE}" && exit 0
+	local table=$1
+	local uppArgs
+	uppArgs+="smc_pptable/MinVoltageGfx "		# 0
+	uppArgs+="smc_pptable/MaxVoltageGfx "		# 1
+
+	uppArgs+="smc_pptable/MinVoltageSoc "		# 2
+	uppArgs+="smc_pptable/MaxVoltageSoc "		# 3
+ 
+	uppArgs+="smc_pptable/MemVddciVoltage/0 "	# 4-
+	uppArgs+="smc_pptable/MemVddciVoltage/3 "	# 5
+
+	uppArgs+="smc_pptable/MemMvddVoltage/0 "	# 6
+	uppArgs+="smc_pptable/MemMvddVoltage/3 "	# 7
+	
+	uppArgs+="smc_pptable/FreqTableUclk/3 "		# 8
+	uppArgs+="overdrive_table/max/7 "			# 9
+	uppArgs+="overdrive_table/max/0 "			# 10
+	
+	uppArgs+="smc_pptable/FreqTableSocclk/0 "	# 11
+	uppArgs+="smc_pptable/FreqTableSocclk/1 "	# 12
+	
+	ppData=(`$upp -p $table get $uppArgs`)
+
+	MinVoltageGfx=`echo "scale=0; ${ppData[0]} / 4" | bc -l`
+	MaxVoltageGfx=`echo "scale=0; ${ppData[1]} / 4" | bc -l`
+	MinVoltageSoc=`echo "scale=0; ${ppData[2]} / 4" | bc -l`
+	MaxVoltageSoc=`echo "scale=0; ${ppData[3]} / 4" | bc -l`
+	MinMemVddciVoltage=`echo "scale=0; ${ppData[4]} / 4" | bc -l`
+	MaxMemVddciVoltage=`echo "scale=0; ${ppData[5]} / 4" | bc -l`
+	MinMemMvddVoltage=`echo "scale=0; ${ppData[6]} / 4" | bc -l`
+	MaxMemMvddVoltage=`echo "scale=0; ${ppData[7]} / 4" | bc -l`
+	DefMemClock=${ppData[8]}
+	MaxMemClock=${ppData[9]}
+	MaxCoreClock=${ppData[10]}
+	MinSocClock=${ppData[11]}
+	MaxSocClock=${ppData[12]}
+
+	echo -e "Default PowerPlay table data:"
+	echo -e "Core\tMax Clock $MaxCoreClock, Voltage\t$MinVoltageGfx / $MaxVoltageGfx"
+	echo -e "SOC\tMin Clock $MinSocClock, Max Clock $MaxSocClock, Voltage\t$MinVoltageSoc / $MaxVoltageSoc"
+	echo -e "Mem\tDefault Clock $DefMemClock, Max Clock $MaxMemClock, Voltage $MinMemMvddVoltage / $MaxMemMvddVoltage"
+	echo -e "VDDCI\tVoltage $MinMemVddciVoltage / $MaxMemVddciVoltage"
+	echo -e ""
+}
+
+
+function navi20OC() {
+	#local upp=/dog/sbin/upp/upp.py
+	local upp=upp
+	local upp=/dog/sbin/upp/upp.py
+	[[ ! $1 ]] && echo -e "${RED}Something wrong with core address${WHITE}" && exit 0
+	local coreAddr=$1
+	local table="$coreAddr/pp_table"
+
+	local uppArgs="smc_pptable/FanStopTemp=0 smc_pptable/FanStartTemp=10 smc_pptable/FanZeroRpmEnable=0 "
+	#upp -p $table set $uppArgs --write
+
+	# SOC Clock
+	if [[ ! -z ${SOC_CLK_MAX[$i]} && ${SOC_CLK_MAX[$i]} -gt 0 && ${SOC_CLK_MAX[$i]} -le $MaxSocClock ]]; then
+		echo -e "Applying Max SOC Clock ${SOC_CLK_MAX[$i]}"
+		socClock=${SOC_CLK_MAX[$i]}
+	else
+		echo -e "${BROWN}Max SOC Clock${WHITE} value (${SOC_CLK_MAX[$i]}) does not fit min/max, will use def. $MaxSocClock"
+		socClock=$MaxSocClock
+	fi
+	uppArgs+="smc_pptable/FreqTableSocclk/1=$socClock "
+
+	# SOC Min Clock	
+	#local MinSocClockLocal=`echo "scale=0; ${SOC_CLK_MAX[$i]} - 100" | bc -l`
+	local MinSocClockLocal=$MinSocClock
+	uppArgs+="smc_pptable/FreqTableSocclk/0=$MinSocClockLocal "
+		
+	# SOC Voltage
+	local socVdd=`echo "scale=0; $MaxVoltageSoc * 4" | bc -l` # default
+	if [[ ! -z ${SOC_VDD_MAX[$i]} && ${SOC_VDD_MAX[$i]} -le $LIMIT_NAVI20_SOC_VDD_MAX ]]; then
+		if [[ ${SOC_VDD_MAX[$i]} -lt $LIMIT_NAVI20_SOC_VDD_MIN ]]; then
+			socVdd=`echo "scale=0; $LIMIT_NAVI20_SOC_VDD_MIN * 4" | bc -l`
+			echo -e "${BROWN}Max SOC VDD${WHITE} value (${SOC_VDD_MAX[$i]}) does not fit min/max, will use def. default $LIMIT_NAVI20_SOC_VDD_MIN"
+		else
+			socVdd=`echo "scale=0; $SOC_VDD_MAX * 4" | bc -l`
+			echo -e "Applying Max SOC VDD ${SOC_VDD_MAX[$i]}"
+		fi	
+	else
+		echo -e "${BROWN}Max SOC VDD${WHITE} value (${SOC_VDD_MAX[$i]}) does not fit min/max, will use def. $MaxVoltageSoc"
+	fi
+	uppArgs+="smc_pptable/MaxVoltageSoc=$socVdd "
+
+	# VDDCI Voltage
+	local vlt_vddci=`echo "scale=0; $MaxMemVddciVoltage * 4" | bc -l` # default
+	if [[ ! -z ${VDDCI[$i]} && ${VDDCI[$i]} -le $LIMIT_NAVI20_VDDCI_MAX ]]; then
+		if [[ ${VDDCI[$i]} -lt $LIMIT_NAVI20_VDDCI_MIN ]]; then
+			echo -e "${BROWN}VDDCI${WHITE} value (${VDDCI[$i]}) does not fit min/max, will use def. $LIMIT_NAVI20_VDDCI_MIN"
+			vlt_vddci=`echo "scale=0; $LIMIT_NAVI20_VDDCI_MIN * 4" | bc -l`
+		else
+			echo -e "Applying VDDCI ${VDDCI[$i]}"
+			vlt_vddci=`echo "scale=0; ${VDDCI[$i]} * 4" | bc -l`
+		fi
+	else
+		echo -e "${BROWN}VDDCI${WHITE} value (${VDDCI[$i]}) does not fit min/max, will use def. $MaxMemVddciVoltage"
+	fi
+	uppArgs+="smc_pptable/MemVddciVoltage/1=${vlt_vddci} "
+	uppArgs+="smc_pptable/MemVddciVoltage/2=${vlt_vddci} "
+	uppArgs+="smc_pptable/MemVddciVoltage/3=${vlt_vddci} "
+
+	# MVDD
+	local mvdd=`echo "scale=0; $MaxMemMvddVoltage * 4" | bc -l` # default
+	if [[ ${MEMORY_VOLTAGE[$i]} -gt 0 && ${MEMORY_VOLTAGE[$i]} -le $LIMIT_NAVI20_MVDD_MAX ]]; then
+       if [[ ${MEMORY_VOLTAGE[$i]} -lt $NAVI_MVDD_MIN ]]; then
+           mem_vdd=`echo "scale=0; $LIMIT_NAVI20_MVDD_MIN * 4" | bc -l`
+       else
+           mem_vdd=`echo "scale=0; $MEMORY_VOLTAGE * 4" | bc -l`
+       fi
+	fi
+	uppArgs+="smc_pptable/MemMvddVoltage/1=${mvdd} "
+	uppArgs+="smc_pptable/MemMvddVoltage/2=${mvdd} "
+	uppArgs+="smc_pptable/MemMvddVoltage/3=${mvdd} "
+
+	# Core Clock
+	if [[ ! -z ${CORE_CLOCK[$i]} && ${CORE_CLOCK[$i]} -ge $LIMIT_NAVI20_CORE_CLOCK_MIN && ${CORE_CLOCK[$i]} -le $MaxCoreClock ]]; then
+		local coreClock=${CORE_CLOCK[$i]}
+	else
+		echo -e "${CYAN}Core Clock${WHITE} value (${CORE_CLOCK[$i]}) does not fit min/max, will use def. $DEFAULT_NAVI20_CORE_CLOCK"
+		local coreClock=$DEFAULT_NAVI20_CORE_CLOCK
+	fi
+
+	# Core Voltage
+	if [[ ! -z ${CORE_VOLTAGE[$i]} && ${CORE_VOLTAGE[$i]} -ge $LIMIT_NAVI20_CVDDC_MIN && ${CORE_VOLTAGE[$i]} -le $MaxVoltageGfx ]]; then
+		local vddc=${CORE_VOLTAGE[$i]}
+	else
+		echo -e "${BROWN}Core Voltage${WHITE} value (${CORE_VOLTAGE[$i]}) does not fit min/max, will use def. $DEFAULT_NAVI20_CORE_VOLTAGE"
+		local vddc=$DEFAULT_NAVI20_CORE_VOLTAGE
+	fi
+
+	$upp -p $table set_curve_gfx $coreClock $vddc --write > /dev/null 2>&1
+	$upp -p $table set $uppArgs --write > /dev/null 2>&1
+	exitcode=$?
+	[[ $exitcode -ne 0 ]] && echo -e "${RED}Something goes wrong while applying command${WHITE}" && echo "upp -p $table set $uppArgs --write"
+
+	#exit 0
+	# Memory clock
+	if [[ ! -z ${MEMORY_CLOCK[$i]} && ${MEMORY_CLOCK[$i]} -le $MaxMemClock ]]; then
+		local memoryClock=${MEMORY_CLOCK[$i]}
+	else
+		echo -e "${CYAN}Memory Clock${WHITE} value (${MEMORY_CLOCK[$i]}) does not fit min/max, will use def. $DefMemClock"
+		local memoryClock=$DefMemClock
+	fi
+	echo -e "Applying ${BROWN}Core Clock${WHITE}\t${CYAN}$coreClock${WHITE}"
+	echo -e "Applying ${BROWN}Memory Clock${WHITE}\t${CYAN}$memoryClock${WHITE}"
+	local pp_dpm_sclk_lastState=`tail -n 1 $coreAddr/pp_dpm_sclk | sed 's/^\([0-9]*\):.*/\1/'`
+	local pp_dpm_mclk_lastState=`tail -n 1 $coreAddr/pp_dpm_mclk | sed 's/^\([0-9]*\):.*/\1/'`
+	local pp_dpm_socclk_lastState=`tail -n 1 $coreAddr/pp_dpm_socclk | sed 's/^\([0-9]*\):.*/\1/'`
+
+	echo 5 > $coreAddr/pp_power_profile_mode 2> /dev/null
+	echo "manual" > $coreAddr/power_dpm_force_performance_level 2> /dev/null
+	echo "s 1 $coreClock" > $coreAddr/pp_od_clk_voltage 2> /dev/null
+	echo "m 1 $memoryClock" > $coreAddr/pp_od_clk_voltage 2> /dev/null
+	echo "vc 2 $coreClock" > $coreAddr/pp_od_clk_voltage 2> /dev/null
+	echo "c" > $coreAddr/pp_od_clk_voltage 2> /dev/null
+
+	echo $pp_dpm_sclk_lastState > $coreAddr/pp_dpm_sclk 2> /dev/null
+	echo $pp_dpm_mclk_lastState > $coreAddr/pp_dpm_mclk 2> /dev/null
+	echo $pp_dpm_socclk_lastState > $coreAddr/pp_dpm_socclk 2> /dev/null
+
+	if [[ $DEBUG -eq 1 ]]; then
+		echo -e "UPP arguments:\n$uppArgs"
+		echo ""
+		echo "echo \"s 1 $coreClock\" > $coreAddr/pp_od_clk_voltage"
+		echo "echo \"m 1 $memoryClock\" > $coreAddr/pp_od_clk_voltage 2> /dev/null"
+		echo "echo \"vc 2 $coreClock\" > $coreAddr/pp_od_clk_voltage 2> /dev/null"
+		echo "echo \"c\" > $coreAddr/pp_od_clk_voltage 2> /dev/null"
+		
+		echo "echo $pp_dpm_sclk_lastState > $coreAddr/pp_dpm_sclk"
+		echo "echo $pp_dpm_socclk_lastState > $coreAddr/pp_dpm_socclk"
+		echo "echo $pp_dpm_mclk_lastState > $coreAddr/pp_dpm_mclk"		
 	fi
 }
 
@@ -94,20 +317,20 @@ for (( i=0; $i < $n; ++i )); do
 done
 
 echo "Trying to apply next settings:"
-echo -e ${CYAN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
-echo -e ${CYAN}"Core State:${WHITE}\t${CORE_STATE[@]}"
-echo -e ${CYAN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
-echo -e ${CYAN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
-echo -e ${CYAN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
-echo -e ${CYAN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
-echo -e ${CYAN}"MemCon Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
-echo -e ${CYAN}"Max Soc Clock:${WHITE}\t${SOC_CLK_MAX[@]}"
-echo -e ${CYAN}"MaxSoc Voltage:${WHITE}\t${SOC_VDD_MAX[@]}"
+echo -e ${BROWN}"Core Clock:${WHITE}\t${CORE_CLOCK[@]}"
+echo -e ${BROWN}"Core State:${WHITE}\t${CORE_STATE[@]}"
+echo -e ${BROWN}"Core Voltage:${WHITE}\t${CORE_VOLTAGE[@]}"
+echo -e ${BROWN}"Memory Clock:${WHITE}\t${MEMORY_CLOCK[@]}"
+echo -e ${BROWN}"Memory State:${WHITE}\t${MEMORY_STATE[@]}"
+echo -e ${BROWN}"Memory Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
+echo -e ${BROWN}"MemCon Voltage:${WHITE}\t${MEMORY_VOLTAGE[@]}"
+echo -e ${BROWN}"Max Soc Clock:${WHITE}\t${SOC_CLK_MAX[@]}"
+echo -e ${BROWN}"MaxSoc Voltage:${WHITE}\t${SOC_VDD_MAX[@]}"
 
-echo -en ${CYAN}"Alt. Memory OC:${WHITE} "
+echo -en ${BROWN}"Alt. Memory OC:${WHITE} "
 [[ $ALT -eq 1 ]] && echo "Yes" || echo "No"
-echo -e ${CYAN}"Fan:${WHITE}\t\t${FAN[@]}"
-echo -en ${CYAN}"Memory Tweak:${WHITE}\t"
+echo -e ${BROWN}"Fan:${WHITE}\t\t${FAN[@]}"
+echo -en ${BROWN}"Memory Tweak:${WHITE}\t"
 if [[ $MEMORY_TWEAK_TYPE == 0 ]]; then
 	echo "Common"
 	echo "$MEMORY_TWEAK"
@@ -180,8 +403,6 @@ for (( i=0; i < $n; i++ )); do
 		else
 			str="$script -i $card"
 			if [[ -z ${CORE_STATE[$i]} || ${CORE_STATE[$i]} == "A" ]]; then
-				#CORE_STATE[$i]=`cat "${core_addr[$i]}/pp_dpm_sclk" | grep \* | sed -e 's/*//; s/:.*//'`
-				#cs_trigger=1
 				CORE_STATE[$i]=5 #if Core State is not set, use default
 			fi
 			
@@ -334,19 +555,15 @@ for (( i=0; i < $n; i++ )); do
 			fi
 		fi
 	#elif [[ $name == *"5700"* || $name == *"5500"* || $name == *"5600"* ]]; then
-	else #this is NAVI
+	elif [[ $navi -lt 20 ]]; then #this is NAVI 10
 		echo "Detected NAVI$navi GPU"
 		echo $coreAddr
 		echo "manual" > $coreAddr/power_dpm_force_performance_level
 		uppArgs=""
-		if [[ $navi -eq 10 ]]; then
-			uppArgs+="smc_pptable/FanStopTemp=0 "
-			uppArgs+="smc_pptable/FanStartTemp=10 "
-		else #big navi
-			#upp -p /sys/class/drm/card0/device/pp_table dump | grep Fan
-			uppArgs+="smc_pptable/FanStopTemp=20 "
-			uppArgs+="smc_pptable/FanStartTemp=35 "
-		fi
+
+		uppArgs+="smc_pptable/FanStopTemp=0 "
+		uppArgs+="smc_pptable/FanStartTemp=10 "
+
 		#uppArgs+="smc_pptable/FanTargetTemperature=0 "
 		
 		uppArgs+="smc_pptable/FanZeroRpmEnable=0 "
@@ -431,6 +648,12 @@ for (( i=0; i < $n; i++ )); do
 			#	echo $fan_target > $fanAddr/fan1_target
 			#fi
 		fi
+	elif [[ $navi -ge 20 ]]; then
+		getDefaultDataNavi20 $coreAddr/pp_table
+		navi20OC $coreAddr
+		PWMfan ${FAN[$i]} $fanAddr
+	else
+		echo "Unknkown GPU"
 	fi
 
 	echo -e $BROWN"================================================================"$WHITE
