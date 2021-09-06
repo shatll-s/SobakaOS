@@ -167,6 +167,7 @@ function firststats {
 		}'
 	)
 	[[ $plJson != '{}' ]] && request=`jq ".stats += {\"pl\": $plJson}" <<< "$request"`
+	[[ -f /etc/osdog-release ]] && iso=`cat /etc/osdog-release` && request=`jq ".stats.sysinfo += {\"iso\": \"$iso\"}" <<< "$request"`
 
 	#[[ $gpu_vendor_json != '{}' ]] && request=`jq ".stats += {\"gpu_vendor\": $gpu_vendor_json}" <<< "$request"`
 

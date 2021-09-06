@@ -82,7 +82,7 @@ function PWMfan() {
 
 function getDefaultDataNavi20() {
 	#local upp=/dog/sbin/upp/upp.py
-	local upp=/dog/sbin/upp/upp.py
+	local upp=upp
 	[[ ! $1 || ! -f $1 ]] && echo -e "${RED}Something wrong with pp_table${WHITE}" && exit 0
 	local table=$1
 	local uppArgs
@@ -133,7 +133,6 @@ function getDefaultDataNavi20() {
 function navi20OC() {
 	#local upp=/dog/sbin/upp/upp.py
 	local upp=upp
-	local upp=/dog/sbin/upp/upp.py
 	[[ ! $1 ]] && echo -e "${RED}Something wrong with core address${WHITE}" && exit 0
 	local coreAddr=$1
 	local table="$coreAddr/pp_table"
@@ -217,7 +216,6 @@ function navi20OC() {
 		local vddc=$DEFAULT_NAVI20_CORE_VOLTAGE
 	fi
 
-	$upp -p $table set_curve_gfx $coreClock $vddc --write > /dev/null 2>&1
 	$upp -p $table set $uppArgs --write > /dev/null 2>&1
 	exitcode=$?
 	[[ $exitcode -ne 0 ]] && echo -e "${RED}Something goes wrong while applying command${WHITE}" && echo "upp -p $table set $uppArgs --write"
