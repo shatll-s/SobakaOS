@@ -266,6 +266,30 @@ case $1 in
 			miner_total_hr=$(echo "scale=$scale; $miner_total_hr*$x/1" | bc -l)
 		fi
 	;;
+	teamblackminer)
+		local MINER_LOG="/dog/log/teamblackminer.log"
+		local log=`cat $MINER_LOG | tr -d '\0'`
+		local minername="TBMiner"
+		local gpuCount=`gpu-detect all`
+		[[ $miner1 == $1 ]] && local batch=$batch1 || local batch=$batch2
+		local miner_ver=`echo $batch | sed 's#.*/dog/miners/teamblackminer/\([.0-9a-zA-Z]*\)/.*#\1#'`
+		local miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
+		local miner_online_raw=`ps -C $minername -o etimes= | awk '{print $1}'`
+		[[ ! -z $miner_online_raw ]] && local miner_online=$(date --date "-$miner_online_raw sec" +%s) #absolute time
+		
+		local miner_total_hr=0
+		local hrPart=`echo "$log" | grep "HASHRATE" -A$gpuCount | tail -n $gpuCount`
+		for (( i=0; i < $gpuCount; i++ )); do
+            local hr=`echo "$hrPart" | grep -a "GPU$i\s" | sed "s/.*GPU$i\s//" | sed "s/^.*\s\([.0-9]*\) MH\/s.*MH.*/\1/"`
+			if [[ ! -z $hr ]]; then
+				local miner_hr[$i]=`echo "scale=0; $hr * 1000" | bc -l`
+				miner_total_hr=`echo "scale=2; $miner_total_hr + ${miner_hr[$i]}" | bc -l`
+			fi
+        done
+
+		local miner_total_share=`echo "$log" | grep -a "Global stats:" | tail -n 1 | sed 's/.*Accepted: \([0-9]*\).*/\1/'`
+		local miner_total_badshare=`echo "$log" | grep -a "Global stats:" | tail -n 1 | sed 's/.*Rejected: \([0-9]*\).*/\1/'`
+	;;
 	teamredminer)
 		#stupid BASED ON sgminer API doesn`t give algo, let`s get it from config
 		local miner_algo=`echo $batch | sed 's/.*-a \([0-9a-zA-Z]*\).*/\1/'`
@@ -286,10 +310,10 @@ case $1 in
 		miner_badshare=(`echo $stats_template | jq '.devs.DEVS[]."Rejected"'`)
 		miner_invshare=(`echo $stats_template | jq '.devs.DEVS[]."Hardware Errors"'`)
 
-		miner_busid_raw=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//'`)
-		for ((i=0; i < ${#miner_busid_raw[@]}; i++)); do #hex -> dec
-			miner_busid[$i]=`printf "%d" 0x${miner_busid_raw[$i]}`
-		done		
+		miner_busid=(`echo $stats_template | jq -r '.devdetails.DEVDETAILS[]."Device Path"' | sed 's/:.*//' | tr '[:upper:]' '[:lower:]'`)
+		#for ((i=0; i < ${#miner_busid_raw[@]}; i++)); do #hex -> dec
+		#	miner_busid[$i]=`printf "%d" 0x${miner_busid_raw[$i]}`
+		#done
 
 		local scale=0
 		if [[ "phi2 ethash etchash nimiq kawpow trtl autolykos2" == *$miner_algo* ]]; then
@@ -320,7 +344,11 @@ case $1 in
 		miner_total_share=`echo $stats_template | jq -r '.accepted_count'`
 		miner_total_badshare=`echo $stats_template | jq -r '.rejected_count'`
 
-		miner_busid=(`echo $stats_template | jq -r '.gpus[].pci_bus'`)
+		miner_busidRaw=(`echo $stats_template | jq -r '.gpus[].pci_bus'`)
+		for ((i=0; i < ${#miner_busidRaw[@]}; i++)); do #hex -> dec
+			miner_busid[$i]=`printf "%x" ${miner_busidRaw[$i]} | tr '[:upper:]' '[:lower:]'`
+			[[ `echo ${#miner_busid[$i]}` -eq 1 ]] && miner_busid[$i]="0${miner_busid[$i]}"
+		done	
 		miner_hr=(`echo $stats_template | jq '.gpus[].hashrate'`)
 
 		if [[ $majorVer -ge 20 ]]; then
@@ -338,7 +366,7 @@ case $1 in
 		miner_power=(`echo $stats_template | jq '.gpus[].power'`)
 		if [[ $miner_algo == "x16rv2" ]]; then #mb we need to fix other algos
 			multiplier=1000000
-		elif [[ $miner_algo == "ethash" ||  $miner_algo == "etchash" || $miner_algo == "kawpow" ]]; then
+		elif [[ $miner_algo == "ethash" ||  $miner_algo == "etchash" || $miner_algo == "kawpow" || $miner_algo == "autolykos2" ]]; then
 			multiplier=1000
 		fi
 
@@ -436,11 +464,15 @@ case $1 in
 
 		local miner_fan=(`echo $stats_template | jq -r '.GPUs[]."Fan Speed (%)"'`)
 		local miner_temp=(`echo $stats_template | jq -r '.GPUs[]."Temp (deg C)"'`)
-		local miner_busid_10=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
-		for ((i=0; i < ${#miner_busid_10[@]}; i++)); do
-			#echo "obase=16; ${miner_busid_10[$i]}"
-			local miner_busid[$i]=`echo "obase=16; ${miner_busid_10[$i]}" | bc -l`
-		done
+		local miner_busidRaw=(`echo $stats_template | jq -r '.GPUs[].PCIE_Address' | sed 's/:.*//g'`)
+		#for ((i=0; i < ${#miner_busid_10[@]}; i++)); do
+		#	#echo "obase=16; ${miner_busid_10[$i]}"
+		#	local miner_busid[$i]=`echo "obase=16; ${miner_busid_10[$i]}" | bc -l`
+		#done
+		for ((i=0; i < ${#miner_busidRaw[@]}; i++)); do #dec -> hex
+			miner_busid[$i]=`printf "%x" ${miner_busidRaw[$i]} | tr '[:upper:]' '[:lower:]'`
+			[[ `echo ${#miner_busid[$i]}` -eq 1 ]] && miner_busid[$i]="0${miner_busid[$i]}"
+		done	
 		#for ((i=0; i < ${#miner_share[@]}; i++)); do
 		#	miner_badshare[$i]=$(echo "${miner_submitted[$i]} - ${miner_share[$i]}" | bc -l)
 		#done

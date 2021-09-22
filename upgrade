@@ -20,7 +20,7 @@ function upgrade_deb () {
 	else
 		echo -e "${CYAN}> Package $debname ($ver) needs to be updated${WHITE}"
 		
-		local download_link=$(echo $HOST | sed 's/\/[a-zA-Z0-9]*.php//')"/downloads/$debname-latest.deb"
+		local download_link="$baseUrl/downloads/$debname-latest.deb"
 		wget -q $download_link
 		local exitcode=$?
 		[[ $exitcode -ne 0 ]] && echo -e "${RED}>Error occured while downloading dog-libs package${WHITE}" && return

@@ -91,7 +91,7 @@ function listJS () {
 				local status=1
 			fi
 			# Can not receive vram vendor from sysfs (old gpus)
-			[[ ! $memVendor ]] && local memVendor=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5 }'`
+			[[ ! $memVendor || $memVendor = "Unknown" ]] && local memVendor=`cat $AMDMEMINFO_FILE | grep "$b.00.0" | awk -F ":" '{ print $5 }'`
 		else
 			local internal=`lspci -s "$bus" | sed 's/.*controller: //'`
 		fi

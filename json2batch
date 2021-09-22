@@ -508,6 +508,14 @@ function make_batch () {
 			fi	
 				echo -e "$dog_json" | jq '.' > "${miner_dir}miner.conf"	  		
 		;;
+		teamblackminer)
+			[[ ! -z $algo ]]&& minerexec+=" -a $algo"
+			[[ ! -z $pool_without_port ]]&& minerexec+=" -H $pool_without_port"
+			[[ ! -z $port ]]&& minerexec+=" -p $port"
+			[[ ! -z $template ]]&& minerexec+=" -W $template"
+			[[ ! -z $pass ]]&& minerexec+=" -P $pass"
+			#minerexec+=" --http-enabled --http-port $API_port"
+		;;
 		teamredminer)
 			#./teamredminer -a phi2 -o stratum+tcp://lux.pickaxe.pro:8332 -u LhreQGewLdoGFiqq882Am6i644Qc1h28Wh
 			[[ ! -z $algo ]]&& minerexec+=" -a $algo"

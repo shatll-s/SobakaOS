@@ -1,0 +1,149 @@
+#!/bin/bash
+# Teleconsole control script
+
+MAX_TELEC_IDLE=3600
+logfile=/dog/log/teleconsole.log
+. /dog/colors
+
+if [[ ! -e /usr/local/bin/teleconsole && ! -e /dog/sbin/teleconsole ]]; then
+	echo -e "${CYAN}> Installing Teleconsole${WHITE}"
+	curl https://www.teleconsole.com/get.sh | sh
+fi
+
+findID () {
+	for i in {1..60}; do # wait console init
+		#^MYour Teleconsole ID: eu08471d936ca72040a12dd95ea6823fcd6a299158^[[0m^M
+		buf=`cat $logfile | grep -m1 "Your Teleconsole ID: "`
+		if [[ ! -z $buf ]]; then
+			buf=`sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g" <<< "$buf"` #sed removes colors
+			sessid=`awk '{print $NF}' <<< "$buf"`
+			[[ -z $sessid ]] && continue #just in case
+
+			link=`cat $logfile | grep -m1 "WebUI for this session:" | awk '{print $NF}'`
+			echo -e "${CYAN}TELECONSOLE${WHITE} ${GREEN}$sessid${WHITE}"
+			echo -e "Link: <a href='$link'>$link</a>"
+
+			cat $logfile
+
+			return 0
+		fi
+
+		sleep 0.5
+	done
+}
+
+start () {
+	screen -ls teleconsole | grep -q teleconsole && running=1 || running=0
+
+	[[ $running -eq 1 ]] &&
+		echo -e "${YELLOW}Teleconsole session already running${WHITE}" &&
+		#Add teleconsole ID here
+
+		
+		exit 1
+
+	[[ -e $logfile ]] && rm $logfile
+
+	screen -dm -c /dog/service/screenrc.teleconsole
+	sleep 0.2
+
+	for i in {1..60}; do # wait console init
+		#^MYour Teleconsole ID: ^[[1meu97a28a596ce613ee679c714437899da9ae326e21^[[0m^M
+		buf=`cat $logfile | grep -m1 "Your Teleconsole ID: "`
+		if [[ ! -z $buf ]]; then
+			buf=$(sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g" <<< "$buf") #sed removes colors
+			sessid=$(awk '{print $NF}' <<< "$buf")
+			[[ -z $sessid ]] && continue #just in case
+
+			echo -e "${CYAN}TELECONSOLE${WHITE} ${GREEN}$sessid${WHITE}"
+			echo ""
+
+			cat $logfile
+
+			exit 0
+		fi
+
+		sleep 0.5
+	done
+
+	cat $logfile
+	echo -e "${YELLOW}Unable to start Teleconsole session${WHITE}"
+
+	cat $logfile | grep -q 'Please upgrade to the latest version'
+
+	if [[ $? -eq 0 ]]; then
+		echo ""
+		echo -e "${GREEN}> Trying to upgrade Teleconsole client${WHITE}"
+		curl https://www.teleconsole.com/get.sh | sh
+		if [[ $? -ne 0 ]]; then
+			echo "${YELLOW}Failed to upgrade${WHITE}"
+			exit 1
+		fi
+
+		telec start
+		return $?
+	fi
+
+	return 1
+}
+
+stop () {
+	screen -S teleconsole -X quit
+	[[ $? -eq 0 ]] &&
+		echo -e "${YELLOW}Teleconsole session closed${WHITE}"
+}
+
+open () {
+	screen -r -S teleconsole
+}
+
+killidle () {
+	echo "Watching for teleconsole idle"
+	sleep 5
+
+	while true; do
+		sleep 60
+
+		mtime=`stat -c %Y $logfile`
+
+		now=`date +%s`
+		elapsed=$(($now - $mtime))
+		echo "idle for $elapsed seconds"
+
+		if [[ $elapsed -ge $MAX_TELEC_IDLE ]]; then
+			echo -e "${YELLOW}Stopping teleconsole, idle more than $MAX_TELEC_IDLE seconds"
+			stop
+			exit 0
+		fi
+	done
+}
+
+case $1 in
+	start)
+		start
+	;;
+	stop)
+		stop
+	;;
+	restart)
+		stop
+		start
+	;;
+	open)
+		open
+	;;
+	killidle)
+		killidle
+	;;
+	log)
+		cat $logfile
+	;;
+	*)
+		screen -ls teleconsole | grep -q teleconsole && running=1 || running=0
+
+		[[ $running -eq 1 ]] && echo -e "${GREEN}Teleconsole session running${WHITE}" ||
+			echo -e "${YELLOW}Teleconsole session is not running${WHITE}"
+
+		echo -e "Usage: ${CYAN}telec start|stop|log|open${WHITE}"
+	;;
+esac

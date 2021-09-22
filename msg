@@ -56,10 +56,17 @@ fi
 
 #echo "$request" | jq '.' #no need, just visualisation
 
+if [[ $HOST == 'https://os.dog/message.php' ]]; then # old API
+	url="${HOST}?id=${RIG_ID}&method=message"
+else
+	url="$HOST/$RIG_ID/message"
+fi
+echo -e "${GREEN}> Trying to say \"hello\" to server side $url${WHITE}"
+
 #get server answer
 response=$(echo "$request" | curl -s --data @- \
 	--connect-timeout 7 --max-time 15 \
-	"${HOST}?id=$RIG_ID&method=message"  -H "Content-Type: application/json")
+	"$url"  -H "Content-Type: application/json")
 
 echo -n $(date --rfc-3339=seconds)" Message ($title) sent"
 echo " [answer: $response]" #server answer (commands usually):
